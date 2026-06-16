@@ -27,3 +27,14 @@
 
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
+
+/* ── Conteúdo HTML do contrato de expositor ─────────────────────────────── */
+.contrato-content { color: #374151; font-size: 0.875rem; line-height: 1.75; }
+.contrato-content h2 { font-size: 1rem; font-weight: 700; color: #3D3000; margin: 1.25rem 0 0.5rem; }
+.contrato-content h3 { font-size: 0.9375rem; font-weight: 700; color: #5C4500; margin: 1.25rem 0 0.5rem; }
+.contrato-content p  { margin-bottom: 0.75rem; }
+.contrato-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+.contrato-content li { margin-bottom: 0.25rem; }
+.contrato-content hr { border: none; border-top: 1px solid #e5e7eb; margin: 1rem 0; }
+.contrato-content strong { font-weight: 700; color: #3D3000; }
+.contrato-content em { font-style: italic; }

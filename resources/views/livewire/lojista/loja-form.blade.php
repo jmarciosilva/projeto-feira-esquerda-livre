@@ -46,6 +46,21 @@
             </div>
         </div>
 
+        {{-- Eixos de Atuação --}}
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 class="font-semibold text-gray-900 mb-1">Eixos de Atuação</h3>
+            <p class="text-sm text-gray-500 mb-4">Em quais pilares da feira sua loja atua. Você pode marcar mais de um.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                @foreach(\App\Enums\ItemType::cases() as $type)
+                <label class="flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all"
+                       style="border-color: {{ in_array($type->value, $eixos) ? '#E8A000' : '#e5e7eb' }}; background: {{ in_array($type->value, $eixos) ? '#FFFBEB' : '#fff' }};">
+                    <input type="checkbox" wire:model="eixos" value="{{ $type->value }}" class="w-4 h-4 text-[#E8A000] rounded border-gray-300">
+                    <span class="text-sm font-semibold" style="color:#3D3000;">{{ $type->emoji() }} {{ $type->label() }}</span>
+                </label>
+                @endforeach
+            </div>
+        </div>
+
         {{-- Imagens --}}
         <div class="bg-white rounded-xl border border-gray-200 p-6">
             <h3 class="font-semibold text-gray-900 mb-4">Imagens</h3>

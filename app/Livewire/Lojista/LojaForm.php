@@ -25,6 +25,7 @@ class LojaForm extends Component
     public ?string $image_path    = null;
     public $logo_upload           = null;
     public $banner_upload         = null;
+    public array   $eixos         = [];
 
     // Dados bancários
     public string $banco_nome       = '';
@@ -71,6 +72,7 @@ class LojaForm extends Component
             $this->slug          = $expositor->slug ?? '';
             $this->logo_path        = $expositor->logo_path;
             $this->image_path       = $expositor->image_path;
+            $this->eixos            = $expositor->eixos ?? [];
             $this->banco_nome       = $expositor->banco_nome       ?? '';
             $this->banco_agencia    = $expositor->banco_agencia    ?? '';
             $this->banco_conta      = $expositor->banco_conta      ?? '';
@@ -119,6 +121,7 @@ class LojaForm extends Component
             'website_url'      => $this->website_url,
             'city'             => $this->city,
             'state'            => strtoupper($this->state),
+            'eixos'            => $this->eixos,
             'banco_nome'       => $this->banco_nome       ?: null,
             'banco_agencia'    => $this->banco_agencia    ?: null,
             'banco_conta'      => $this->banco_conta      ?: null,

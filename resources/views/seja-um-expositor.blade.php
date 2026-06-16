@@ -136,10 +136,10 @@
                     {{-- Corpo do contrato (scrollável) --}}
                     <div class="relative">
                         <div id="contract-body"
-                             class="px-7 py-6 overflow-y-auto text-sm leading-7"
-                             style="max-height:300px; color:#374151; font-family:'Georgia',serif; scroll-behavior:smooth;"
+                             class="px-7 py-6 overflow-y-auto contrato-content"
+                             style="max-height:360px; scroll-behavior:smooth;"
                              @scroll="checkScroll($event)">
-                            {!! nl2br(e($contrato)) !!}
+                            {!! $contrato !!}
                         </div>
                         {{-- Gradiente "rolar para ver mais" --}}
                         <div x-show="!scrolledToBottom"

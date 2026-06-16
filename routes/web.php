@@ -4,6 +4,8 @@ use App\Enums\ItemType;
 use App\Enums\MenuLocation;
 use App\Livewire\Admin\Banners\BannerForm;
 use App\Livewire\Admin\Banners\BannerIndex;
+use App\Livewire\Admin\Categorias\CategoriaForm;
+use App\Livewire\Admin\Categorias\CategoriaIndex;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\Events\EventForm;
 use App\Livewire\Admin\Events\EventIndex;
@@ -255,6 +257,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/expositores', ExpositoresIndex::class)->name('expositores.index');
     Route::get('/expositores/{expositor}/edit', ExpositoresForm::class)->name('expositores.edit');
+
+    Route::get('/categorias', CategoriaIndex::class)->name('categorias.index');
+    Route::get('/categorias/create', CategoriaForm::class)->name('categorias.create');
+    Route::get('/categorias/{categoria}/edit', CategoriaForm::class)->name('categorias.edit');
 
     // Lojistas
     Route::get('/lojistas/solicitacoes', SolicitacaoIndex::class)->name('lojistas.solicitacoes');

@@ -174,6 +174,18 @@
             {{-- ============================================================ --}}
             <div class="space-y-6">
 
+                <x-admin.card title="Eixos de Atuação">
+                    <p class="text-xs text-gray-500 mb-3">Em quais pilares este expositor atua. Apenas informativo — não restringe os tipos de produto cadastrados.</p>
+                    <div class="space-y-2">
+                        @foreach(\App\Enums\ItemType::cases() as $type)
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" wire:model="eixos" value="{{ $type->value }}" class="w-4 h-4 text-[#52b788] rounded border-gray-300">
+                            <span class="text-sm font-medium text-gray-700">{{ $type->emoji() }} {{ $type->label() }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                </x-admin.card>
+
                 <x-admin.card title="Destaque e Ordenação">
                     <div class="space-y-4">
                         <label class="flex items-center gap-3 cursor-pointer">

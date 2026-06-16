@@ -20,6 +20,7 @@ class ExpositoresForm extends Component
     public int     $sort_order  = 0;
     public ?string $image_path  = null;
     public $image_upload        = null;
+    public array   $eixos       = [];
 
     // Dados bancários
     public string $banco_nome       = '';
@@ -52,6 +53,7 @@ class ExpositoresForm extends Component
         $this->is_active        = $expositor->is_active;
         $this->sort_order       = $expositor->sort_order ?? 0;
         $this->image_path       = $expositor->image_path;
+        $this->eixos            = $expositor->eixos ?? [];
         $this->banco_nome       = $expositor->banco_nome       ?? '';
         $this->banco_agencia    = $expositor->banco_agencia    ?? '';
         $this->banco_conta      = $expositor->banco_conta      ?? '';
@@ -88,6 +90,7 @@ class ExpositoresForm extends Component
             'is_featured'      => $this->is_featured,
             'is_active'        => $this->is_active,
             'sort_order'       => $this->sort_order,
+            'eixos'            => $this->eixos,
             'banco_nome'       => $this->banco_nome       ?: null,
             'banco_agencia'    => $this->banco_agencia    ?: null,
             'banco_conta'      => $this->banco_conta      ?: null,

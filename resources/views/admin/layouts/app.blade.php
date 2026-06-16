@@ -77,6 +77,10 @@
                 Expositores
             </x-admin.nav-item>
 
+            <x-admin.nav-item href="{{ route('admin.categorias.index') }}" icon="tag" :active="request()->routeIs('admin.categorias.*')">
+                Categorias
+            </x-admin.nav-item>
+
             <div class="pt-4 pb-1 px-3">
                 <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Lojistas</p>
             </div>
