@@ -19,6 +19,9 @@ class DatabaseSeeder extends Seeder
             ProductSeeder::class,
             PostSeeder::class,
             LojistaSeeder::class,
+            ExpositorUserSeeder::class,
+            ServicoSeeder::class,
+            CuidadoSeeder::class,
         ]);
     }
 }

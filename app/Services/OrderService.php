@@ -1,0 +1,80 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\OrderSplit;
+use App\Models\SiteSetting;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+class OrderService
+{
+    /**
+     * Cria um pedido a partir do carrinho atual, com frete e pagamento manuais (MVP da Fase 4).
+     *
+     * @param array<string, mixed> $customerData
+     */
+    public function createFromCart(array $customerData, CartService $cart): Order
+    {
+        $items = $cart->items();
+
+        if ($items->isEmpty()) {
+            throw new \RuntimeException('O carrinho está vazio.');
+        }
+
+        $settings   = SiteSetting::instance();
+        $commission = (float) ($settings->comissao_percentual ?? 0);
+        $itemsTotal = $cart->total();
+
+        $deliveryType = $customerData['delivery_type'] ?? 'entrega';
+        $shippingNote = $deliveryType === 'retirada'
+            ? 'Retirada combinada diretamente com o(s) lojista(s) via WhatsApp.'
+            : ($settings->frete_mensagem_manual ?: 'Frete a combinar diretamente com o(s) lojista(s) via WhatsApp.');
+
+        return DB::transaction(function () use ($customerData, $items, $itemsTotal, $cart, $shippingNote, $commission) {
+            $order = Order::create([
+                ...$customerData,
+                'user_id'        => Auth::id(),
+                'session_id'     => $items->first()->session_id,
+                'items_total'    => $itemsTotal,
+                'shipping_total' => 0,
+                'shipping_note'  => $shippingNote,
+                'total_amount'   => $itemsTotal,
+                'status'         => 'aguardando_pagamento',
+            ]);
+
+            foreach ($items as $item) {
+                OrderItem::create([
+                    'order_id'     => $order->id,
+                    'product_id'   => $item->product_id,
+                    'expositor_id' => $item->expositor_id,
+                    'product_name' => $item->product?->name ?? 'Item removido',
+                    'unit_price'   => $item->price_snapshot,
+                    'quantity'     => $item->quantity,
+                    'total_price'  => $item->subtotal(),
+                ]);
+            }
+
+            foreach ($items->groupBy('expositor_id') as $expositorId => $storeItems) {
+                $gross      = $storeItems->sum(fn ($item) => $item->subtotal());
+                $commissionAmount = round($gross * ($commission / 100), 2);
+
+                OrderSplit::create([
+                    'order_id'            => $order->id,
+                    'expositor_id'        => $expositorId,
+                    'gross_amount'        => $gross,
+                    'commission_percent'  => $commission,
+                    'commission_amount'   => $commissionAmount,
+                    'net_amount'          => $gross - $commissionAmount,
+                    'status'              => 'pendente',
+                ]);
+            }
+
+            $cart->clear();
+
+            return $order->load(['items', 'splits.expositor']);
+        });
+    }
+}

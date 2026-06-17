@@ -36,14 +36,37 @@ class SiteSetting extends Model
         'mail_encryption',
         'mail_from_address',
         'mail_from_name',
+        'frete_modo',
+        'frete_mensagem_manual',
+        'frete_valor_padrao',
+        'melhor_envio_ativo',
+        'melhor_envio_client_id',
+        'melhor_envio_client_secret',
+        'melhor_envio_token',
+        'melhor_envio_sandbox',
+        'pagamento_modo',
+        'comissao_percentual',
+        'mercado_pago_ativo',
+        'mercado_pago_public_key',
+        'mercado_pago_access_token',
+        'mercado_pago_sandbox',
     ];
 
     protected function casts(): array
     {
         return [
-            'maintenance_mode' => 'boolean',
-            'mail_port'        => 'integer',
-            'mail_password'    => 'encrypted',
+            'maintenance_mode'           => 'boolean',
+            'mail_port'                  => 'integer',
+            'mail_password'              => 'encrypted',
+            'frete_valor_padrao'         => 'decimal:2',
+            'melhor_envio_ativo'         => 'boolean',
+            'melhor_envio_client_secret' => 'encrypted',
+            'melhor_envio_token'         => 'encrypted',
+            'melhor_envio_sandbox'       => 'boolean',
+            'comissao_percentual'        => 'decimal:2',
+            'mercado_pago_ativo'         => 'boolean',
+            'mercado_pago_access_token'  => 'encrypted',
+            'mercado_pago_sandbox'       => 'boolean',
         ];
     }
 

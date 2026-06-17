@@ -80,6 +80,15 @@
                 Meus Produtos
             </a>
 
+            <a href="{{ route('lojista.pedidos.index') }}"
+               class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('lojista.pedidos.*') ? 'text-[#3D3000] font-semibold' : 'text-[#D4B800] hover:text-white hover:bg-[#5C4500]' }}"
+               style="{{ request()->routeIs('lojista.pedidos.*') ? 'background:#F4E294;' : '' }}">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                </svg>
+                Meus Pedidos
+            </a>
+
             <a href="{{ route('agenda.index') }}"
                class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#D4B800] hover:text-white hover:bg-[#5C4500] transition-colors">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -174,29 +174,24 @@
             {{-- Botão WhatsApp desktop + hambúrguer mobile --}}
             <div class="flex items-center gap-3">
                 @auth
-                    @if(auth()->user()->role === \App\Enums\UserRole::Admin)
-                        <a href="{{ route('admin.dashboard') }}"
-                           class="hidden md:inline-flex items-center gap-2 text-sm font-semibold transition-colors"
-                           style="color: #3D3000;"
-                           onmouseover="this.style.color='#000'"
-                           onmouseout="this.style.color='#3D3000'">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                            </svg>
-                            Painel Admin
-                        </a>
-                    @else
-                        <a href="{{ route('lojista.dashboard') }}"
-                           class="hidden md:inline-flex items-center gap-2 text-sm font-semibold transition-colors"
-                           style="color: #3D3000;"
-                           onmouseover="this.style.color='#000'"
-                           onmouseout="this.style.color='#3D3000'">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                            </svg>
-                            Minha Loja
-                        </a>
-                    @endif
+                @php
+                    $wUser = auth()->user();
+                    [$wPanelUrl, $wPanelLabel] = match(true) {
+                        $wUser->isAdmin() || $wUser->isEditor() => [route('admin.dashboard'),         'Painel Admin'],
+                        $wUser->isLojista()                     => [route('lojista.dashboard'),        'Minha Loja'],
+                        default                                 => [route('cliente.pedidos.index'),    'Minha Conta'],
+                    };
+                @endphp
+                    <a href="{{ $wPanelUrl }}"
+                       class="hidden md:inline-flex items-center gap-2 text-sm font-semibold transition-colors"
+                       style="color: #3D3000;"
+                       onmouseover="this.style.color='#000'"
+                       onmouseout="this.style.color='#3D3000'">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                        {{ $wPanelLabel }}
+                    </a>
                 @else
                     <a href="{{ route('login') }}"
                        class="hidden md:inline-flex items-center gap-2 text-sm font-semibold transition-colors"
@@ -206,7 +201,7 @@
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                         </svg>
-                        Área do Lojista
+                        Entrar
                     </a>
                 @endauth
                 <div class="hidden md:block">
@@ -287,29 +282,16 @@
         @endif
 
         @auth
-            @if(auth()->user()->role === \App\Enums\UserRole::Admin)
-                <a href="{{ route('admin.dashboard') }}"
-                   class="flex items-center gap-3 px-6 py-4 text-base font-semibold border-b transition-colors"
-                   style="color: #3D3000; border-color: #F4E294;"
-                   onmouseover="this.style.backgroundColor='#F4E294'"
-                   onmouseout="this.style.backgroundColor=''">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                    </svg>
-                    Painel Admin
-                </a>
-            @else
-                <a href="{{ route('lojista.dashboard') }}"
-                   class="flex items-center gap-3 px-6 py-4 text-base font-semibold border-b transition-colors"
-                   style="color: #3D3000; border-color: #F4E294;"
-                   onmouseover="this.style.backgroundColor='#F4E294'"
-                   onmouseout="this.style.backgroundColor=''">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                    </svg>
-                    Minha Loja
-                </a>
-            @endif
+            <a href="{{ $wPanelUrl }}"
+               class="flex items-center gap-3 px-6 py-4 text-base font-semibold border-b transition-colors"
+               style="color: #3D3000; border-color: #F4E294;"
+               onmouseover="this.style.backgroundColor='#F4E294'"
+               onmouseout="this.style.backgroundColor=''">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                {{ $wPanelLabel }}
+            </a>
         @else
             <a href="{{ route('login') }}"
                class="flex items-center gap-3 px-6 py-4 text-base font-semibold border-b transition-colors"
@@ -319,7 +301,7 @@
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                 </svg>
-                Área do Lojista
+                Entrar
             </a>
         @endauth
         <div class="px-6 py-4 border-b" style="border-color: #F4E294;">
@@ -773,10 +755,234 @@
                     @endif
                 @endforeach
             </div>
+            <div class="text-center mt-8">
+                <a href="{{ route('catalogo.produto') }}" class="btn-outline px-8 py-3">
+                    Ver todos os Produtos →
+                </a>
+            </div>
         @else
             <div class="text-center py-16">
                 <div class="text-6xl mb-4">🛍</div>
                 <p class="text-xl font-semibold" style="color: #7A5C00;">Produtos chegando em breve!</p>
+            </div>
+        @endif
+
+    </div>
+</section>
+
+{{-- ====================== SEÇÃO 5b: SERVIÇOS ====================== --}}
+<section id="servicos" class="py-16 md:py-24 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        <div class="text-center mb-10">
+            <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
+            <h2 class="section-title">🎯 Serviços em Destaque</h2>
+            <p class="section-subtitle">Design, aulas e consultorias de quem trabalha com propósito</p>
+        </div>
+
+        @if($featuredServicos->isNotEmpty())
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                @foreach($featuredServicos as $item)
+                    @if($item->expositor)
+                    <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug]) }}"
+                       class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col"
+                       style="border-color: #F0D060;">
+                    @else
+                    <article class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col"
+                             style="border-color: #F0D060;">
+                    @endif
+
+                        {{-- Cabeçalho colorido com emoji --}}
+                        <div class="h-36 overflow-hidden">
+                            @if($item->image_path)
+                                <img src="{{ Storage::url($item->image_path) }}"
+                                     alt="{{ $item->name }}"
+                                     class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                                     loading="lazy">
+                            @else
+                                <div class="w-full h-full flex flex-col items-center justify-center gap-1"
+                                     style="background: linear-gradient(135deg, #E8F4EA 0%, #B8DDB9 100%);">
+                                    <span class="text-4xl">🎯</span>
+                                    <span class="text-xs font-semibold" style="color: #2D6A30;">Serviço</span>
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="p-4 flex flex-col flex-1">
+                            {{-- Badges: modalidade --}}
+                            @if($item->modality)
+                            <div class="flex items-center gap-1.5 mb-2 flex-wrap">
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                      style="background-color: #E8F4EA; color: #2D6A30;">
+                                    {{ $item->modality instanceof \App\Enums\Modality ? $item->modality->label() : $item->modality }}
+                                </span>
+                                @if($item->duration_min)
+                                <span class="text-xs font-medium px-2 py-0.5 rounded-full"
+                                      style="background-color: #FDF8DC; color: #7A5C00;">
+                                    ⏱ {{ $item->duration_min >= 60 ? floor($item->duration_min/60).'h'.($item->duration_min%60 ? ($item->duration_min%60).'min' : '') : $item->duration_min.'min' }}
+                                </span>
+                                @endif
+                            </div>
+                            @endif
+
+                            <h3 class="text-sm sm:text-base font-bold leading-snug mb-1 flex-1" style="color: #1A1A1A;">
+                                {{ $item->name }}
+                            </h3>
+
+                            {{-- Preço com contexto --}}
+                            <div class="my-2">
+                                @if($item->price_type?->value === 'sob_consulta' || (! $item->price && $item->price_type?->value !== 'fixo'))
+                                    <p class="text-sm font-bold" style="color: #5C8A3C;">A combinar</p>
+                                @elseif($item->price)
+                                    <p class="text-base font-black" style="color: #C47A00;">
+                                        R$ {{ number_format($item->price, 2, ',', '.') }}
+                                        @if($item->price_type?->value === 'por_hora')
+                                            <span class="text-xs font-normal text-gray-500">/hora</span>
+                                        @elseif($item->price_type?->value === 'por_sessao')
+                                            <span class="text-xs font-normal text-gray-500">/sessão</span>
+                                        @endif
+                                    </p>
+                                @endif
+                            </div>
+
+                            @if($item->expositor)
+                                <p class="text-xs text-gray-500 mb-3 flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                    </svg>
+                                    {{ $item->expositor->name }}
+                                </p>
+                            @endif
+                            <span class="btn-primary text-xs py-2 px-3 text-center w-full" style="min-height: 36px; font-size: 0.8125rem;">
+                                Ver Serviço
+                            </span>
+                        </div>
+
+                    @if($item->expositor)
+                    </a>
+                    @else
+                    </article>
+                    @endif
+                @endforeach
+            </div>
+
+            <div class="text-center mt-8">
+                <a href="{{ route('catalogo.servico') }}" class="btn-outline px-8 py-3">
+                    Ver todos os Serviços →
+                </a>
+            </div>
+        @else
+            <div class="text-center py-16">
+                <div class="text-6xl mb-4">🎯</div>
+                <p class="text-xl font-semibold" style="color: #7A5C00;">Serviços chegando em breve!</p>
+            </div>
+        @endif
+
+    </div>
+</section>
+
+{{-- ====================== SEÇÃO 5c: CUIDADO & BEM VIVER ====================== --}}
+<section id="cuidado" class="py-16 md:py-24" style="background-color: #FDF8DC;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        <div class="text-center mb-10">
+            <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
+            <h2 class="section-title">🌿 Cuidado & Bem Viver</h2>
+            <p class="section-subtitle">Massagens, terapias e práticas integrativas para corpo e mente</p>
+        </div>
+
+        @if($featuredCuidados->isNotEmpty())
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                @foreach($featuredCuidados as $item)
+                    @if($item->expositor)
+                    <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug]) }}"
+                       class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col"
+                       style="border-color: #F0D060;">
+                    @else
+                    <article class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col"
+                             style="border-color: #F0D060;">
+                    @endif
+
+                        <div class="h-36 overflow-hidden">
+                            @if($item->image_path)
+                                <img src="{{ Storage::url($item->image_path) }}"
+                                     alt="{{ $item->name }}"
+                                     class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                                     loading="lazy">
+                            @else
+                                <div class="w-full h-full flex flex-col items-center justify-center gap-1"
+                                     style="background: linear-gradient(135deg, #EAF4E8 0%, #B8D9B5 100%);">
+                                    <span class="text-4xl">🌿</span>
+                                    <span class="text-xs font-semibold" style="color: #2D6A2A;">Cuidado & Bem Viver</span>
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="p-4 flex flex-col flex-1">
+                            @if($item->modality)
+                            <div class="flex items-center gap-1.5 mb-2 flex-wrap">
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                      style="background-color: #EAF4E8; color: #2D6A2A;">
+                                    {{ $item->modality instanceof \App\Enums\Modality ? $item->modality->label() : $item->modality }}
+                                </span>
+                                @if($item->duration_min)
+                                <span class="text-xs font-medium px-2 py-0.5 rounded-full"
+                                      style="background-color: #FDF8DC; color: #7A5C00;">
+                                    ⏱ {{ $item->duration_min >= 60 ? floor($item->duration_min/60).'h'.($item->duration_min%60 ? ($item->duration_min%60).'min' : '') : $item->duration_min.'min' }}
+                                </span>
+                                @endif
+                            </div>
+                            @endif
+
+                            <h3 class="text-sm sm:text-base font-bold leading-snug mb-1 flex-1" style="color: #1A1A1A;">
+                                {{ $item->name }}
+                            </h3>
+
+                            <div class="my-2">
+                                @if($item->price_type?->value === 'sob_consulta' || (! $item->price && $item->price_type?->value !== 'fixo'))
+                                    <p class="text-sm font-bold" style="color: #5C8A3C;">A combinar</p>
+                                @elseif($item->price)
+                                    <p class="text-base font-black" style="color: #C47A00;">
+                                        R$ {{ number_format($item->price, 2, ',', '.') }}
+                                        @if($item->price_type?->value === 'por_hora')
+                                            <span class="text-xs font-normal text-gray-500">/hora</span>
+                                        @elseif($item->price_type?->value === 'por_sessao')
+                                            <span class="text-xs font-normal text-gray-500">/sessão</span>
+                                        @endif
+                                    </p>
+                                @endif
+                            </div>
+
+                            @if($item->expositor)
+                                <p class="text-xs text-gray-500 mb-3 flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                    </svg>
+                                    {{ $item->expositor->name }}
+                                </p>
+                            @endif
+                            <span class="btn-primary text-xs py-2 px-3 text-center w-full" style="min-height: 36px; font-size: 0.8125rem;">
+                                Ver Detalhes
+                            </span>
+                        </div>
+
+                    @if($item->expositor)
+                    </a>
+                    @else
+                    </article>
+                    @endif
+                @endforeach
+            </div>
+
+            <div class="text-center mt-8">
+                <a href="{{ route('catalogo.cuidado') }}" class="btn-outline px-8 py-3">
+                    Ver todo Cuidado & Bem Viver →
+                </a>
+            </div>
+        @else
+            <div class="text-center py-16">
+                <div class="text-6xl mb-4">🌿</div>
+                <p class="text-xl font-semibold" style="color: #7A5C00;">Práticas de cuidado chegando em breve!</p>
             </div>
         @endif
 

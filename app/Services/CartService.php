@@ -84,4 +84,16 @@ class CartService
     {
         return $this->items()->groupBy('expositor_id');
     }
+
+    /**
+     * Reatribui o carrinho de uma sessão antiga (convidado) para a nova sessão + usuário,
+     * necessário porque o login/cadastro regenera o ID de sessão por segurança.
+     */
+    public function reassignSession(string $oldSessionId, int $userId): void
+    {
+        CartItem::where('session_id', $oldSessionId)->update([
+            'session_id' => $this->sessionId(),
+            'user_id'    => $userId,
+        ]);
+    }
 }

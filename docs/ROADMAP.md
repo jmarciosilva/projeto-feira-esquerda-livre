@@ -1,8 +1,8 @@
 # 🗺️ Roadmap de Desenvolvimento — Feira Esquerda Livre
 
 **Documento de Planejamento Estratégico**
-**Versão:** 1.2 — Junho de 2026
-**Status geral do projeto:** Fase 3 em andamento — três eixos do marketplace implementados
+**Versão:** 1.4 — Junho de 2026
+**Status geral do projeto:** Fase 4 concluída em modo MVP manual — checkout, frete e pagamento funcionam sem integrações externas, prontos para demonstração ao Gerente de Produto e ao cliente; ativação do Melhor Envio e do Mercado Pago fica para uma fase técnica futura
 
 ---
 
@@ -15,11 +15,11 @@
 [FASE 2 ✅ CONCLUÍDA]
   Lojistas & Agenda
            ↓
-[FASE 3 🔄 EM ANDAMENTO]
+[FASE 3 ✅ CONCLUÍDA]
   Catálogo & Três Eixos
            ↓
-[FASE 4 ⏳ Semanas 10–13]
-  Checkout & Pagamentos
+[FASE 4 ✅ MVP MANUAL CONCLUÍDO]
+  Checkout & Pagamentos (sem integrações externas ainda)
            ↓
 [FASE 5 ⏳ Semanas 14–17]
   Comunidade & Engajamento
@@ -178,12 +178,12 @@ event_expositores (nova — pivot)
 
 ---
 
-## 🔄 Fase 3 — Catálogo de Produtos e Loja Pública (Em andamento)
+## ✅ Fase 3 — Catálogo de Produtos e Loja Pública (Concluída)
 
 **Período:** Semanas 7 a 9
 **Objetivo estratégico:** Transformar o marketplace em utilidade real — produtos cadastráveis pelos lojistas e navegáveis pelo público com fluidez nos três eixos.
 
-### O que foi entregue até agora
+### O que foi entregue
 
 | Componente | Status |
 |---|---|
@@ -200,10 +200,16 @@ event_expositores (nova — pivot)
 | Rotas públicas `/produtos`, `/servicos` e `/cuidados` com paginação e filtros | ✅ Concluído |
 | Scope `Product::scopeDoEixo()` e métodos `isProduto()` / `isServico()` / `isCuidado()` | ✅ Concluído |
 | View `catalogo.index` compartilhada pelos três eixos | ✅ Concluído |
+| CRUD de Produtos do lojista (`ProdutoIndex`/`ProdutoForm`) com upload e compressão via `intervention/image` | ✅ Concluído |
+| Toggle ativo/inativo na listagem de produtos do lojista | ✅ Concluído |
+| Loja pública `/loja/{slug}` e página de produto `/loja/{slug}/{produto-slug}` | ✅ Concluído |
+| Carrinho multilojas (`CartDrawer` + `CartService`) com agrupamento por loja | ✅ Concluído |
+| CRUD de Categorias no admin (`/admin/categorias`), vinculadas a um eixo | ✅ Concluído |
+| Ordenação drag-and-drop dos produtos do lojista (Livewire + SortableJS) | ❌ Não entregue — adiado, `sort_order` é só um campo numérico manual |
 
 ---
 
-### Módulo 3.1 — CRUD de Produtos (Área do Lojista)
+### Módulo 3.1 — CRUD de Produtos (Área do Lojista) — ✅ Concluído (com 1 ressalva)
 
 **Objetivo:** Permitir que o lojista gerencie seu catálogo de forma autônoma.
 
@@ -233,7 +239,7 @@ event_expositores (nova — pivot)
 **3.1.2 — Listagem de Produtos do Lojista**
 - Tabela com miniatura, nome, preço e status (ativo/inativo)
 - Toggle rápido de ativo/inativo na listagem (sem abrir formulário)
-- Ordenação drag-and-drop para definir ordem de exibição (Livewire + SortableJS)
+- Ordenação drag-and-drop para definir ordem de exibição (Livewire + SortableJS) — **pendente**, ver Módulo 3.4
 - Limite sugerido: 50 produtos por lojista na versão inicial
 
 **Tabelas alteradas (já migradas):**
@@ -262,7 +268,7 @@ lojista_solicitacoes (alter)
 
 ---
 
-### Módulo 3.2 — Renderização das Lojas e Produtos (Visão do Cliente)
+### Módulo 3.2 — Renderização das Lojas e Produtos (Visão do Cliente) — ✅ Concluído
 
 **Objetivo:** Criar as páginas públicas das lojas com UX otimizada para o público 40+.
 
@@ -289,7 +295,7 @@ lojista_solicitacoes (alter)
 
 ---
 
-### Módulo 3.3 — Carrinho Multilojas (Livewire)
+### Módulo 3.3 — Carrinho Multilojas (Livewire) — ✅ Concluído
 
 **Objetivo:** Carrinho que agrupa produtos de lojistas diferentes de forma transparente.
 
@@ -319,18 +325,60 @@ cart_items
 
 ---
 
-## 💳 Fase 4 — Checkout, Logística e Split de Pagamento
+### Módulo 3.4 — Pendências técnicas adiadas para depois da Fase 4
 
-**Período estimado:** Semanas 10 a 13
-**Objetivo estratégico:** A fase mais crítica do core do negócio — calcular frete, cobrar e distribuir o dinheiro automaticamente.
+Itens descritos na Fase 3 original que não bloqueiam o checkout e foram conscientemente adiados:
+
+- Ordenação drag-and-drop dos produtos do lojista (Livewire + SortableJS) — hoje `sort_order` é editado manualmente no formulário
+- Persistência do carrinho por 7 dias via cookie assinado para usuários não logados — validar comportamento atual de expiração de sessão
+- Limite de 50 produtos por lojista — ainda não há validação/enforcement no backend
 
 ---
 
-### Módulo 4.1 — Cálculo de Frete (Melhor Envio)
+## ✅ Fase 4 — Checkout, Logística e Split de Pagamento (MVP manual concluído)
+
+**Período:** Semanas 10 a 13
+**Objetivo estratégico:** A fase mais crítica do core do negócio — calcular frete, cobrar e distribuir o dinheiro automaticamente.
+
+**Decisão de produto (16/06/2026):** para validar o fluxo completo de compra com o Gerente de Produto e o cliente o mais rápido possível,
+a Fase 4 foi entregue como um **MVP 100% manual**: sem integração real com Correios/Melhor Envio e sem Mercado Pago.
+O frete é combinado diretamente entre cliente e lojista (WhatsApp) e o pagamento é feito via PIX/dados bancários do
+próprio lojista (já cadastrados no perfil da loja), confirmado manualmente. As **telas de configuração das duas
+integrações já existem no admin** e guardam as credenciais — a ativação automática fica para uma fase técnica futura,
+sem precisar refazer o checkout, o modelo de pedidos ou o split.
+
+### O que foi entregue
+
+| Componente | Status |
+|---|---|
+| Tabelas `orders`, `order_items`, `order_splits` | ✅ Concluído |
+| Campos de frete/pagamento manuais + credenciais futuras em `site_settings` | ✅ Concluído |
+| Enums `OrderStatus` e `OrderSplitStatus` | ✅ Concluído |
+| `OrderService::createFromCart()` — cria pedido, itens e split por loja a partir do carrinho | ✅ Concluído |
+| Checkout público `/checkout` (dados do cliente + endereço, sem login obrigatório) | ✅ Concluído |
+| Página de confirmação `/pedido/{reference}` com instruções de PIX/banco por loja | ✅ Concluído |
+| Admin → `/admin/settings/checkout`: mensagem de frete manual e comissão da plataforma | ✅ Concluído |
+| Admin → campos placeholder para Melhor Envio (client id/secret/token) e Mercado Pago (public key/access token) | ✅ Concluído — salvos, integração inativa |
+| Admin → `/admin/pedidos`: visão geral de todos os pedidos, com atualização de status | ✅ Concluído |
+| Lojista → `/minha-loja/pedidos`: confirmação manual de pagamento recebido por loja | ✅ Concluído |
+| Botão "Finalizar Compra" do carrinho ligado ao checkout | ✅ Concluído |
+| Cálculo automático de comissão (%) para fins de relatório (não retida de fato) | ✅ Concluído |
+| Cotação real de frete (Melhor Envio) | ❌ Adiado — ver Módulo 4.1 |
+| Cobrança e split automático (Mercado Pago) | ❌ Adiado — ver Módulo 4.3 |
+| Login simplificado por link mágico/Google no checkout | ❌ Adiado — checkout aceita convidado com nome/WhatsApp/e-mail |
+
+---
+
+### Módulo 4.1 — Cálculo de Frete (Melhor Envio) — ⏳ Adiado (config pronta)
 
 **Objetivo:** Cotação de frete automatizada por lojista no carrinho.
 
-**Entregas:**
+**Status atual:** o checkout exibe uma mensagem fixa ("frete a combinar com o lojista via WhatsApp"), configurável pelo
+admin em `/admin/settings/checkout`. Os campos de credenciais do Melhor Envio (Client ID, Client Secret, Access Token,
+sandbox) já existem na mesma tela e são persistidos — faltando apenas implementar as chamadas de API quando a
+integração for priorizada.
+
+**Entregas futuras:**
 
 **4.1.1 — Integração com API Melhor Envio**
 - Autenticação OAuth2 (token por lojista, não por plataforma)
@@ -338,13 +386,13 @@ cart_items
 - Cotação chamada no momento em que o cliente informa o CEP de entrega
 - Exibe: transportadora, prazo e preço para cada loja do carrinho
 - Modalidades exibidas: Correios PAC, Sedex, transportadoras privadas (quando disponíveis)
-- Fallback: se a API falhar, exibe "Frete a combinar — fale com o lojista"
+- Fallback: se a API falhar, mantém o texto manual atual
 
 **4.1.2 — Seleção de Frete por Loja**
 - Interface clara: o cliente escolhe a transportadora de cada loja separadamente
 - Resumo final: frete total = soma dos fretes de cada loja
 
-**Tabela nova:**
+**Tabela planejada (ainda não criada):**
 ```
 order_shippings
   - id, order_id, expositor_id, carrier, service_name
@@ -355,75 +403,57 @@ order_shippings
 
 ---
 
-### Módulo 4.2 — Checkout em Etapa Única (One Page Checkout)
+### Módulo 4.2 — Checkout — ✅ Concluído (versão manual)
 
 **Objetivo:** Fluxo de compra mais simples possível para o público 40+.
 
-**Entregas:**
+**O que foi entregue:**
+- Checkout em página única `/checkout`: dados do cliente (nome, WhatsApp, e-mail opcional) + endereço completo
+- Sem exigência de login — aceita convidado (pré-preenche nome/e-mail se já estiver autenticado)
+- Resumo do pedido agrupado por loja, com total geral
+- Mensagem de frete manual configurável pelo admin
+- Ao confirmar, gera `Order` + `OrderItem` + `OrderSplit` (um por loja) e limpa o carrinho
+- Página de confirmação `/pedido/{reference}` com referência pública (não sequencial), endereço de entrega e
+  instruções de pagamento por loja (PIX/banco + link direto para o WhatsApp do lojista)
 
-**4.2.1 — Identificação do Comprador**
-- Três opções de acesso (ordem de prioridade para o público 40+):
-  1. **Link Mágico por WhatsApp** — telefone → recebe link de acesso (sem senha)
-  2. **Google** — OAuth simplificado
-  3. **E-mail + Senha** — tradicional, como alternativa
-
-**4.2.2 — Formulário de Endereço**
-- CEP com preenchimento automático via ViaCEP (API gratuita)
-- Campos: CEP, Rua, Número, Complemento, Bairro, Cidade, Estado
-- Sem campos desnecessários (não pedir CPF aqui — já foi no cadastro)
-- Mapa opcional (mostrar pin apenas, não editar)
-
-**4.2.3 — Resumo e Pagamento**
-- Lista dos itens, subtotal por loja, frete por loja, total final
-- Uma única opção destacada: **PIX**
-  - Gerar QR Code exibido com tamanho grande (mín. 250×250px)
-  - Botão "Copiar Código PIX" de largura total, altura mínima 60px
-  - Countdown de 30 minutos com barra de progresso visual
-  - Verificação automática de pagamento a cada 5 segundos (polling Livewire)
-- Opção secundária (menor destaque): Cartão de crédito (até 12×)
+**Adiado para quando o volume de pedidos justificar:**
+- Login simplificado por link mágico via WhatsApp ou Google (4.2.1 original)
+- Preenchimento automático de endereço via ViaCEP
+- Pagamento via PIX com QR Code gerado automaticamente e verificação por polling — hoje o cliente paga direto na
+  chave PIX do lojista, exibida na página de confirmação
 
 ---
 
-### Módulo 4.3 — Split de Pagamento Mercado Pago
+### Módulo 4.3 — Split de Pagamento Mercado Pago — ⏳ Adiado (config pronta)
 
 **Objetivo:** Cobrar o cliente uma vez e distribuir automaticamente para cada lojista, retendo a comissão da plataforma.
 
-**Entregas:**
+**Status atual:** como o pagamento ainda é manual (cliente paga direto na chave PIX/conta do lojista), não há
+cobrança centralizada para "splitar". O que já existe:
+- Campo de comissão da plataforma (%) configurável em `/admin/settings/checkout`
+- `OrderSplit` calcula e registra `gross_amount`, `commission_amount` e `net_amount` por loja para fins de relatório,
+  mesmo sem retenção real
+- Campos de credenciais do Mercado Pago (Public Key, Access Token, sandbox) já salvos na mesma tela de configuração
+- Confirmação manual do recebimento pelo lojista em `/minha-loja/pedidos` (equivalente ao status "Pago" do fluxo
+  original, só que registrado manualmente em vez de via webhook)
+
+**Entregas futuras:**
 
 **4.3.1 — Configuração da Conta Mercado Pago**
 - Conta principal: plataforma Feira Esquerda Livre (recebe tudo e redistribui)
 - Cada lojista vincula sua conta Mercado Pago via OAuth no painel da loja
-- Administrador define a taxa de comissão global (% configurável via CMS)
+- Ativar o modo `mercado_pago_ativo` nas configurações já existentes
 
 **4.3.2 — Lógica do Split**
 - Pagamento único feito pelo cliente para a conta da plataforma
-- Após confirmação do pagamento:
-  - Cálculo: `valor_lojista = subtotal_loja + frete_loja − comissão_plataforma`
+- Após confirmação do pagamento (webhook):
+  - Cálculo já implementado em `OrderSplit`: `net_amount = gross_amount − commission_amount`
   - Repasse automático via API Marketplace do Mercado Pago
   - Prazo de repasse: D+2 (conforme política do Mercado Pago)
-- Webhook de confirmação de pagamento → dispara os repasses
 
 **4.3.3 — Painel de Recebimentos do Lojista**
-- Histórico de pedidos com status: Aguardando Pagamento · Pago · Repassado · Cancelado
-- Valor bruto, comissão retida, valor líquido recebido
-- Filtro por mês
-
-**Tabelas novas:**
-```
-orders
-  - id, user_id, status, total_amount, payment_method
-  - mp_payment_id, mp_status, pix_qrcode, pix_expiry_at
-  - created_at, updated_at
-
-order_items
-  - id, order_id, product_id, expositor_id, quantity
-  - unit_price, total_price
-
-order_splits
-  - id, order_id, expositor_id
-  - gross_amount, commission_amount, net_amount
-  - mp_transfer_id, transferred_at, status
-```
+- Hoje: `/minha-loja/pedidos` já mostra valor bruto e status (Pendente/Confirmado) por pedido
+- Futuro: adicionar valor líquido pós-comissão, repasse automático e filtro por mês
 
 ---
 
@@ -501,8 +531,8 @@ feed_comments
 |---|---|---|---|
 | ✅ Fase 1 — Fundação | Semanas 1–3 | CMS · Admin · Home | Plataforma funcional com conteúdo dinâmico |
 | ✅ Fase 2 — Lojistas & Agenda | Semanas 4–6 | 2.1 · 2.2 · 2.3 | Lojistas cadastráveis · Agenda pública navegável |
-| 🔄 Fase 3 — Catálogo & Três Eixos | Semanas 7–9 | 3.1 · 3.2 · 3.3 | Estrutura dos três eixos concluída; loja pública e carrinho em desenvolvimento |
-| ⏳ Fase 4 — Checkout & Pagamento | Semanas 10–13 | 4.1 · 4.2 · 4.3 | Venda completa com frete e split automático |
+| ✅ Fase 3 — Catálogo & Três Eixos | Semanas 7–9 | 3.1 · 3.2 · 3.3 | Três eixos, CRUD de produtos, loja pública e carrinho multilojas em produção |
+| ✅ Fase 4 — Checkout & Pagamento | Semanas 10–13 | 4.1 · 4.2 · 4.3 | MVP manual em produção; frete e split automáticos ficam para depois (config já existe) |
 | ⏳ Fase 5 — Comunidade | Semanas 14–17 | 5.1 · 5.2 | Feed social + ferramentas de marketing |
 
 ---
@@ -536,5 +566,5 @@ Estes princípios se aplicam a todas as fases e devem guiar cada decisão de UX 
 
 ---
 
-*Documento atualizado em: 14 de junho de 2026*
-*Próxima revisão: ao término da Fase 3 (catálogo público e carrinho)*
+*Documento atualizado em: 16 de junho de 2026*
+*Próxima revisão: ao priorizar a ativação real do Melhor Envio e do Mercado Pago, ou ao término da Fase 5 (comunidade)*

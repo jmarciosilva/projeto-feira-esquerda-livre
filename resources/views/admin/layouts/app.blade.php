@@ -49,6 +49,10 @@
                 E-mail
             </x-admin.nav-item>
 
+            <x-admin.nav-item href="{{ route('admin.settings.checkout') }}" icon="cog" :active="request()->routeIs('admin.settings.checkout')">
+                Frete & Pagamento
+            </x-admin.nav-item>
+
             <x-admin.nav-item href="{{ route('admin.pages.index') }}" icon="document" :active="request()->routeIs('admin.pages.*')">
                 Páginas
             </x-admin.nav-item>
@@ -95,15 +99,15 @@
             </x-admin.nav-item>
 
             <div class="pt-4 pb-1 px-3">
-                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Em Preparação</p>
+                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Marketplace</p>
             </div>
 
-            <div class="flex items-center gap-3 px-3 py-2 rounded-lg text-[#2d6a4f] cursor-not-allowed select-none">
-                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
-                </svg>
-                <span class="text-sm">Marketplace</span>
-                <span class="ml-auto text-xs bg-[#2d6a4f] text-[#b7e4c7] px-2 py-0.5 rounded-full">Em breve</span>
+            <x-admin.nav-item href="{{ route('admin.pedidos.index') }}" icon="store" :active="request()->routeIs('admin.pedidos.*')">
+                Pedidos
+            </x-admin.nav-item>
+
+            <div class="pt-4 pb-1 px-3">
+                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Em Preparação</p>
             </div>
 
             <div class="flex items-center gap-3 px-3 py-2 rounded-lg text-[#2d6a4f] cursor-not-allowed select-none">

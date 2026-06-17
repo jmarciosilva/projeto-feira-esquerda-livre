@@ -30,6 +30,7 @@ class CartDrawer extends Component
         $this->dispatch('cart-updated');
     }
 
+    #[On('add-to-cart')]
     public function addToCart(int $productId, CartService $cart): void
     {
         $product = \App\Models\Product::find($productId);

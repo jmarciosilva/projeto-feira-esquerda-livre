@@ -119,7 +119,7 @@
 
                 {{-- CTA --}}
                 <div class="mt-8 space-y-3">
-                    <button onclick="document.dispatchEvent(new CustomEvent('livewire-call', { detail: { id: 'cart-drawer', method: 'addToCart', params: [{{ $product->id }}] } }))"
+                    <button onclick="Livewire.dispatch('add-to-cart', { productId: {{ $product->id }} })"
                             class="w-full py-4 rounded-xl text-white text-lg font-bold transition-colors"
                             style="background: #E8A000; min-height: 60px;">
                         Adicionar ao Carrinho

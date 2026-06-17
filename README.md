@@ -110,6 +110,8 @@ Um mesmo lojista pode atuar em todos os eixos simultaneamente. O carrinho é uni
 | `GET /blog/{slug}` | Detalhe de post/notícia |
 | `GET /loja/{slug}` | Página pública de uma loja (agrupa por eixo) |
 | `GET /loja/{slug}/{produto-slug}` | Página pública de um item |
+| `GET /checkout` | Finalização de compra (dados do cliente + endereço) |
+| `GET /pedido/{reference}` | Confirmação do pedido com instruções de pagamento manual por loja |
 
 ### Painel Administrativo (`/admin`)
 
@@ -120,14 +122,17 @@ Requer autenticação com role `admin`.
 | `/admin` | Dashboard com resumo do sistema |
 | `/admin/settings` | Configurações gerais do site |
 | `/admin/settings/mail` | Configurações de e-mail |
+| `/admin/settings/checkout` | Configuração de frete e pagamento (modo manual + credenciais para integração futura) |
 | `/admin/banners` | Gestão de banners do carousel |
 | `/admin/menus` | Gestão de menus de navegação |
 | `/admin/pages` | Gestão de páginas estáticas |
 | `/admin/posts` | Gestão de posts e notícias |
 | `/admin/events` | Gestão de eventos/feiras |
 | `/admin/expositores` | Gestão de expositores |
+| `/admin/categorias` | Gestão de categorias de conteúdo (vinculadas a um eixo) |
 | `/admin/media` | Biblioteca de mídia |
 | `/admin/lojistas/solicitacoes` | Aprovação de novos lojistas |
+| `/admin/pedidos` | Visão geral de todos os pedidos |
 
 ### Painel do Lojista (`/minha-loja`)
 
@@ -140,6 +145,7 @@ Requer autenticação com role `lojista`.
 | `/minha-loja/produtos` | Listagem dos produtos |
 | `/minha-loja/produtos/novo` | Cadastro de novo produto |
 | `/minha-loja/produtos/{id}/editar` | Edição de produto |
+| `/minha-loja/pedidos` | Pedidos recebidos, com confirmação manual de pagamento |
 
 ---
 
@@ -170,6 +176,9 @@ NewsletterSubscriber
 LojistasSolicitacao → solicitações de novos lojistas; campo eixos declarados
 Media              → biblioteca de mídia
 ContentCategory    → categorias de conteúdo; campo eixo para filtro por catálogo
+Order              → pedido (frete e pagamento manuais nesta fase); referência pública única
+OrderItem          → itens do pedido (snapshot de nome/preço no momento da compra)
+OrderSplit         → valor por loja dentro do pedido; confirmação manual de pagamento pelo lojista
 ```
 
 ### Enums
@@ -181,6 +190,8 @@ ContentCategory    → categorias de conteúdo; campo eixo para filtro por catá
 | `Modality` | `presencial` · `online` · `ambos` |
 | `UserRole` | `admin` · `lojista` |
 | `SolicitacaoStatus` | `pendente` · `aprovado` · `bloqueado` |
+| `OrderStatus` | `aguardando_pagamento` · `pagamento_confirmado` · `concluido` · `cancelado` |
+| `OrderSplitStatus` | `pendente` · `confirmado` |
 
 ---
 
@@ -200,8 +211,8 @@ Consulte [`docs/ROADMAP.md`](docs/ROADMAP.md) para o planejamento completo.
 |---|---|---|
 | Fase 1 — CMS, Admin & Home | ✅ Concluída | Plataforma funcional com conteúdo dinâmico |
 | Fase 2 — Lojistas & Agenda | ✅ Concluída | Cadastro de lojistas, agenda pública, painel do lojista |
-| Fase 3 — Catálogo & Loja | 🔄 Em andamento | Três eixos implementados; carrinho e loja pública em desenvolvimento |
-| Fase 4 — Checkout & Pagamento | ⏳ Pendente | Frete (Melhor Envio), PIX e split via Mercado Pago |
+| Fase 3 — Catálogo & Loja | ✅ Concluída | Três eixos, CRUD de produtos do lojista, loja pública e carrinho multilojas |
+| Fase 4 — Checkout & Pagamento | ✅ MVP manual concluído | Checkout, frete e pagamento manuais; telas de configuração prontas para integrar Melhor Envio e Mercado Pago depois |
 | Fase 5 — Comunidade | ⏳ Pendente | Feed social e ferramentas de compartilhamento |
 
 ---

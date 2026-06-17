@@ -67,6 +67,11 @@ class Expositor extends Model
         return $this->hasMany(Product::class);
     }
 
+    public function orderSplits(): HasMany
+    {
+        return $this->hasMany(OrderSplit::class);
+    }
+
     public function events(): BelongsToMany
     {
         return $this->belongsToMany(Event::class, 'event_expositores')

@@ -17,12 +17,18 @@ use App\Livewire\Admin\Menus\MenuForm;
 use App\Livewire\Admin\Menus\MenuIndex;
 use App\Livewire\Admin\Pages\PageForm;
 use App\Livewire\Admin\Pages\PageIndex;
+use App\Livewire\Admin\Pedidos\PedidoIndex as AdminPedidoIndex;
 use App\Livewire\Admin\Posts\PostForm;
 use App\Livewire\Admin\Posts\PostIndex;
+use App\Livewire\Admin\Settings\CheckoutSettingsForm;
 use App\Livewire\Admin\Settings\MailSettingsForm;
 use App\Livewire\Admin\Settings\SettingsForm;
+use App\Livewire\Cliente\Enderecos\EnderecoForm;
+use App\Livewire\Cliente\Enderecos\EnderecoIndex;
+use App\Livewire\Cliente\Pedidos\PedidoIndex as ClientePedidoIndex;
 use App\Livewire\Lojista\Dashboard as LojistaDashboard;
 use App\Livewire\Lojista\LojaForm;
+use App\Livewire\Lojista\Pedidos\PedidoIndex as LojistaPedidoIndex;
 use App\Livewire\Lojista\Produtos\ProdutoForm;
 use App\Livewire\Lojista\Produtos\ProdutoIndex;
 use App\Models\Banner;
@@ -51,12 +57,14 @@ Route::get('/', function () {
 
     $upcomingEvents      = Event::upcoming()->limit(3)->get();
     $featuredExpositores = Expositor::featured()->limit(6)->get();
-    $featuredProducts    = Product::featured()->with('expositor')->limit(10)->get();
+    $featuredProducts    = Product::featured()->where('item_type', 'produto')->with('expositor')->limit(10)->get();
+    $featuredServicos    = Product::featured()->where('item_type', 'servico')->with('expositor')->limit(10)->get();
+    $featuredCuidados    = Product::featured()->where('item_type', 'cuidado')->with('expositor')->limit(10)->get();
     $latestPosts         = Post::published()->orderByDesc('published_at')->limit(5)->get();
 
     return view('welcome', compact(
         'settings', 'banners', 'headerMenu',
-        'upcomingEvents', 'featuredExpositores', 'featuredProducts', 'latestPosts',
+        'upcomingEvents', 'featuredExpositores', 'featuredProducts', 'featuredServicos', 'featuredCuidados', 'latestPosts',
     ));
 });
 
@@ -192,6 +200,22 @@ Route::get('/blog/{slug}', function (string $slug) {
     return view('blog.show', compact('post', 'related'));
 })->name('blog.show');
 
+// ─── Checkout (convidados veem modal de auth inline) ──────────────────────────
+Route::get('/checkout', function () {
+    if (! auth()->check()) {
+        session()->put('url.intended', route('checkout'));
+    }
+    return view('checkout');
+})->name('checkout');
+
+Route::get('/pedido/{reference}', function (string $reference) {
+    $order = \App\Models\Order::where('reference', $reference)
+        ->with(['items', 'splits.expositor'])
+        ->firstOrFail();
+
+    return view('pedido.show', compact('order'));
+})->name('pedido.show');
+
 // ─── Lojas públicas ───────────────────────────────────────────────────────────
 Route::get('/loja/{slug}', function (string $slug) {
     $expositor = \App\Models\Expositor::where('slug', $slug)
@@ -233,6 +257,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/settings', SettingsForm::class)->name('settings.edit');
     Route::get('/settings/mail', MailSettingsForm::class)->name('settings.mail');
+    Route::get('/settings/checkout', CheckoutSettingsForm::class)->name('settings.checkout');
 
     Route::get('/pages', PageIndex::class)->name('pages.index');
     Route::get('/pages/create', PageForm::class)->name('pages.create');
@@ -264,6 +289,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Lojistas
     Route::get('/lojistas/solicitacoes', SolicitacaoIndex::class)->name('lojistas.solicitacoes');
+
+    Route::get('/pedidos', AdminPedidoIndex::class)->name('pedidos.index');
 });
 
 // ─── Painel do Lojista ────────────────────────────────────────────────────────
@@ -274,6 +301,19 @@ Route::middleware(['auth', 'lojista'])->prefix('minha-loja')->name('lojista.')->
     Route::get('/produtos', ProdutoIndex::class)->name('produtos.index');
     Route::get('/produtos/novo', ProdutoForm::class)->name('produtos.create');
     Route::get('/produtos/{product}/editar', ProdutoForm::class)->name('produtos.edit');
+
+    Route::get('/pedidos', LojistaPedidoIndex::class)->name('pedidos.index');
+});
+
+// ─── Minha Conta (cliente) ─────────────────────────────────────────────────────
+Route::middleware('auth')->prefix('minha-conta')->name('cliente.')->group(function () {
+    Route::redirect('/', '/minha-conta/pedidos');
+
+    Route::get('/pedidos', ClientePedidoIndex::class)->name('pedidos.index');
+
+    Route::get('/enderecos', EnderecoIndex::class)->name('enderecos.index');
+    Route::get('/enderecos/novo', EnderecoForm::class)->name('enderecos.create');
+    Route::get('/enderecos/{endereco}/editar', EnderecoForm::class)->name('enderecos.edit');
 });
 
 // ─── Autenticação ─────────────────────────────────────────────────────────────

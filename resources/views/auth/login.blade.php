@@ -20,7 +20,7 @@
                 </svg>
             </div>
             <h1 class="text-xl font-bold text-white">Feira Esquerda Livre</h1>
-            <p class="text-sm text-[#b7e4c7] mt-1">Painel Administrativo</p>
+            <p class="text-sm text-[#b7e4c7] mt-1">Entrar na plataforma</p>
         </div>
 
         {{-- Form --}}
@@ -75,8 +75,11 @@
                 </button>
             </form>
 
-            <div class="mt-6 p-4 bg-gray-50 rounded-lg">
-                <p class="text-xs text-gray-500 text-center font-medium">Acesso restrito a administradores</p>
+            <div class="mt-6 p-4 bg-gray-50 rounded-lg text-center">
+                <p class="text-sm text-gray-600">
+                    Não tem conta?
+                    <a href="{{ route('register') }}" class="font-semibold text-[#1a472a] hover:underline">Cadastre-se</a>
+                </p>
             </div>
         </div>
     </div>

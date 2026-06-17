@@ -110,10 +110,11 @@
                     R$ {{ number_format($total, 2, ',', '.') }}
                 </span>
             </div>
-            <button class="w-full py-4 rounded-xl text-white text-lg font-bold transition-colors"
-                    style="background: #E8A000; min-height: 60px;">
+            <a href="{{ route('checkout') }}"
+               class="block w-full text-center py-4 rounded-xl text-white text-lg font-bold transition-colors"
+               style="background: #E8A000; min-height: 60px;">
                 Finalizar Compra
-            </button>
+            </a>
             <button wire:click="toggle" class="w-full py-3 rounded-xl border-2 font-semibold text-base transition-colors"
                     style="border-color: #E8A000; color: #C47A00;">
                 Continuar Comprando

@@ -18,6 +18,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'whatsapp',
         'password',
         'role',
         'is_active',
@@ -53,6 +54,11 @@ class User extends Authenticatable
         return $this->role === UserRole::Lojista;
     }
 
+    public function isCliente(): bool
+    {
+        return $this->role === UserRole::User;
+    }
+
     public function media(): HasMany
     {
         return $this->hasMany(Media::class, 'uploaded_by');
@@ -66,5 +72,15 @@ class User extends Authenticatable
     public function expositor(): HasOne
     {
         return $this->hasOne(Expositor::class);
+    }
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(CustomerAddress::class);
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
     }
 }
