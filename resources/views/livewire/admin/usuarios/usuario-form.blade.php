@@ -74,7 +74,6 @@
                 </label>
             </x-admin.card>
 
-            @if($user)
             <x-admin.card title="Perfil de Cliente">
                 <label class="flex items-start gap-3 cursor-pointer">
                     <input type="checkbox" wire:model="isAlsoCustomer" class="mt-1 w-4 h-4 rounded border-gray-300" style="accent-color:#1a472a;">
@@ -86,7 +85,7 @@
                     </span>
                 </label>
 
-                @if($user->customerProfile)
+                @if($user?->customerProfile)
                 <div class="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
                     <svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
@@ -96,7 +95,6 @@
                 </div>
                 @endif
             </x-admin.card>
-            @endif
 
             <x-admin.button type="submit" class="w-full justify-center">
                 Salvar Usuário
@@ -116,12 +114,12 @@
                     </svg>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <h3 class="text-base font-semibold text-gray-900">Usuário já existe como cliente</h3>
+                    <h3 class="text-base font-semibold text-gray-900">Usuário já cadastrado no sistema</h3>
                     @if($candidateUser)
                     <p class="text-sm text-gray-600 mt-1">
                         <strong>{{ $candidateUser->name }}</strong>
                         <span class="text-gray-400">({{ $candidateUser->email }})</span>
-                        já é um cliente do marketplace.
+                        está cadastrado como <strong>{{ $candidateUser->role?->label() }}</strong>.
                     </p>
                     @endif
                 </div>
@@ -129,7 +127,7 @@
 
             <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 mb-5">
                 Deseja conceder acesso ao painel administrativo para este usuário?
-                Pedidos, endereços e histórico de compras serão totalmente preservados.
+                O cadastro, pedidos, endereços e histórico serão totalmente preservados.
             </div>
 
             <x-admin.select

@@ -12,6 +12,7 @@ use App\Livewire\Admin\Usuarios\UsuarioForm;
 use App\Livewire\Admin\Usuarios\UsuarioIndex;
 use App\Mail\InternalUserAccessCreated;
 use App\Models\CustomerProfile;
+use App\Models\Expositor;
 use App\Models\Order;
 use App\Models\Page;
 use App\Models\User;
@@ -414,6 +415,124 @@ class AdminUserGovernanceTest extends TestCase
             ->test(UsuarioIndex::class)
             ->assertSee('Gerente Híbrido')
             ->assertSee('Cliente');
+    }
+
+    public function test_save_shows_promote_modal_when_email_belongs_to_lojista(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin   = $this->makeUser(UserRole::Admin);
+        $lojista = $this->makeUser(UserRole::Lojista, ['email' => 'lojista-existente@example.com']);
+
+        Livewire::actingAs($admin)
+            ->test(UsuarioForm::class)
+            ->set('name', 'Nome Qualquer')
+            ->set('email', 'lojista-existente@example.com')
+            ->set('role', 'gerente')
+            ->call('save')
+            ->assertSet('showPromoteModal', true)
+            ->assertSet('candidateUserId', $lojista->id)
+            ->assertSet('promoteRole', 'gerente');
+    }
+
+    public function test_save_shows_validation_error_when_email_belongs_to_existing_internal_user(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin   = $this->makeUser(UserRole::Admin);
+        $this->makeUser(UserRole::Gerente, ['email' => 'gerente-existente@example.com']);
+
+        Livewire::actingAs($admin)
+            ->test(UsuarioForm::class)
+            ->set('name', 'Nome Qualquer')
+            ->set('email', 'gerente-existente@example.com')
+            ->set('role', 'supervisor')
+            ->call('save')
+            ->assertHasErrors(['email'])
+            ->assertSet('showPromoteModal', false);
+    }
+
+    public function test_promote_lojista_to_internal_preserves_expositor_record(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin   = $this->makeUser(UserRole::Admin);
+        $lojista = $this->makeUser(UserRole::Lojista);
+
+        Expositor::create([
+            'user_id'     => $lojista->id,
+            'name'        => 'Loja do Lojista',
+            'slug'        => 'loja-do-lojista',
+            'description' => 'desc',
+            'is_active'   => true,
+            'is_featured' => false,
+        ]);
+
+        $this->assertNotNull($lojista->fresh()->expositor);
+
+        Livewire::actingAs($admin)
+            ->test(UsuarioForm::class)
+            ->set('candidateUserId', $lojista->id)
+            ->set('promoteRole', 'editor')
+            ->call('promoteToInternal');
+
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $fresh = $lojista->fresh()->load(['roles', 'expositor']);
+
+        $this->assertSame(UserRole::Editor, $fresh->role);
+        $this->assertTrue($fresh->isInternalUser());
+        $this->assertTrue($fresh->hasRole('editor'));
+        $this->assertNotNull($fresh->expositor);
+    }
+
+    public function test_create_internal_user_with_also_customer_creates_customer_profile(): void
+    {
+        Mail::fake();
+        $this->seed(RolePermissionSeeder::class);
+        $admin = $this->makeUser(UserRole::Admin);
+
+        Livewire::actingAs($admin)
+            ->test(UsuarioForm::class)
+            ->set('name', 'Gerente Comprador')
+            ->set('email', 'gerente-comprador@example.com')
+            ->set('whatsapp', '(11) 99999-9999')
+            ->set('role', UserRole::Gerente->value)
+            ->set('is_active', true)
+            ->set('isAlsoCustomer', true)
+            ->set('send_credentials', false)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $user = User::where('email', 'gerente-comprador@example.com')->firstOrFail();
+
+        $this->assertSame(UserRole::Gerente, $user->role);
+        $this->assertNotNull($user->customerProfile);
+        $this->assertSame(MarketplaceStatus::Active, $user->customerProfile->marketplace_status);
+    }
+
+    public function test_lojista_badge_appears_in_usuario_index_after_promotion(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin  = $this->makeUser(UserRole::Admin);
+        $editor = $this->makeUser(UserRole::Editor, ['name' => 'Editor Com Loja']);
+
+        // Sem expositor: badge não deve aparecer
+        Livewire::actingAs($admin)
+            ->test(UsuarioIndex::class)
+            ->assertSee('Editor Com Loja')
+            ->assertDontSee('Lojista');
+
+        Expositor::create([
+            'user_id'     => $editor->id,
+            'name'        => 'Loja do Editor',
+            'slug'        => 'loja-do-editor',
+            'description' => 'desc',
+            'is_active'   => true,
+            'is_featured' => false,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(UsuarioIndex::class)
+            ->assertSee('Editor Com Loja')
+            ->assertSee('Lojista');
     }
 
     /**

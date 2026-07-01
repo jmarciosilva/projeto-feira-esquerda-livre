@@ -70,6 +70,11 @@
                                     Cliente
                                 </span>
                                 @endif
+                                @if($internalUser->expositor)
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700">
+                                    Lojista
+                                </span>
+                                @endif
                             </div>
                         </td>
                         <td class="py-3 pr-4">

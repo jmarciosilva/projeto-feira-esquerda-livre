@@ -55,11 +55,17 @@ class UsuarioForm extends Component
     {
         abort_unless(auth()->user()?->can('usuarios.gerenciar'), 403);
 
-        // Pre-flight: e-mail pertence a um cliente puro? Oferecer promoção.
+        // Pre-flight: e-mail já pertence a algum usuário?
         if (! $this->user) {
             $existingUser = User::where('email', $this->email)->first();
 
-            if ($existingUser && $existingUser->isCliente()) {
+            if ($existingUser) {
+                if ($existingUser->isInternalUser()) {
+                    $this->addError('email', 'Este e-mail já pertence a um usuário com acesso interno ao sistema.');
+                    return null;
+                }
+
+                // Usuário não-interno (cliente, lojista) → oferecer promoção preservando tudo
                 $this->candidateUserId  = $existingUser->id;
                 $this->promoteRole      = $this->role;
                 $this->showPromoteModal = true;
@@ -70,20 +76,25 @@ class UsuarioForm extends Component
 
         $internalRoleValues = collect($this->internalRoles())->pluck('value')->all();
 
-        $validated = $this->validate([
-            'name'             => 'required|string|max:255',
-            'email'            => [
-                'required',
-                'email',
-                'max:255',
-                Rule::unique('users', 'email')->ignore($this->user?->id),
+        $validated = $this->validate(
+            [
+                'name'             => 'required|string|max:255',
+                'email'            => [
+                    'required',
+                    'email',
+                    'max:255',
+                    Rule::unique('users', 'email')->ignore($this->user?->id),
+                ],
+                'whatsapp'         => 'nullable|string|max:20',
+                'role'             => ['required', Rule::in($internalRoleValues)],
+                'is_active'        => 'boolean',
+                'password'         => ['nullable', 'string', 'min:8', 'max:100'],
+                'send_credentials' => 'boolean',
             ],
-            'whatsapp'         => 'nullable|string|max:20',
-            'role'             => ['required', Rule::in($internalRoleValues)],
-            'is_active'        => 'boolean',
-            'password'         => ['nullable', 'string', 'min:8', 'max:100'],
-            'send_credentials' => 'boolean',
-        ]);
+            [
+                'email.unique' => 'Este e-mail já está em uso por outro usuário do sistema.',
+            ]
+        );
 
         $password   = $validated['password'] ?: Str::random(12);
         $role       = UserRole::from($validated['role']);
@@ -107,9 +118,7 @@ class UsuarioForm extends Component
 
         $user->syncRoles([$role->spatieRole()]);
 
-        if (! $isCreating) {
-            $this->syncCustomerProfile($user);
-        }
+        $this->syncCustomerProfile($user);
 
         if (($isCreating || $validated['password']) && $validated['send_credentials']) {
             try {

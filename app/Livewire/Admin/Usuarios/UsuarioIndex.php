@@ -79,7 +79,7 @@ class UsuarioIndex extends Component
 
         $users = User::query()
             ->whereIn('role', $internalRoles)
-            ->with('customerProfile')
+            ->with(['customerProfile', 'expositor'])
             ->when($this->search, fn ($query) => $query->where(function ($query) {
                 $query->where('name', 'like', "%{$this->search}%")
                     ->orWhere('email', 'like', "%{$this->search}%");

@@ -83,6 +83,11 @@ class User extends Authenticatable
         return $this->customerProfile?->marketplace_status !== MarketplaceStatus::Inactive;
     }
 
+    public function hasCustomerProfile(): bool
+    {
+        return $this->customerProfile !== null;
+    }
+
     public function customerProfile(): HasOne
     {
         return $this->hasOne(CustomerProfile::class);
