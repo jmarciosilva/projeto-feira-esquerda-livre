@@ -61,9 +61,16 @@
                             <p class="text-sm text-gray-500">{{ $internalUser->email }}</p>
                         </td>
                         <td class="py-3 pr-4">
-                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700">
-                                {{ $internalUser->role?->label() }}
-                            </span>
+                            <div class="flex flex-wrap gap-1.5">
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700">
+                                    {{ $internalUser->role?->label() }}
+                                </span>
+                                @if($internalUser->customerProfile)
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">
+                                    Cliente
+                                </span>
+                                @endif
+                            </div>
                         </td>
                         <td class="py-3 pr-4">
                             <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold {{ $internalUser->is_active ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500' }}">
@@ -77,20 +84,33 @@
                                     <x-admin.button variant="secondary" size="sm">Editar</x-admin.button>
                                 </a>
 
-                                <x-admin.button
-                                    variant="secondary"
-                                    size="sm"
-                                    wire:click="resetPassword({{ $internalUser->id }})"
-                                    wire:confirm="Redefinir a senha deste usuário e enviar por e-mail?">
+                                <button
+                                    @click="$dispatch('open-confirm', {
+                                        title: 'Redefinir senha',
+                                        message: 'Uma nova senha temporária será gerada e enviada para {{ $internalUser->email }} por e-mail.',
+                                        confirmText: 'Redefinir',
+                                        variant: 'warning',
+                                        action: () => $wire.resetPassword({{ $internalUser->id }})
+                                    })"
+                                    class="inline-flex items-center gap-2 font-medium border rounded-lg transition-colors duration-150 px-3 py-1.5 text-xs bg-white hover:bg-gray-50 text-gray-700 border-gray-300"
+                                >
                                     Redefinir senha
-                                </x-admin.button>
+                                </button>
 
-                                <x-admin.button
-                                    variant="{{ $internalUser->is_active ? 'danger' : 'success' }}"
-                                    size="sm"
-                                    wire:click="toggleActive({{ $internalUser->id }})">
+                                <button
+                                    @click="$dispatch('open-confirm', {
+                                        title: '{{ $internalUser->is_active ? 'Desativar usuário' : 'Reativar usuário' }}',
+                                        message: '{{ $internalUser->is_active
+                                            ? 'O usuário perderá o acesso ao painel administrativo imediatamente.'
+                                            : 'O usuário voltará a ter acesso ao painel administrativo.' }}',
+                                        confirmText: '{{ $internalUser->is_active ? 'Desativar' : 'Reativar' }}',
+                                        variant: '{{ $internalUser->is_active ? 'danger' : 'success' }}',
+                                        action: () => $wire.toggleActive({{ $internalUser->id }})
+                                    })"
+                                    class="inline-flex items-center gap-2 font-medium border border-transparent rounded-lg transition-colors duration-150 px-3 py-1.5 text-xs {{ $internalUser->is_active ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-[#52b788] hover:bg-[#2d6a4f] text-white' }}"
+                                >
                                     {{ $internalUser->is_active ? 'Desativar' : 'Ativar' }}
-                                </x-admin.button>
+                                </button>
                                 @endcan
                             </div>
                         </td>
@@ -110,4 +130,6 @@
             {{ $users->links() }}
         </div>
     </x-admin.card>
+
+    <x-admin.confirm-modal />
 </div>

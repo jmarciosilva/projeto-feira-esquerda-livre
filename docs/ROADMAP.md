@@ -1,8 +1,8 @@
 # 🗺️ Roadmap de Desenvolvimento — Feira Esquerda Livre
 
 **Documento de Planejamento Estratégico**
-**Versão:** 1.8 — Julho de 2026
-**Status geral do projeto:** Fase 4 evoluída após o MVP manual — checkout e pagamento manual seguem operacionais; a cotação inicial de frete via Melhor Envio foi implementada para o MVP usando conta única da plataforma, enquanto compra de etiqueta, rastreamento, OAuth por lojista e split de frete continuam planejados para fases futuras. A Fase 6 de governança administrativa foi implementada com gestão de usuários internos, perfis de acesso, permissões por módulo, proteção de rotas e bloqueio de ações críticas no backend. A área de clientes foi aprimorada com a tabela `customer_profiles` separando o status no marketplace do status global do usuário, permitindo que administradores também sejam clientes e que a inativação no marketplace não bloqueie o acesso administrativo.
+**Versão:** 2.0 — Julho de 2026
+**Status geral do projeto:** MVP em fase final. Checkout, cotação de frete via Melhor Envio e pagamento manual operacionais. Governança administrativa (usuários internos, permissões, perfis de acesso) implementada com modelo multi-papel: um único e-mail pode ser simultaneamente equipe interna e cliente do marketplace. Dois módulos adicionais foram incorporados à entrega do MVP: rastreio personalizado de entregas (Módulo 4.4) e central de email marketing (Módulo 5.3). Após estes módulos, o MVP estará completo e o produto poderá ser lançado; fases futuras (split automático via Mercado Pago, OAuth por lojista, etiquetas físicas, rede social) seguem planejadas.
 
 ---
 
@@ -19,10 +19,12 @@
   Catálogo & Três Eixos
            ↓
 [FASE 4 ✅ MVP + COTAÇÃO DE FRETE]
-  Checkout, cotação inicial de frete & pagamentos manuais
+  Checkout, cotação de frete & pagamentos manuais
+  + [4.4 ⏳] Rastreio personalizado de entregas
            ↓
-[FASE 5 ⏳ Semanas 14–17]
+[FASE 5 ⏳ Em andamento]
   Comunidade & Engajamento
+  + [5.3 ⏳] Central de Email Marketing
           ↓
 [FASE 6 ✅ CONCLUÍDA]
   Usuários internos, perfis & permissões
@@ -468,6 +470,93 @@ cobrança centralizada para "splitar". O que já existe:
 
 ---
 
+### Módulo 4.4 — Rastreio Personalizado de Entrega — ⏳ A implementar
+
+**Objetivo:** dar ao cliente visibilidade total sobre o ciclo de vida da entrega com uma experiência de rastreio com a identidade visual da Feira Esquerda Livre — não apenas um link para o site dos Correios ou transportadora.
+
+**Contexto técnico:** a tabela `order_shippings` já está planejada no Módulo 4.1. Este módulo a cria efetivamente e constrói sobre ela a camada de rastreio.
+
+**Fluxo completo:**
+
+```
+Pedido confirmado
+    → Lojista informa código de rastreio em /minha-loja/pedidos/{id}
+    → Sistema consulta Melhor Envio Tracking API (ou entrada manual)
+    → Eventos de rastreio persistidos em order_tracking_events
+    → Cliente acessa /minha-conta/pedidos/{reference}/rastreio
+    → Página exibe linha do tempo personalizada e branded
+    → E-mail + link WhatsApp notificam o cliente a cada mudança de status
+```
+
+**Entregas planejadas:**
+
+**4.4.1 — Tabelas e Modelos**
+```
+order_shippings
+  - id, order_id, expositor_id
+  - carrier (ex.: "Correios", "Jadlog", "Sequoia")
+  - service_name (ex.: "SEDEX", "PAC", "Econômico")
+  - tracking_code (nullable até o envio)
+  - price (decimal — frete cobrado)
+  - estimated_days
+  - status enum: pending | label_generated | shipped | in_transit | delivered | returned | failed
+  - shipped_at, delivered_at
+  - created_at, updated_at
+
+order_tracking_events
+  - id, order_shipping_id
+  - status (string — código normalizado da Feira Esquerda Livre)
+  - description (string — descrição amigável em português)
+  - location (string nullable — "São Paulo, SP")
+  - happened_at (timestamp — quando o evento ocorreu)
+  - source enum: carrier_api | manual (quem criou o evento)
+  - created_at
+```
+
+**4.4.2 — Painel do Lojista: informar envio**
+- Em `/minha-loja/pedidos/{id}`, botão "Marcar como Enviado"
+- Modal para informar: transportadora (select), código de rastreio, data do envio
+- Ao confirmar: cria `OrderShipping`, muda status do pedido para `shipped`, dispara notificação ao cliente
+
+**4.4.3 — Integração com Melhor Envio Tracking**
+- Ao cadastrar o código, consulta a API de rastreio do Melhor Envio
+- Normaliza os eventos recebidos para status da Feira: `Em Triagem`, `Em Trânsito`, `Saiu para Entrega`, `Entregue`, `Tentativa de Entrega`, `Devolvido`
+- Job agendado (`TrackShipmentsJob`) roda 3× ao dia para atualizar pedidos em trânsito
+- Se não há rastreio automático disponível, o lojista pode adicionar eventos manuais
+
+**4.4.4 — Página de Rastreio do Cliente**
+- Rota: `/minha-conta/pedidos/{reference}/rastreio`
+- Rota pública alternativa: `/rastreio/{tracking_code}` (acessível sem login)
+- **Linha do tempo visual (branded com `#F4E294` e `#1a472a`):**
+  - Pedido Realizado ✓
+  - Pagamento Confirmado ✓
+  - Em Preparação ✓
+  - Enviado (com data, transportadora e código clicável)
+  - Em Trânsito (eventos detalhados com localização)
+  - Saiu para Entrega
+  - Entregue ✓
+- Exibe estimativa de entrega (data calculada a partir de `shipped_at + estimated_days`)
+- Botão "Rastrear no site da transportadora" (link externo para fallback)
+- Responsivo: mobile-first, legível para público 40+
+
+**4.4.5 — Notificações ao Cliente**
+- E-mail automático quando o lojista informa o envio (inclui link da página de rastreio)
+- E-mail quando o status muda para "Saiu para Entrega" (máximo 1 e-mail por etapa)
+- Mensagem WhatsApp opcional: link pré-formatado com código e página de rastreio
+- Nenhum e-mail enviado em loop — cada status notifica no máximo uma vez
+
+**4.4.6 — Painel Admin**
+- Em `/admin/pedidos/{id}`: visão do rastreio com todos os eventos
+- Capacidade de adicionar evento manual (ex.: "Atraso por volume nas Festas de Final de Ano")
+- Filtro de pedidos: por status de envio (pendente envio, em trânsito, entregue, com problema)
+
+**Decisão de produto:**
+- Para o MVP, o lojista informa o código manualmente; a plataforma consulta a API automaticamente
+- A compra de etiqueta diretamente no sistema (Melhor Envio Label Purchase) permanece como evolução futura
+- O rastreio é por loja: em pedidos com múltiplos lojistas, cada loja tem seu próprio tracking independente
+
+---
+
 ## 👥 Fase 5 — Mini Rede Social e Marketing Digital
 
 **Período estimado:** Semanas 14 a 17
@@ -536,6 +625,110 @@ feed_comments
 
 ---
 
+### Módulo 5.3 — Central de Email Marketing — ⏳ A implementar
+
+**Objetivo:** dar ao time de marketing e aos administradores da Feira Esquerda Livre uma ferramenta para criar, enviar e acompanhar campanhas de e-mail para a base de clientes e assinantes, dentro do próprio painel — sem depender de plataformas externas pagas para o MVP.
+
+**Público-alvo das campanhas:**
+- Assinantes da newsletter (`newsletter_subscribers`)
+- Clientes do marketplace (`customer_profiles`)
+- Combinação filtrada (ex.: clientes ativos que compraram nos últimos 60 dias)
+- Segmento manual (lista de e-mails colados no campo de edição)
+
+**Entregas planejadas:**
+
+**5.3.1 — Gerenciamento de Campanhas (Admin)**
+- Rota: `/admin/email-marketing`
+- Listagem de campanhas com status, data de envio e contadores
+- CRUD completo: criar, editar (somente rascunhos), duplicar, excluir (somente rascunhos)
+- Visualização de relatório por campanha (enviados, abertos, cliques, descadastros)
+
+**5.3.2 — Construtor de E-mail**
+- Editor de conteúdo rico (TipTap ou equivalente leve — sem dependências pesadas)
+- Campos obrigatórios: Nome interno da campanha, Assunto do e-mail, Remetente (padrão: `noreply@feiraesquerdalivre.com.br`)
+- Seletor de destinatários com preview de contagem estimada
+- Upload de imagem de cabeçalho (opcional)
+- Variáveis de personalização suportadas: `{{nome}}`, `{{email}}`
+- Link de descadastro inserido automaticamente no rodapé (exigência LGPD)
+- Preview em tempo real da versão mobile e desktop
+- Botão "Enviar e-mail de teste" para o endereço do usuário logado
+
+**5.3.3 — Templates de Campanha**
+Modelos pré-configurados com identidade visual da Feira:
+
+| Template | Uso típico |
+|---|---|
+| Newsletter Mensal | Curadoria de novidades, feiras e produtos em destaque |
+| Novo Evento | Divulgação de feira com data, local e expositores confirmados |
+| Promoção de Produto | Destaque de produto(s) com preço e link direto |
+| Boas-Vindas | Enviado automaticamente ao novo assinante da newsletter |
+| Recuperação de Carrinho Abandonado | Para clientes com `cart_items` há mais de 24h sem checkout (futuro) |
+
+**5.3.4 — Agendamento e Envio**
+- Envio imediato: dispara o Job de envio na fila
+- Agendamento: data e hora futuras (usa Laravel Scheduler + queue)
+- Status de campanha: `rascunho → agendado → enviando → enviado → com_erros`
+- Envio assíncrono via `SendEmailCampaignJob` em queue dedicada (`email-marketing`)
+- Rate limiting configurável: máximo de e-mails por minuto (evitar blacklist de IP)
+- Cada destinatário recebe uma entrada em `email_campaign_sends` antes do envio; falhas são registradas separadamente
+
+**5.3.5 — Rastreio e Relatórios**
+- Pixel de abertura (1×1 GIF transparente com UUID único por envio)
+- Rastreio de cliques via redirect interno (`/mk/c/{token}` → URL de destino)
+- Dashboard por campanha: taxa de abertura, taxa de clique, descadastros, bounces
+- Descadastro: rota pública `/newsletter/descadastro/{token}` marca o e-mail como `unsubscribed_at` e impede reenvios
+
+**5.3.6 — Conformidade LGPD**
+- Todo e-mail enviado contém link de descadastro válido
+- E-mails com `unsubscribed_at` nunca recebem campanhas futuras
+- Assinantes `newsletter_subscribers` mantêm campo `consent_at` (data do opt-in)
+- Para clientes do marketplace: o cadastro de conta equivale ao opt-in de comunicações transacionais; campanhas promocionais exigem consentimento explícito (campo `marketing_opt_in` na `customer_profiles`)
+- Exportação de dados do assinante disponível para exercício do direito de acesso LGPD
+
+**Tabelas novas:**
+```
+email_campaigns
+  - id, name (interno), subject, from_name, from_email
+  - body_html, body_text (gerado automaticamente do HTML)
+  - recipient_type enum: all_subscribers | customers | customers_active | segment_manual
+  - recipient_emails_manual (JSON nullable — para segmento manual)
+  - template_key (string nullable — chave do template usado)
+  - status enum: draft | scheduled | sending | sent | failed
+  - scheduled_at (timestamp nullable)
+  - sent_at (timestamp nullable)
+  - recipients_count, sent_count, failed_count
+  - created_by (FK users), created_at, updated_at
+
+email_campaign_sends
+  - id, campaign_id, email, name (nullable)
+  - sent_at (timestamp nullable)
+  - opened_at (timestamp nullable)
+  - clicked_at (timestamp nullable)
+  - unsubscribed_at (timestamp nullable)
+  - bounce_type (nullable — soft | hard)
+  - tracking_pixel_token (UUID único)
+  - created_at
+```
+
+**Alteração em tabela existente:**
+```
+customer_profiles (alter)
+  + marketing_opt_in (boolean, default: true)
+  + marketing_opt_in_at (timestamp nullable)
+```
+
+**Configurações em `site_settings`:**
+- `mail_from_name`, `mail_from_email` (já existentes)
+- `marketing_rate_limit_per_minute` (novo — padrão: 60)
+- `marketing_unsubscribe_secret` (novo — HMAC secret para tokens de descadastro)
+
+**Decisão de produto para o MVP:**
+- Envio via SMTP configurado no painel (`/admin/settings/mail`) — sem dependência de API de terceiros
+- Rastreio de abertura e clique ativo por padrão; pode ser desativado por campanha
+- Integração futura com SendGrid ou Amazon SES para melhorar deliverability em listas grandes
+
+---
+
 ## ✅ Fase 6 — Governança Administrativa, Usuários Internos e Permissões
 
 **Objetivo estratégico:** profissionalizar a operação interna da plataforma, permitindo que a Feira Esquerda Livre tenha administradores, gerentes, supervisores e editores com acessos controlados, auditáveis e coerentes com suas responsabilidades.
@@ -557,13 +750,23 @@ feed_comments
 - Rotas administrativas protegidas com middleware `can:*`
 - Componentes Livewire administrativos protegendo ações críticas no backend
 - Testes automatizados para acesso por perfil, URL direta e ações Livewire bloqueadas
+- **Modelo multi-papel:** um único cadastro por e-mail pode acumular papel interno e perfil de cliente simultaneamente
+- **Fluxo de promoção:** ao cadastrar usuário interno com e-mail de cliente existente, o painel oferece modal para conceder acesso interno preservando CustomerProfile, pedidos e endereços
+- **Badge híbrido:** `UsuarioIndex` exibe badge "Cliente" para usuários internos que também são clientes do marketplace
+- **Toggle de cliente no modo edição:** `UsuarioForm` permite adicionar ou remover o perfil de cliente de um usuário interno existente
 
 **Pendências futuras fora da Fase 6:** auditoria detalhada de alterações administrativas, logs de alteração de permissões e possível campo auxiliar de contexto de usuário para relatórios.
 
-**Princípio de arquitetura:** separar claramente os três universos de usuários:
-- **Cliente:** comprador da plataforma, com acesso à área de conta, endereços e pedidos.
-- **Lojista:** dono de loja/expositor, com acesso à área `/minha-loja`.
-- **Equipe interna:** usuários operacionais da Feira, com acesso ao painel `/admin` conforme perfil e permissões.
+**Princípio de arquitetura — modelo de papel único com perfil complementar:**
+- `users.role` armazena **um único papel** que define acesso ao painel (admin, gerente, supervisor, editor, lojista, user)
+- `CustomerProfile` é um registro complementar que declara "este usuário também é cliente do marketplace", independente do papel
+- Um usuário com `role = gerente` e `CustomerProfile` é simultaneamente equipe interna e comprador
+- `users.isInternal()` verifica se `role` pertence ao conjunto {admin, gerente, supervisor, editor}
+- `AdminMiddleware` usa `isInternalUser()` para autorizar acesso ao painel — CustomerProfile não interfere
+- **Os três universos de usuário:**
+  - **Cliente puro:** `role = user`, com `CustomerProfile` criado automaticamente no registro
+  - **Lojista:** `role = lojista`, acessa `/minha-loja`; pode ter `CustomerProfile` se também comprador
+  - **Equipe interna:** `role ∈ {admin, gerente, supervisor, editor}`, acessa `/admin`; pode ter `CustomerProfile`
 
 ### Módulo 6.1 — Gestão de Usuários Internos
 
@@ -678,8 +881,9 @@ feed_comments
 | ✅ Fase 2 — Lojistas & Agenda | Semanas 4–6 | 2.1 · 2.2 · 2.3 | Lojistas cadastráveis · Agenda pública navegável |
 | ✅ Fase 3 — Catálogo & Três Eixos | Semanas 7–9 | 3.1 · 3.2 · 3.3 | Três eixos, CRUD de produtos, loja pública e carrinho multilojas em produção |
 | ✅ Fase 4 — Checkout & Pagamento | Semanas 10–13 | 4.1 · 4.2 · 4.3 | MVP com cotação inicial de frete via Melhor Envio; pagamento/split automáticos seguem em fases futuras |
-| ⏳ Fase 5 — Comunidade | Semanas 14–17 | 5.1 · 5.2 | Feed social + ferramentas de marketing |
-| ✅ Fase 6 — Governança Admin | Concluída | 6.1 · 6.2 · 6.3 · 6.4 · 6.5 | Usuários internos, perfis de acesso, permissões e proteção real do painel |
+| ⏳ **4.4 — Rastreio de Entrega** | MVP final | 4.4 | Linha do tempo branded, integração Melhor Envio Tracking, notificações ao cliente |
+| ⏳ Fase 5 — Comunidade | Semanas 14–17 | 5.1 · 5.2 · **5.3** | Feed social + compartilhamento + **Central de Email Marketing** |
+| ✅ Fase 6 — Governança Admin | Concluída | 6.1 · 6.2 · 6.3 · 6.4 · 6.5 | Usuários internos, perfis de acesso, permissões, modelo multi-papel e proteção real do painel |
 
 ---
 
@@ -712,5 +916,6 @@ Estes princípios se aplicam a todas as fases e devem guiar cada decisão de UX 
 
 ---
 
-*Documento atualizado em: 1º de julho de 2026*
-*Próxima revisão: ao priorizar auditoria administrativa, OAuth por lojista, compra/geração de etiquetas, rastreamento, split de frete ou ao término da Fase 5 (comunidade)*
+*Documento atualizado em: 1º de julho de 2026 — Versão 2.0*
+*Próxima revisão: após entrega do Módulo 4.4 (rastreio) e Módulo 5.3 (email marketing), marco do lançamento do MVP*
+*Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala*

@@ -12,32 +12,18 @@ class PageIndex extends Component
 {
     use AuthorizesAdminActions, WithPagination;
 
-    public string $search    = '';
-    public bool   $confirmDelete = false;
-    public ?int   $deleteId  = null;
+    public string $search = '';
 
     public function updatingSearch(): void
     {
         $this->resetPage();
     }
 
-    public function confirmDelete(int $id): void
+    public function deletePage(PageService $service, int $id): void
     {
         $this->authorizeAdminAction('cms.editar');
 
-        $this->deleteId      = $id;
-        $this->confirmDelete = true;
-    }
-
-    public function deletePage(PageService $service): void
-    {
-        $this->authorizeAdminAction('cms.editar');
-
-        $page = Page::findOrFail($this->deleteId);
-        $service->delete($page);
-
-        $this->confirmDelete = false;
-        $this->deleteId      = null;
+        $service->delete(Page::findOrFail($id));
 
         session()->flash('success', 'Página removida com sucesso.');
     }

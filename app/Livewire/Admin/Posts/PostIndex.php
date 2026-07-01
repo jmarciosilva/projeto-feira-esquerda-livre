@@ -14,34 +14,20 @@ class PostIndex extends Component
 {
     use AuthorizesAdminActions, WithPagination;
 
-    public string $search        = '';
-    public string $filterType    = '';
-    public string $filterStatus  = '';
-    public bool   $confirmDelete = false;
-    public ?int   $deleteId      = null;
+    public string $search       = '';
+    public string $filterType   = '';
+    public string $filterStatus = '';
 
     public function updatingSearch(): void
     {
         $this->resetPage();
     }
 
-    public function confirmDelete(int $id): void
+    public function deletePost(PostService $service, int $id): void
     {
         $this->authorizeAdminAction('cms.editar');
 
-        $this->deleteId      = $id;
-        $this->confirmDelete = true;
-    }
-
-    public function deletePost(PostService $service): void
-    {
-        $this->authorizeAdminAction('cms.editar');
-
-        $post = Post::findOrFail($this->deleteId);
-        $service->delete($post);
-
-        $this->confirmDelete = false;
-        $this->deleteId      = null;
+        $service->delete(Post::findOrFail($id));
 
         session()->flash('success', 'Post removido.');
     }

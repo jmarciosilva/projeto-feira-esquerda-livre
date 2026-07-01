@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Usuarios;
 
+use App\Enums\MarketplaceStatus;
 use App\Enums\UserRole;
 use App\Mail\InternalUserAccessCreated;
 use App\Models\User;
@@ -16,19 +17,21 @@ class UsuarioForm extends Component
 {
     public ?User $user = null;
 
-    public string $name = '';
+    public string $name             = '';
+    public string $email            = '';
+    public string $whatsapp         = '';
+    public string $role             = 'supervisor';
+    public bool   $is_active        = true;
+    public string $password         = '';
+    public bool   $send_credentials = true;
 
-    public string $email = '';
+    // Perfil de cliente (modo edição)
+    public bool $isAlsoCustomer = false;
 
-    public string $whatsapp = '';
-
-    public string $role = 'supervisor';
-
-    public bool $is_active = true;
-
-    public string $password = '';
-
-    public bool $send_credentials = true;
+    // Fluxo: promover cliente existente a usuário interno
+    public bool   $showPromoteModal = false;
+    public ?int   $candidateUserId  = null;
+    public string $promoteRole      = 'supervisor';
 
     public function mount(?User $user = null): void
     {
@@ -37,12 +40,13 @@ class UsuarioForm extends Component
         if ($user && $user->exists) {
             abort_unless($user->isInternalUser(), 404);
 
-            $this->user = $user;
-            $this->name = $user->name;
-            $this->email = $user->email;
-            $this->whatsapp = $user->whatsapp ?? '';
-            $this->role = $user->role?->value ?? 'supervisor';
-            $this->is_active = $user->is_active;
+            $this->user           = $user;
+            $this->name           = $user->name;
+            $this->email          = $user->email;
+            $this->whatsapp       = $user->whatsapp ?? '';
+            $this->role           = $user->role?->value ?? 'supervisor';
+            $this->is_active      = $user->is_active;
+            $this->isAlsoCustomer = $user->customerProfile !== null;
             $this->send_credentials = false;
         }
     }
@@ -51,32 +55,45 @@ class UsuarioForm extends Component
     {
         abort_unless(auth()->user()?->can('usuarios.gerenciar'), 403);
 
+        // Pre-flight: e-mail pertence a um cliente puro? Oferecer promoção.
+        if (! $this->user) {
+            $existingUser = User::where('email', $this->email)->first();
+
+            if ($existingUser && $existingUser->isCliente()) {
+                $this->candidateUserId  = $existingUser->id;
+                $this->promoteRole      = $this->role;
+                $this->showPromoteModal = true;
+
+                return null;
+            }
+        }
+
         $internalRoleValues = collect($this->internalRoles())->pluck('value')->all();
 
         $validated = $this->validate([
-            'name' => 'required|string|max:255',
-            'email' => [
+            'name'             => 'required|string|max:255',
+            'email'            => [
                 'required',
                 'email',
                 'max:255',
                 Rule::unique('users', 'email')->ignore($this->user?->id),
             ],
-            'whatsapp' => 'nullable|string|max:20',
-            'role' => ['required', Rule::in($internalRoleValues)],
-            'is_active' => 'boolean',
-            'password' => [$this->user ? 'nullable' : 'nullable', 'string', 'min:8', 'max:100'],
+            'whatsapp'         => 'nullable|string|max:20',
+            'role'             => ['required', Rule::in($internalRoleValues)],
+            'is_active'        => 'boolean',
+            'password'         => ['nullable', 'string', 'min:8', 'max:100'],
             'send_credentials' => 'boolean',
         ]);
 
-        $password = $validated['password'] ?: Str::random(12);
-        $role = UserRole::from($validated['role']);
+        $password   = $validated['password'] ?: Str::random(12);
+        $role       = UserRole::from($validated['role']);
         $isCreating = ! $this->user;
 
         $data = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'whatsapp' => $validated['whatsapp'] ?: null,
-            'role' => $role,
+            'name'      => $validated['name'],
+            'email'     => $validated['email'],
+            'whatsapp'  => $validated['whatsapp'] ?: null,
+            'role'      => $role,
             'is_active' => $validated['is_active'],
         ];
 
@@ -89,6 +106,10 @@ class UsuarioForm extends Component
             : User::create($data);
 
         $user->syncRoles([$role->spatieRole()]);
+
+        if (! $isCreating) {
+            $this->syncCustomerProfile($user);
+        }
 
         if (($isCreating || $validated['password']) && $validated['send_credentials']) {
             try {
@@ -106,23 +127,73 @@ class UsuarioForm extends Component
         return redirect()->route('admin.usuarios.index');
     }
 
+    public function cancelPromote(): void
+    {
+        $this->showPromoteModal = false;
+        $this->candidateUserId  = null;
+    }
+
+    public function promoteToInternal(): mixed
+    {
+        abort_unless(auth()->user()?->can('usuarios.gerenciar'), 403);
+
+        $internalRoleValues = collect($this->internalRoles())->pluck('value')->all();
+
+        $this->validate(
+            ['promoteRole' => ['required', Rule::in($internalRoleValues)]],
+            [],
+            ['promoteRole' => 'papel']
+        );
+
+        $user = User::findOrFail($this->candidateUserId);
+        $role = UserRole::from($this->promoteRole);
+
+        $user->update([
+            'role'      => $role,
+            'is_active' => true,
+        ]);
+
+        $user->syncRoles([$role->spatieRole()]);
+
+        $this->showPromoteModal = false;
+        $this->candidateUserId  = null;
+
+        session()->flash('success', "{$user->name} agora tem acesso interno como {$role->label()}. Perfil de cliente e histórico preservados.");
+
+        return redirect()->route('admin.usuarios.index');
+    }
+
     public function render(): View
     {
+        $candidateUser = $this->candidateUserId
+            ? User::find($this->candidateUserId)
+            : null;
+
         return view('livewire.admin.usuarios.usuario-form', [
-            'roles' => $this->internalRoles(),
+            'roles'         => $this->internalRoles(),
+            'candidateUser' => $candidateUser,
         ])->layout('admin.layouts.app', [
             'title' => $this->user ? 'Editar Usuário Interno' : 'Novo Usuário Interno',
         ]);
     }
 
-    /**
-     * @return array<int, UserRole>
-     */
+    private function syncCustomerProfile(User $user): void
+    {
+        $user->load('customerProfile');
+
+        if ($this->isAlsoCustomer && ! $user->customerProfile) {
+            $user->customerProfile()->create(['marketplace_status' => MarketplaceStatus::Active]);
+        } elseif (! $this->isAlsoCustomer && $user->customerProfile) {
+            $user->customerProfile()->delete();
+        }
+    }
+
+    /** @return array<int, UserRole> */
     private function internalRoles(): array
     {
         return array_values(array_filter(
             UserRole::cases(),
-            fn (UserRole $role) => $role->isInternal(),
+            fn (UserRole $r) => $r->isInternal(),
         ));
     }
 }

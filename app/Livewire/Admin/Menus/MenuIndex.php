@@ -11,10 +11,8 @@ class MenuIndex extends Component
 {
     use AuthorizesAdminActions, WithPagination;
 
-    public bool  $showForm  = false;
-    public bool  $confirmDelete = false;
-    public ?int  $deleteId  = null;
-    public string $name     = '';
+    public bool  $showForm = false;
+    public string $name   = '';
     public string $location = 'header';
     public bool   $is_active = true;
     public ?int  $editId    = null;
@@ -67,22 +65,11 @@ class MenuIndex extends Component
         $this->showForm = false;
     }
 
-    public function confirmDelete(int $id): void
+    public function deleteMenu(int $id): void
     {
         $this->authorizeAdminAction('cms.editar');
 
-        $this->deleteId      = $id;
-        $this->confirmDelete = true;
-    }
-
-    public function deleteMenu(): void
-    {
-        $this->authorizeAdminAction('cms.editar');
-
-        Menu::findOrFail($this->deleteId)->delete();
-
-        $this->confirmDelete = false;
-        $this->deleteId      = null;
+        Menu::findOrFail($id)->delete();
 
         session()->flash('success', 'Menu removido.');
     }

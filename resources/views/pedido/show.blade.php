@@ -6,6 +6,7 @@
 @php
     $isMercadoPago = $order->payment_method === 'mercado_pago';
     $isPaid = $order->status === \App\Enums\OrderStatus::PagamentoConfirmado;
+    $shippings = $order->shippings ?? collect();
 @endphp
 
 <main class="max-w-3xl mx-auto px-4 sm:px-6 py-10">
@@ -112,6 +113,36 @@
         <span class="font-semibold text-gray-700">Total do pedido</span>
         <span class="text-2xl font-bold" style="color:#3D3000;">R$ {{ number_format($order->total_amount, 2, ',', '.') }}</span>
     </div>
+
+    {{-- Rastreio de envio --}}
+    @if($shippings->isNotEmpty())
+    <div class="bg-white rounded-2xl border border-gray-200 p-6 mb-8">
+        <h2 class="font-bold text-base mb-4" style="color:#3D3000;">Rastreio de entrega</h2>
+        <div class="space-y-3">
+            @foreach($shippings as $shipping)
+            <div class="flex items-center justify-between gap-4 p-3 bg-gray-50 rounded-xl">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-gray-800">{{ $shipping->expositor?->name }}</p>
+                    <p class="text-xs text-gray-500">
+                        {{ $shipping->status->icon() }} {{ $shipping->status->label() }}
+                        @if($shipping->carrier) &mdash; {{ $shipping->carrier }} @endif
+                        @if($shipping->tracking_code)
+                        &mdash; <span class="font-mono">{{ $shipping->tracking_code }}</span>
+                        @endif
+                    </p>
+                </div>
+                @if($shipping->tracking_code)
+                <a href="{{ route('rastreio.show', $shipping->tracking_code) }}"
+                   class="flex-shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-semibold"
+                   style="background:#1a472a; color:#F4E294;">
+                    Rastrear
+                </a>
+                @endif
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
 
     <div class="text-center flex flex-col sm:flex-row items-center justify-center gap-4">
         <a href="{{ url('/') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white" style="background:#3D3000;">

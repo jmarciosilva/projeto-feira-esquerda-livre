@@ -74,9 +74,83 @@
                 </label>
             </x-admin.card>
 
+            @if($user)
+            <x-admin.card title="Perfil de Cliente">
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" wire:model="isAlsoCustomer" class="mt-1 w-4 h-4 rounded border-gray-300" style="accent-color:#1a472a;">
+                    <span>
+                        <span class="block text-sm font-semibold text-gray-800">Também é cliente do marketplace</span>
+                        <span class="block text-xs text-gray-500">
+                            Permite que este usuário realize compras e tenha histórico de pedidos como cliente.
+                        </span>
+                    </span>
+                </label>
+
+                @if($user->customerProfile)
+                <div class="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
+                    <svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    Perfil de cliente ativo —
+                    status marketplace: <strong>{{ $user->customerProfile->marketplace_status->label() }}</strong>.
+                </div>
+                @endif
+            </x-admin.card>
+            @endif
+
             <x-admin.button type="submit" class="w-full justify-center">
                 Salvar Usuário
             </x-admin.button>
         </div>
     </form>
+
+    {{-- Modal: Promover cliente existente a usuário interno --}}
+    @if($showPromoteModal)
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
+
+            <div class="flex items-start gap-4 mb-5">
+                <div class="w-10 h-10 rounded-full bg-yellow-50 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-base font-semibold text-gray-900">Usuário já existe como cliente</h3>
+                    @if($candidateUser)
+                    <p class="text-sm text-gray-600 mt-1">
+                        <strong>{{ $candidateUser->name }}</strong>
+                        <span class="text-gray-400">({{ $candidateUser->email }})</span>
+                        já é um cliente do marketplace.
+                    </p>
+                    @endif
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 mb-5">
+                Deseja conceder acesso ao painel administrativo para este usuário?
+                Pedidos, endereços e histórico de compras serão totalmente preservados.
+            </div>
+
+            <x-admin.select
+                label="Papel interno a conceder"
+                wire:model="promoteRole"
+                :error="$errors->first('promoteRole')"
+            >
+                @foreach($roles as $roleOption)
+                <option value="{{ $roleOption->value }}">{{ $roleOption->label() }}</option>
+                @endforeach
+            </x-admin.select>
+
+            <div class="flex gap-3 justify-end mt-6">
+                <x-admin.button variant="secondary" wire:click="cancelPromote">
+                    Cancelar
+                </x-admin.button>
+                <x-admin.button wire:click="promoteToInternal">
+                    Conceder Acesso Interno
+                </x-admin.button>
+            </div>
+        </div>
+    </div>
+    @endif
 </div>

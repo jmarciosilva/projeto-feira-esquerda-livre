@@ -77,9 +77,17 @@
                     <div class="mb-3 rounded-lg overflow-hidden border border-gray-200">
                         <img src="{{ Storage::url($image_path) }}" alt="Imagem de capa" class="w-full h-48 object-cover">
                     </div>
-                    <button type="button" wire:click="removeImage"
-                            wire:confirm="Remover a imagem de capa?"
-                            class="mb-3 text-xs text-red-500 hover:text-red-700 font-medium">
+                    <button
+                        type="button"
+                        @click="$dispatch('open-confirm', {
+                            title: 'Remover imagem de capa',
+                            message: 'A imagem de capa será removida. Você poderá fazer upload de uma nova imagem a qualquer momento.',
+                            confirmText: 'Remover',
+                            variant: 'danger',
+                            action: () => $wire.removeImage()
+                        })"
+                        class="mb-3 text-xs text-red-500 hover:text-red-700 font-medium"
+                    >
                         × Remover imagem
                     </button>
                     @endif
@@ -238,4 +246,6 @@
             </div>
         </div>
     </form>
+
+    <x-admin.confirm-modal />
 </div>

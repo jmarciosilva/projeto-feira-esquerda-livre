@@ -12,32 +12,19 @@ class CategoriaIndex extends Component
 {
     use AuthorizesAdminActions, WithPagination;
 
-    public string $search        = '';
-    public string $filterEixo    = '';
-    public bool   $confirmDelete = false;
-    public ?int   $deleteId      = null;
+    public string $search     = '';
+    public string $filterEixo = '';
 
     public function updatingSearch(): void
     {
         $this->resetPage();
     }
 
-    public function confirmDelete(int $id): void
+    public function deleteCategoria(int $id): void
     {
         $this->authorizeAdminAction('cms.editar');
 
-        $this->deleteId      = $id;
-        $this->confirmDelete = true;
-    }
-
-    public function deleteCategoria(): void
-    {
-        $this->authorizeAdminAction('cms.editar');
-
-        ContentCategory::findOrFail($this->deleteId)->delete();
-
-        $this->confirmDelete = false;
-        $this->deleteId      = null;
+        ContentCategory::findOrFail($id)->delete();
 
         session()->flash('success', 'Categoria removida.');
     }

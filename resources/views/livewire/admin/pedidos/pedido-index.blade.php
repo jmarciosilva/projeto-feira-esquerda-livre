@@ -41,10 +41,26 @@
                         </td>
                         <td class="py-3 px-2">
                             @foreach($order->splits as $split)
-                            <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mb-1"
-                                  style="{{ $split->status->value === 'confirmado' ? 'background:#dcfce7; color:#166534;' : 'background:#fef9c3; color:#854d0e;' }}">
-                                {{ $split->expositor?->name }}
-                            </span><br>
+                            @php $sh = $order->shippings->where('order_split_id', $split->id)->first(); @endphp
+                            <div class="flex flex-wrap items-center gap-1 mb-1">
+                                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                                      style="{{ $split->status->value === 'confirmado' ? 'background:#dcfce7; color:#166534;' : 'background:#fef9c3; color:#854d0e;' }}">
+                                    {{ $split->expositor?->name }}
+                                </span>
+                                @if($sh)
+                                <span class="inline-flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded-full
+                                    @if($sh->status === \App\Enums\ShippingStatus::Delivered) bg-green-100 text-green-700
+                                    @elseif($sh->status === \App\Enums\ShippingStatus::InTransit || $sh->status === \App\Enums\ShippingStatus::OutForDelivery) bg-indigo-100 text-indigo-700
+                                    @elseif($sh->status === \App\Enums\ShippingStatus::Failed) bg-red-100 text-red-700
+                                    @else bg-blue-100 text-blue-700 @endif">
+                                    {{ $sh->status->icon() }}
+                                    {{ $sh->status->label() }}
+                                    @if($sh->tracking_code)
+                                    — <a href="{{ route('rastreio.show', $sh->tracking_code) }}" target="_blank" class="underline">{{ $sh->tracking_code }}</a>
+                                    @endif
+                                </span>
+                                @endif
+                            </div>
                             @endforeach
                         </td>
                         <td class="py-3 px-2 hidden sm:table-cell">

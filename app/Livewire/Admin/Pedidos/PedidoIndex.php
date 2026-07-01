@@ -45,7 +45,7 @@ class PedidoIndex extends Component
                   ->orWhere('customer_name', 'like', "%{$this->search}%");
             }))
             ->withCount('items')
-            ->with('splits.expositor')
+            ->with(['splits.expositor', 'shippings'])
             ->latest()
             ->paginate(20);
 

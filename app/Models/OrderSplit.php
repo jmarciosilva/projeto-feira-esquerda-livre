@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\OrderSplitStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class OrderSplit extends Model
 {
@@ -39,6 +40,11 @@ class OrderSplit extends Model
     public function expositor(): BelongsTo
     {
         return $this->belongsTo(Expositor::class);
+    }
+
+    public function shipping(): HasOne
+    {
+        return $this->hasOne(OrderShipping::class, 'order_split_id');
     }
 
     public function confirmar(): void

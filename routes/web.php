@@ -50,6 +50,7 @@ use App\Models\LojistasSolicitacao;
 use App\Models\Menu;
 use App\Models\NewsletterSubscriber;
 use App\Models\Order;
+use App\Models\OrderShipping;
 use App\Models\Post;
 use App\Models\Product;
 use App\Models\SiteSetting;
@@ -247,11 +248,19 @@ Route::get('/pedido/{reference}/pagar', [MercadoPagoPaymentController::class, 's
 
 Route::get('/pedido/{reference}', function (string $reference) {
     $order = Order::where('reference', $reference)
-        ->with(['items', 'splits.expositor'])
+        ->with(['items', 'splits.expositor', 'shippings.expositor'])
         ->firstOrFail();
 
     return view('pedido.show', compact('order'));
 })->name('pedido.show');
+
+Route::get('/rastreio/{trackingCode}', function (string $trackingCode) {
+    $shipping = OrderShipping::where('tracking_code', strtoupper($trackingCode))
+        ->with(['order', 'expositor', 'trackingEvents'])
+        ->firstOrFail();
+
+    return view('rastreio.show', compact('shipping'));
+})->name('rastreio.show');
 
 // ─── Lojas públicas ───────────────────────────────────────────────────────────
 Route::get('/loja/{slug}', function (string $slug) {

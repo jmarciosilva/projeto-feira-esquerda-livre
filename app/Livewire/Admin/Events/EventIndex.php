@@ -12,33 +12,19 @@ class EventIndex extends Component
 {
     use AuthorizesAdminActions, WithPagination;
 
-    public string $search        = '';
-    public string $filterState   = '';
-    public bool   $confirmDelete = false;
-    public ?int   $deleteId      = null;
+    public string $search      = '';
+    public string $filterState = '';
 
     public function updatingSearch(): void
     {
         $this->resetPage();
     }
 
-    public function confirmDelete(int $id): void
+    public function deleteEvent(EventService $service, int $id): void
     {
         $this->authorizeAdminAction('cms.editar');
 
-        $this->deleteId      = $id;
-        $this->confirmDelete = true;
-    }
-
-    public function deleteEvent(EventService $service): void
-    {
-        $this->authorizeAdminAction('cms.editar');
-
-        $event = Event::findOrFail($this->deleteId);
-        $service->delete($event);
-
-        $this->confirmDelete = false;
-        $this->deleteId      = null;
+        $service->delete(Event::findOrFail($id));
 
         session()->flash('success', 'Evento removido.');
     }

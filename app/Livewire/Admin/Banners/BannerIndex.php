@@ -12,32 +12,18 @@ class BannerIndex extends Component
 {
     use AuthorizesAdminActions, WithPagination;
 
-    public string $search        = '';
-    public bool   $confirmDelete = false;
-    public ?int   $deleteId      = null;
+    public string $search = '';
 
     public function updatingSearch(): void
     {
         $this->resetPage();
     }
 
-    public function confirmDelete(int $id): void
+    public function deleteBanner(BannerService $service, int $id): void
     {
         $this->authorizeAdminAction('cms.editar');
 
-        $this->deleteId      = $id;
-        $this->confirmDelete = true;
-    }
-
-    public function deleteBanner(BannerService $service): void
-    {
-        $this->authorizeAdminAction('cms.editar');
-
-        $banner = Banner::findOrFail($this->deleteId);
-        $service->delete($banner);
-
-        $this->confirmDelete = false;
-        $this->deleteId      = null;
+        $service->delete(Banner::findOrFail($id));
 
         session()->flash('success', 'Banner removido com sucesso.');
     }

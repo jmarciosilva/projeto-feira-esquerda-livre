@@ -28,6 +28,9 @@
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
+/* ── Alpine.js: impede flash de conteúdo antes da inicialização ─────────── */
+[x-cloak] { display: none !important; }
+
 /* ── Conteúdo HTML do contrato de expositor ─────────────────────────────── */
 .contrato-content { color: #374151; font-size: 0.875rem; line-height: 1.75; }
 .contrato-content h2 { font-size: 1rem; font-weight: 700; color: #3D3000; margin: 1.25rem 0 0.5rem; }

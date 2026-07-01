@@ -29,13 +29,14 @@
                         <th class="text-left py-4 px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Pedido</th>
                         <th class="text-left py-4 px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Itens</th>
                         <th class="text-left py-4 px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Valor</th>
-                        <th class="text-center py-4 px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="text-center py-4 px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Pagamento</th>
+                        <th class="text-center py-4 px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Envio</th>
                         <th class="text-right py-4 px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider">Ações</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
                     @forelse($splits as $split)
-                    @php $order = $split->order; @endphp
+                    @php $order = $split->order; $shipping = $split->shipping; @endphp
                     <tr class="hover:bg-gray-50 transition-colors">
                         <td class="py-4 px-4">
                             <p class="font-semibold text-gray-900">#{{ $order->reference }}</p>
@@ -53,22 +54,62 @@
                                 {{ $split->status->label() }}
                             </span>
                         </td>
-                        <td class="py-4 px-4 text-right">
-                            @if($split->status->value === 'pendente')
-                            <button wire:click="confirmar({{ $split->id }})"
-                                    wire:confirm="Confirmar que o pagamento do pedido #{{ $order->reference }} foi recebido?"
-                                    class="px-3 py-2 rounded-lg text-sm font-semibold border-2 transition-colors"
-                                    style="border-color: #16a34a; color: #16a34a; min-height: 40px;">
-                                Confirmar Pagamento
-                            </button>
+                        <td class="py-4 px-4 text-center hidden md:table-cell">
+                            @if($shipping)
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold
+                                    @if($shipping->status === \App\Enums\ShippingStatus::Delivered) bg-green-100 text-green-800
+                                    @elseif($shipping->status === \App\Enums\ShippingStatus::OutForDelivery) bg-yellow-100 text-yellow-800
+                                    @elseif($shipping->status === \App\Enums\ShippingStatus::InTransit) bg-indigo-100 text-indigo-800
+                                    @elseif($shipping->status === \App\Enums\ShippingStatus::Failed) bg-red-100 text-red-800
+                                    @else bg-blue-100 text-blue-800
+                                    @endif">
+                                    {{ $shipping->status->icon() }} {{ $shipping->status->label() }}
+                                </span>
+                                @if($shipping->tracking_code)
+                                <p class="text-xs text-gray-400 mt-1 font-mono">{{ $shipping->tracking_code }}</p>
+                                @endif
+                                @if($shipping->tracking_code)
+                                <a href="{{ route('rastreio.show', $shipping->tracking_code) }}" target="_blank"
+                                   class="text-xs font-semibold mt-1 inline-block" style="color:#1a472a;">
+                                    Ver rastreio ↗
+                                </a>
+                                @endif
                             @else
-                            <span class="text-xs text-gray-400">Confirmado em {{ $split->confirmed_at?->format('d/m/Y H:i') }}</span>
+                                <span class="text-xs text-gray-400">—</span>
                             @endif
+                        </td>
+                        <td class="py-4 px-4 text-right">
+                            <div class="flex flex-col items-end gap-2">
+                                @if($split->status->value === 'pendente')
+                                <button wire:click="confirmar({{ $split->id }})"
+                                        @click="$dispatch('open-confirm', {
+                                            title: 'Confirmar pagamento',
+                                            message: 'Confirmar que o pagamento do pedido #{{ $order->reference }} foi recebido?',
+                                            confirmText: 'Confirmar',
+                                            variant: 'success',
+                                            action: () => $wire.confirmar({{ $split->id }})
+                                        })"
+                                        class="px-3 py-2 rounded-lg text-sm font-semibold border-2 transition-colors"
+                                        style="border-color: #16a34a; color: #16a34a; min-height: 40px;">
+                                    Confirmar Pagamento
+                                </button>
+                                @else
+                                <span class="text-xs text-gray-400">Pago {{ $split->confirmed_at?->format('d/m') }}</span>
+                                @endif
+
+                                @if($split->status->value === 'confirmado' && (! $shipping || ! $shipping->status->isTerminal()))
+                                <button wire:click="openShipModal({{ $split->id }})"
+                                        class="px-3 py-2 rounded-lg text-sm font-semibold border-2 transition-colors"
+                                        style="border-color: #1a472a; color: #1a472a; min-height: 40px;">
+                                    {{ $shipping ? 'Atualizar Envio' : 'Marcar Enviado' }}
+                                </button>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="py-16 text-center">
+                        <td colspan="6" class="py-16 text-center">
                             <div class="text-5xl mb-4">📦</div>
                             <p class="text-lg font-semibold text-gray-500">Nenhum pedido encontrado.</p>
                         </td>
@@ -84,4 +125,69 @@
         </div>
         @endif
     </div>
+
+    {{-- Modal: Marcar como Enviado --}}
+    @if($showShipModal)
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1.343 9.372A2 2 0 008.33 19h7.34a2 2 0 001.987-1.628L19 8M10 12h4"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Marcar pedido como enviado</h3>
+                    <p class="text-xs text-gray-500">O cliente receberá uma notificação por e-mail com o código de rastreio.</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Transportadora <span class="text-red-500">*</span></label>
+                    <select wire:model="carrier"
+                            class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a472a]">
+                        <option value="">Selecione...</option>
+                        <option value="Correios">Correios</option>
+                        <option value="Jadlog">Jadlog</option>
+                        <option value="Azul Cargo">Azul Cargo</option>
+                        <option value="Sequoia">Sequoia</option>
+                        <option value="Total Express">Total Express</option>
+                        <option value="Loggi">Loggi</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                    @error('carrier') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Código de rastreio <span class="text-red-500">*</span></label>
+                    <input wire:model="trackingCode" type="text" placeholder="Ex: BR000000000BR"
+                           class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-[#1a472a]">
+                    @error('trackingCode') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Data de envio <span class="text-red-500">*</span></label>
+                    <input wire:model="shippedAtDate" type="date" max="{{ now()->format('Y-m-d') }}"
+                           class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a472a]">
+                    @error('shippedAtDate') <p class="text-red-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+            </div>
+
+            <div class="flex gap-3 justify-end mt-6">
+                <button wire:click="closeShipModal"
+                        class="px-4 py-2.5 rounded-xl text-sm font-semibold border-2 border-gray-200 text-gray-600 hover:bg-gray-50">
+                    Cancelar
+                </button>
+                <button wire:click="markAsShipped"
+                        class="px-5 py-2.5 rounded-xl text-sm font-bold text-white"
+                        style="background:#1a472a;">
+                    Confirmar Envio
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    <x-admin.confirm-modal />
 </div>

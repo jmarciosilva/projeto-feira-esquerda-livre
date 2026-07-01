@@ -85,16 +85,26 @@
                         <td class="py-3 pr-4">
                             @if ($client->customerProfile?->marketplace_status === \App\Enums\MarketplaceStatus::Active)
                                 <button
-                                    wire:click="inactivateCustomer({{ $client->id }})"
-                                    wire:confirm="Inativar {{ $client->name }} no marketplace? Ele não poderá finalizar compras enquanto estiver inativo."
+                                    @click="$dispatch('open-confirm', {
+                                        title: 'Inativar cliente no marketplace',
+                                        message: 'O cliente ficará impedido de finalizar compras enquanto estiver inativo. O acesso ao painel não será afetado.',
+                                        confirmText: 'Inativar',
+                                        variant: 'danger',
+                                        action: () => $wire.inactivateCustomer({{ $client->id }})
+                                    })"
                                     class="text-sm font-medium text-red-600 hover:text-red-800 transition-colors"
                                 >
                                     Inativar
                                 </button>
                             @else
                                 <button
-                                    wire:click="activateCustomer({{ $client->id }})"
-                                    wire:confirm="Reativar {{ $client->name }} no marketplace?"
+                                    @click="$dispatch('open-confirm', {
+                                        title: 'Reativar cliente no marketplace',
+                                        message: 'O cliente voltará a poder realizar compras normalmente no marketplace.',
+                                        confirmText: 'Reativar',
+                                        variant: 'success',
+                                        action: () => $wire.activateCustomer({{ $client->id }})
+                                    })"
                                     class="text-sm font-medium text-green-700 hover:text-green-900 transition-colors"
                                 >
                                     Reativar
@@ -118,4 +128,6 @@
             {{ $clients->links() }}
         </div>
     </x-admin.card>
+
+    <x-admin.confirm-modal />
 </div>

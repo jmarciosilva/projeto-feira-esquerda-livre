@@ -9,6 +9,7 @@ use App\Livewire\Admin\Pages\PageIndex;
 use App\Livewire\Admin\Pedidos\PedidoIndex;
 use App\Livewire\Admin\Permissoes\PerfilAcessoIndex;
 use App\Livewire\Admin\Usuarios\UsuarioForm;
+use App\Livewire\Admin\Usuarios\UsuarioIndex;
 use App\Mail\InternalUserAccessCreated;
 use App\Models\CustomerProfile;
 use App\Models\Order;
@@ -295,6 +296,124 @@ class AdminUserGovernanceTest extends TestCase
             ->set('status', 'inactive')
             ->assertSee($inactiveClient->name)
             ->assertDontSee($activeClient->name);
+    }
+
+    public function test_save_shows_promote_modal_when_email_belongs_to_customer(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin   = $this->makeUser(UserRole::Admin);
+        $cliente = $this->makeUser(UserRole::User, ['email' => 'cliente-existente@example.com']);
+
+        Livewire::actingAs($admin)
+            ->test(UsuarioForm::class)
+            ->set('name', 'Novo Nome')
+            ->set('email', 'cliente-existente@example.com')
+            ->set('role', 'gerente')
+            ->call('save')
+            ->assertSet('showPromoteModal', true)
+            ->assertSet('candidateUserId', $cliente->id)
+            ->assertSet('promoteRole', 'gerente');
+    }
+
+    public function test_promote_customer_to_internal_user_preserves_customer_profile_and_orders(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin   = $this->makeUser(UserRole::Admin);
+        $cliente = $this->makeUser(UserRole::User);
+
+        $this->assertNotNull($cliente->fresh()->customerProfile);
+
+        Livewire::actingAs($admin)
+            ->test(UsuarioForm::class)
+            ->set('candidateUserId', $cliente->id)
+            ->set('promoteRole', 'gerente')
+            ->call('promoteToInternal');
+
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $fresh = $cliente->fresh()->load('roles');
+
+        // Papel interno atribuído
+        $this->assertSame(UserRole::Gerente, $fresh->role);
+        $this->assertTrue($fresh->isInternalUser());
+        $this->assertTrue($fresh->hasRole('gerente'));
+        $this->assertTrue($fresh->can('admin.acessar'));
+
+        // CustomerProfile intacto
+        $this->assertNotNull($fresh->customerProfile);
+        $this->assertSame(MarketplaceStatus::Active, $fresh->customerProfile->marketplace_status);
+
+        // Aparece na lista de clientes (ClienteIndex usa whereHas('customerProfile'))
+        $this->actingAs($admin)->get(route('admin.clientes.index'))->assertOk()->assertSee($fresh->name);
+    }
+
+    public function test_supervisor_cannot_access_promote_form(): void
+    {
+        // Supervisor não tem usuarios.gerenciar → o formulário retorna 403 no mount()
+        $this->seed(RolePermissionSeeder::class);
+        $supervisor = $this->makeUser(UserRole::Supervisor);
+
+        $this->actingAs($supervisor)
+            ->get(route('admin.usuarios.create'))
+            ->assertForbidden();
+    }
+
+    public function test_edit_form_can_add_customer_profile_to_internal_user(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin    = $this->makeUser(UserRole::Admin);
+        $gerente  = $this->makeUser(UserRole::Gerente);
+
+        // Gerente sem CustomerProfile inicialmente
+        $this->assertNull($gerente->fresh()->customerProfile);
+
+        Livewire::actingAs($admin)
+            ->test(UsuarioForm::class, ['user' => $gerente])
+            ->assertSet('isAlsoCustomer', false)
+            ->set('isAlsoCustomer', true)
+            ->call('save');
+
+        $this->assertNotNull($gerente->fresh()->customerProfile);
+    }
+
+    public function test_edit_form_can_remove_customer_profile_from_internal_user(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin   = $this->makeUser(UserRole::Admin);
+        $gerente = $this->makeUser(UserRole::Gerente);
+
+        // Cria CustomerProfile manualmente
+        CustomerProfile::create(['user_id' => $gerente->id, 'marketplace_status' => MarketplaceStatus::Active]);
+        $this->assertNotNull($gerente->fresh()->customerProfile);
+
+        Livewire::actingAs($admin)
+            ->test(UsuarioForm::class, ['user' => $gerente])
+            ->assertSet('isAlsoCustomer', true)
+            ->set('isAlsoCustomer', false)
+            ->call('save');
+
+        $this->assertNull($gerente->fresh()->customerProfile);
+    }
+
+    public function test_hybrid_user_shows_customer_badge_in_usuario_index(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin   = $this->makeUser(UserRole::Admin);
+        $gerente = $this->makeUser(UserRole::Gerente, ['name' => 'Gerente Híbrido']);
+
+        // Sem CustomerProfile: badge não deve aparecer
+        Livewire::actingAs($admin)
+            ->test(UsuarioIndex::class)
+            ->assertSee('Gerente Híbrido')
+            ->assertDontSee('Cliente'); // nenhum badge cliente ainda
+
+        // Adiciona CustomerProfile: badge deve aparecer
+        CustomerProfile::create(['user_id' => $gerente->id, 'marketplace_status' => MarketplaceStatus::Active]);
+
+        Livewire::actingAs($admin)
+            ->test(UsuarioIndex::class)
+            ->assertSee('Gerente Híbrido')
+            ->assertSee('Cliente');
     }
 
     /**

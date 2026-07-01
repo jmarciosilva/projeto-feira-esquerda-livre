@@ -90,6 +90,11 @@ class Order extends Model
         return $this->hasMany(OrderSplit::class);
     }
 
+    public function shippings(): HasMany
+    {
+        return $this->hasMany(OrderShipping::class);
+    }
+
     public function scopeStatus(Builder $query, OrderStatus $status): Builder
     {
         return $query->where('status', $status);

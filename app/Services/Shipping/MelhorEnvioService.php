@@ -113,6 +113,63 @@ class MelhorEnvioService
         return $this->calculate((string) $store->zipcode, $destinationZipcode, $products);
     }
 
+    /**
+     * Consulta eventos de rastreio de um código no Melhor Envio.
+     *
+     * @return array<int, array{status: string, description: string, location: ?string, happened_at: string}>
+     */
+    public function track(string $trackingCode): array
+    {
+        if (! $this->isConfigured() || blank($trackingCode)) {
+            return [];
+        }
+
+        try {
+            $response = Http::baseUrl($this->baseUrl())
+                ->withToken($this->token())
+                ->acceptJson()
+                ->timeout($this->timeout())
+                ->get('/api/v2/me/shipper/orders/tracking', ['q' => $trackingCode])
+                ->throw();
+
+            $data = $response->json();
+
+            if (! is_array($data)) {
+                return [];
+            }
+
+            return $this->normalizeTrackingEvents($data);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+    }
+
+    /**
+     * @param  array<mixed>  $data
+     * @return array<int, array{status: string, description: string, location: ?string, happened_at: string}>
+     */
+    private function normalizeTrackingEvents(array $data): array
+    {
+        $events = $data['tracking'] ?? $data['events'] ?? $data;
+
+        if (! is_array($events)) {
+            return [];
+        }
+
+        return collect($events)
+            ->filter(fn ($e) => is_array($e))
+            ->map(fn (array $e) => [
+                'status'      => (string) ($e['status'] ?? 'in_transit'),
+                'description' => (string) ($e['message'] ?? $e['description'] ?? 'Atualização de status'),
+                'location'    => isset($e['city'], $e['state']) ? "{$e['city']}, {$e['state']}" : null,
+                'happened_at' => $e['event_date'] ?? $e['created_at'] ?? now()->toDateTimeString(),
+            ])
+            ->values()
+            ->all();
+    }
+
     public function isConfigured(): bool
     {
         return filled($this->token()) && filled($this->baseUrl());
