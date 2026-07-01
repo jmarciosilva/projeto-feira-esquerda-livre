@@ -120,6 +120,44 @@
                     </div>
                     @endif
 
+                    @if($item_type === 'produto')
+                    <div class="rounded-2xl border border-yellow-100 p-4" style="background:#FFFBEB;">
+                        <h3 class="text-base font-bold mb-1" style="color:#3D3000;">Dados para Frete</h3>
+                        <p class="text-sm text-gray-500 mb-4">Preencha quando quiser liberar cotação automática pelo Melhor Envio.</p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Peso (kg)</label>
+                                <input wire:model="weight" type="number" step="0.001" min="0" placeholder="0.300"
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000]"
+                                       style="min-height: 52px;">
+                                @error('weight')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Altura (cm)</label>
+                                <input wire:model="height" type="number" step="0.01" min="0" placeholder="4"
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000]"
+                                       style="min-height: 52px;">
+                                @error('height')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Largura (cm)</label>
+                                <input wire:model="width" type="number" step="0.01" min="0" placeholder="16"
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000]"
+                                       style="min-height: 52px;">
+                                @error('width')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Comprimento (cm)</label>
+                                <input wire:model="length" type="number" step="0.01" min="0" placeholder="24"
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000]"
+                                       style="min-height: 52px;">
+                                @error('length')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
                     {{-- Categoria --}}
                     <div>
                         <label class="block text-base font-semibold text-gray-700 mb-2">Categoria</label>

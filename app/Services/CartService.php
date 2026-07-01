@@ -6,6 +6,7 @@ use App\Models\CartItem;
 use App\Models\Product;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
 class CartService
@@ -17,6 +18,10 @@ class CartService
 
     private function baseQuery()
     {
+        if (Auth::check()) {
+            return CartItem::where('user_id', Auth::id());
+        }
+
         return CartItem::where('session_id', $this->sessionId());
     }
 
@@ -86,14 +91,37 @@ class CartService
     }
 
     /**
-     * Reatribui o carrinho de uma sessão antiga (convidado) para a nova sessão + usuário,
-     * necessário porque o login/cadastro regenera o ID de sessão por segurança.
+     * Mescla o carrinho guest no carrinho do usuário após login ou cadastro.
      */
     public function reassignSession(string $oldSessionId, int $userId): void
     {
-        CartItem::where('session_id', $oldSessionId)->update([
-            'session_id' => $this->sessionId(),
-            'user_id'    => $userId,
-        ]);
+        DB::transaction(function () use ($oldSessionId, $userId) {
+            $guestItems = CartItem::where('session_id', $oldSessionId)
+                ->whereNull('user_id')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($guestItems as $guestItem) {
+                $userItem = CartItem::where('user_id', $userId)
+                    ->where('product_id', $guestItem->product_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($userItem) {
+                    $userItem->increment('quantity', $guestItem->quantity);
+                    $guestItem->delete();
+                    continue;
+                }
+
+                $guestItem->update([
+                    'session_id' => $this->sessionId(),
+                    'user_id'    => $userId,
+                ]);
+            }
+
+            CartItem::where('user_id', $userId)->update([
+                'session_id' => $this->sessionId(),
+            ]);
+        });
     }
 }

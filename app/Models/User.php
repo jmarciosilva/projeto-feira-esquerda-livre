@@ -83,4 +83,19 @@ class User extends Authenticatable
     {
         return $this->hasMany(Order::class);
     }
+
+    public function feedLikes(): HasMany
+    {
+        return $this->hasMany(FeedLike::class);
+    }
+
+    public function feedComments(): HasMany
+    {
+        return $this->hasMany(FeedComment::class);
+    }
+
+    public function feedReports(): HasMany
+    {
+        return $this->hasMany(FeedReport::class);
+    }
 }

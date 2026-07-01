@@ -48,7 +48,34 @@ class RegisteredUserController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
         $cart->reassignSession($oldSessionId, $user->id);
+        $redirectTo = $this->safeRedirectPath($request);
 
-        return redirect()->intended(route('cliente.pedidos.index'));
+        return $redirectTo
+            ? redirect($redirectTo)
+            : redirect()->intended(route('cliente.pedidos.index'));
+    }
+
+    private function safeRedirectPath(Request $request): ?string
+    {
+        $redirectTo = (string) $request->input('redirect_to', '');
+
+        if ($redirectTo === '') {
+            return null;
+        }
+
+        $parts = parse_url($redirectTo);
+
+        if ($parts === false) {
+            return null;
+        }
+
+        if (isset($parts['host']) && $parts['host'] !== $request->getHost()) {
+            return null;
+        }
+
+        $path = $parts['path'] ?? '/';
+        $query = isset($parts['query']) ? '?' . $parts['query'] : '';
+
+        return str_starts_with($path, '/') ? $path . $query : null;
     }
 }

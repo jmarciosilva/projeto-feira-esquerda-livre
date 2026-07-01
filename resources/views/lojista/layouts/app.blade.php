@@ -80,6 +80,15 @@
                 Meus Produtos
             </a>
 
+            <a href="{{ route('lojista.feed.index') }}"
+               class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('lojista.feed.*') ? 'text-[#3D3000] font-semibold' : 'text-[#D4B800] hover:text-white hover:bg-[#5C4500]' }}"
+               style="{{ request()->routeIs('lojista.feed.*') ? 'background:#F4E294;' : '' }}">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h6m-8 8l4-4h8a3 3 0 003-3V7a3 3 0 00-3-3H7a3 3 0 00-3 3v6a3 3 0 003 3h1l-3 4z"/>
+                </svg>
+                Comunidade
+            </a>
+
             <a href="{{ route('lojista.pedidos.index') }}"
                class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('lojista.pedidos.*') ? 'text-[#3D3000] font-semibold' : 'text-[#D4B800] hover:text-white hover:bg-[#5C4500]' }}"
                style="{{ request()->routeIs('lojista.pedidos.*') ? 'background:#F4E294;' : '' }}">

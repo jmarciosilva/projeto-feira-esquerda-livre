@@ -158,6 +158,7 @@
                             </a>
                         @endif
                     @endforeach
+                    <a href="{{ route('feed.index') }}" class="nav-link">Comunidade</a>
                 </nav>
             @else
                 <nav class="hidden md:flex items-center gap-1">
@@ -165,6 +166,7 @@
                     <a href="#agenda" class="nav-link">Agenda</a>
                     <a href="#expositores" class="nav-link">Expositores</a>
                     <a href="#marketplace" class="nav-link">Marketplace</a>
+                    <a href="{{ route('feed.index') }}" class="nav-link">Comunidade</a>
                     <a href="#noticias" class="nav-link">Notícias</a>
                     <a href="#sobre" class="nav-link">Sobre</a>
                     <a href="#contato" class="nav-link">Contato</a>
@@ -269,8 +271,16 @@
                     </a>
                 @endforeach
             @endforeach
+
+            <a href="{{ route('feed.index') }}"
+               class="block px-6 py-4 text-base font-semibold border-b transition-colors"
+               style="color: #3D3000; border-color: #F4E294;"
+               onmouseover="this.style.backgroundColor='#F4E294'"
+               onmouseout="this.style.backgroundColor=''">
+                Comunidade
+            </a>
         @else
-            @foreach(['Início' => '#', 'Agenda' => '#agenda', 'Expositores' => '#expositores', 'Marketplace' => '#marketplace', 'Notícias' => '#noticias', 'Sobre' => '#sobre', 'Contato' => '#contato'] as $label => $href)
+            @foreach(['Início' => '#', 'Agenda' => '#agenda', 'Expositores' => '#expositores', 'Marketplace' => '#marketplace', 'Comunidade' => route('feed.index'), 'Notícias' => '#noticias', 'Sobre' => '#sobre', 'Contato' => '#contato'] as $label => $href)
                 <a href="{{ $href }}"
                    class="block px-6 py-4 text-base font-semibold border-b transition-colors"
                    style="color: #3D3000; border-color: #F4E294;"

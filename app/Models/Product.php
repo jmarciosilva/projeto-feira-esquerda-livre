@@ -8,6 +8,7 @@ use App\Enums\PriceType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Product extends Model
@@ -22,6 +23,10 @@ class Product extends Model
         'image_path',
         'images',
         'price',
+        'weight',
+        'height',
+        'width',
+        'length',
         'price_type',
         'modality',
         'duration_min',
@@ -35,14 +40,18 @@ class Product extends Model
     protected function casts(): array
     {
         return [
-            'item_type'      => ItemType::class,
-            'price_type'     => PriceType::class,
-            'modality'       => Modality::class,
-            'price'          => 'decimal:2',
-            'has_stock'      => 'boolean',
-            'is_featured'    => 'boolean',
-            'is_active'      => 'boolean',
-            'images'         => 'array',
+            'item_type' => ItemType::class,
+            'price_type' => PriceType::class,
+            'modality' => Modality::class,
+            'price' => 'decimal:2',
+            'weight' => 'decimal:3',
+            'height' => 'decimal:2',
+            'width' => 'decimal:2',
+            'length' => 'decimal:2',
+            'has_stock' => 'boolean',
+            'is_featured' => 'boolean',
+            'is_active' => 'boolean',
+            'images' => 'array',
         ];
     }
 
@@ -70,11 +79,12 @@ class Product extends Model
     {
         $images = $this->images;
         if (! empty($images[0]['medium'])) {
-            return \Illuminate\Support\Facades\Storage::url($images[0]['medium']);
+            return Storage::url($images[0]['medium']);
         }
         if ($this->image_path) {
-            return \Illuminate\Support\Facades\Storage::url($this->image_path);
+            return Storage::url($this->image_path);
         }
+
         return null;
     }
 

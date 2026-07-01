@@ -129,6 +129,35 @@
                            placeholder="https://seusite.com.br">
                     @error('website_url')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">CEP de origem</label>
+                    <input wire:model="zipcode" type="text"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000] focus:border-transparent"
+                           placeholder="00000-000">
+                    <p class="mt-1 text-xs text-gray-400">Usado para calcular frete pelo Melhor Envio.</p>
+                    @error('zipcode')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Rua</label>
+                    <input wire:model="street" type="text"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000] focus:border-transparent"
+                           placeholder="Rua da loja">
+                    @error('street')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Número</label>
+                    <input wire:model="number" type="text"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000] focus:border-transparent"
+                           placeholder="123">
+                    @error('number')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Bairro</label>
+                    <input wire:model="district" type="text"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000] focus:border-transparent"
+                           placeholder="Centro">
+                    @error('district')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Cidade</label>

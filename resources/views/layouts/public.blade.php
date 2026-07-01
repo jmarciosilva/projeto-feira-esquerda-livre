@@ -29,6 +29,7 @@
                 <a href="{{ url('/servicos') }}" class="hover:opacity-70 transition-opacity">🎯 Serviços</a>
                 <a href="{{ url('/cuidados') }}" class="hover:opacity-70 transition-opacity">🌿 Cuidados</a>
                 <a href="{{ route('agenda.index') }}" class="hover:opacity-70 transition-opacity">Agenda</a>
+                <a href="{{ route('feed.index') }}" class="hover:opacity-70 transition-opacity">Comunidade</a>
                 <a href="{{ route('seja-um-expositor') }}" class="hover:opacity-70 transition-opacity">Seja Expositor</a>
             </div>
             <div class="flex items-center gap-2">
@@ -113,6 +114,7 @@
             <a href="{{ url('/cuidados') }}" class="block px-3 py-2 rounded-lg text-sm font-medium" style="color:#3D3000;">🌿 Cuidados & Bem Viver</a>
             <div class="border-t my-2" style="border-color:#D4B800;"></div>
             <a href="{{ route('agenda.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium" style="color:#3D3000;">Agenda de Feiras</a>
+            <a href="{{ route('feed.index') }}" class="block px-3 py-2 rounded-lg text-sm font-medium" style="color:#3D3000;">Comunidade</a>
             <a href="{{ route('seja-um-expositor') }}" class="block px-3 py-2 rounded-lg text-sm font-medium" style="color:#3D3000;">Seja um Expositor</a>
 
             @if(auth()->check())
@@ -164,6 +166,7 @@
                     <a href="{{ url('/servicos') }}" class="block hover:opacity-70">🎯 Serviços</a>
                     <a href="{{ url('/cuidados') }}" class="block hover:opacity-70">🌿 Cuidados & Bem Viver</a>
                     <a href="{{ route('agenda.index') }}" class="block hover:opacity-70">Agenda de Feiras</a>
+                    <a href="{{ route('feed.index') }}" class="block hover:opacity-70">Comunidade</a>
                     <a href="{{ route('seja-um-expositor') }}" class="block hover:opacity-70">Seja um Expositor</a>
                 </div>
             </div>

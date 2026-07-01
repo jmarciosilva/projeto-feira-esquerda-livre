@@ -1,10 +1,9 @@
 <div>
-    {{-- Cart icon trigger (floating or inline) --}}
     <button wire:click="toggle"
             class="relative flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-base transition-colors"
             style="background: #3D3000; color: #F4E294; min-height: 44px;"
-            aria-label="Carrinho">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            aria-label="Abrir carrinho">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
         </svg>
         <span class="hidden sm:inline">Carrinho</span>
@@ -14,112 +13,152 @@
         @endif
     </button>
 
-    {{-- Drawer backdrop --}}
     @if($open)
-    <div class="fixed inset-0 z-40 bg-black/50" wire:click="toggle"></div>
+    <div class="fixed inset-0 z-40 bg-black/70" wire:click="toggle"></div>
     @endif
 
-    {{-- Drawer panel --}}
-    <div class="fixed top-0 right-0 z-50 h-full w-full max-w-md bg-white shadow-2xl flex flex-col transition-transform duration-300 {{ $open ? 'translate-x-0' : 'translate-x-full' }}">
-
-        {{-- Header --}}
-        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <h2 class="text-lg font-bold text-gray-900">
-                Carrinho
+    <aside class="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl ring-1 ring-black/10 transition-transform duration-300 {{ $open ? 'translate-x-0' : 'translate-x-full' }}"
+           style="height: 100dvh;"
+           aria-label="Carrinho de compras">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-white">
+            <div>
+                <h2 class="text-xl font-bold text-gray-900">Carrinho</h2>
                 @if($count > 0)
-                <span class="ml-2 text-sm font-medium text-gray-500">({{ $count }} {{ $count === 1 ? 'item' : 'itens' }})</span>
+                <p class="text-sm text-gray-500">{{ $count }} {{ $count === 1 ? 'item' : 'itens' }} no carrinho</p>
                 @endif
-            </h2>
-            <button wire:click="toggle" class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            </div>
+            <button wire:click="toggle"
+                    class="w-11 h-11 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors"
+                    aria-label="Fechar carrinho">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
             </button>
         </div>
 
-        {{-- Items --}}
-        <div class="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+        <div class="flex-1 min-h-0 overflow-y-auto bg-white px-5 py-4">
             @forelse($grouped as $expositorId => $storeItems)
             @php $firstItem = $storeItems->first(); @endphp
-            <div>
-                {{-- Store name --}}
-                <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
-                    {{ $firstItem->expositor?->name ?? 'Loja' }}
-                </p>
+            <section class="mb-6 last:mb-0">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <p class="text-xs font-bold uppercase tracking-wide text-gray-500">
+                        {{ $firstItem->expositor?->name ?? 'Loja' }}
+                    </p>
+                    <p class="text-xs font-semibold text-gray-400">
+                        {{ $storeItems->sum('quantity') }} {{ $storeItems->sum('quantity') === 1 ? 'item' : 'itens' }}
+                    </p>
+                </div>
 
                 <div class="space-y-3">
                     @foreach($storeItems as $item)
-                    <div class="flex gap-3 items-start">
-                        {{-- Thumb --}}
-                        @php
-                            $imgs = $item->product?->images ?? [];
-                            $thumb = !empty($imgs[0]['thumb']) ? \Storage::url($imgs[0]['thumb']) : ($item->product?->image_path ? \Storage::url($item->product->image_path) : null);
-                        @endphp
-                        @if($thumb)
-                        <img src="{{ $thumb }}" alt="{{ $item->product?->name }}"
-                             class="w-16 h-16 rounded-xl object-cover flex-shrink-0 border border-gray-100">
-                        @else
-                        <div class="w-16 h-16 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl border border-gray-100"
-                             style="background: linear-gradient(135deg, #F4E294, #E8A000);">🛍</div>
-                        @endif
+                    @php
+                        $imgs = $item->product?->images ?? [];
+                        $thumb = !empty($imgs[0]['thumb'])
+                            ? \Storage::url($imgs[0]['thumb'])
+                            : ($item->product?->image_path ? \Storage::url($item->product->image_path) : null);
+                    @endphp
+                    <article class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm" wire:key="cart-item-{{ $item->id }}">
+                        <div class="flex gap-3">
+                            @if($thumb)
+                            <img src="{{ $thumb }}"
+                                 alt="{{ $item->product?->name ?? 'Produto' }}"
+                                 class="w-20 h-20 rounded-lg object-cover flex-shrink-0 border border-gray-100">
+                            @else
+                            <div class="w-20 h-20 rounded-lg flex-shrink-0 flex items-center justify-center border border-gray-100"
+                                 style="background: linear-gradient(135deg, #F4E294, #E8A000);">
+                                <svg class="w-8 h-8" fill="none" stroke="#3D3000" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l-1 11H6L5 9z"/>
+                                </svg>
+                            </div>
+                            @endif
 
-                        {{-- Info --}}
-                        <div class="flex-1 min-w-0">
-                            <p class="font-semibold text-gray-900 text-sm leading-tight truncate">{{ $item->product?->name }}</p>
-                            <p class="text-sm font-bold mt-0.5" style="color: #C47A00;">
-                                R$ {{ number_format((float) $item->price_snapshot, 2, ',', '.') }}
-                            </p>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <h3 class="text-sm font-bold leading-snug text-gray-900">
+                                            {{ $item->product?->name ?? 'Produto removido' }}
+                                        </h3>
+                                        <p class="mt-1 text-xs font-semibold text-gray-500">
+                                            Unitário: R$ {{ number_format((float) $item->price_snapshot, 2, ',', '.') }}
+                                        </p>
+                                    </div>
+                                    <button wire:click="remove({{ $item->id }})"
+                                            wire:loading.attr="disabled"
+                                            class="w-9 h-9 rounded-full flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors"
+                                            title="Remover item"
+                                            aria-label="Remover {{ $item->product?->name ?? 'produto' }}">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4h6v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </div>
 
-                            {{-- Qty controls --}}
-                            <div class="flex items-center gap-2 mt-2">
-                                <button wire:click="updateQty({{ $item->id }}, {{ max(1, $item->quantity - 1) }})"
-                                        class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 font-bold text-lg transition-colors"
-                                        @if($item->quantity <= 1) disabled @endif>−</button>
-                                <span class="text-base font-semibold text-gray-800 w-5 text-center">{{ $item->quantity }}</span>
-                                <button wire:click="updateQty({{ $item->id }}, {{ $item->quantity + 1 }})"
-                                        class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 font-bold text-lg transition-colors">+</button>
-                                <button wire:click="remove({{ $item->id }})"
-                                        class="ml-auto text-red-400 hover:text-red-600 transition-colors" title="Remover">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                    </svg>
-                                </button>
+                                <div class="mt-3 flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-2">
+                                        <button type="button"
+                                                wire:click="updateQty({{ $item->id }}, {{ max(1, $item->quantity - 1) }})"
+                                                wire:loading.attr="disabled"
+                                                @disabled($item->quantity <= 1)
+                                                class="w-9 h-9 rounded-lg border border-gray-300 flex items-center justify-center text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                aria-label="Diminuir quantidade">
+                                            -
+                                        </button>
+                                        <span class="w-8 text-center text-base font-bold text-gray-900">{{ $item->quantity }}</span>
+                                        <button type="button"
+                                                wire:click="updateQty({{ $item->id }}, {{ $item->quantity + 1 }})"
+                                                wire:loading.attr="disabled"
+                                                class="w-9 h-9 rounded-lg border border-gray-300 flex items-center justify-center text-lg font-bold text-gray-700 hover:bg-gray-50"
+                                                aria-label="Aumentar quantidade">
+                                            +
+                                        </button>
+                                    </div>
+
+                                    <div class="text-right">
+                                        <p class="text-xs text-gray-500">Subtotal</p>
+                                        <p class="text-sm font-black" style="color: #3D3000;">
+                                            R$ {{ number_format($item->subtotal(), 2, ',', '.') }}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </article>
                     @endforeach
                 </div>
-            </div>
+            </section>
             @empty
-            <div class="h-full flex flex-col items-center justify-center py-16 text-center">
-                <div class="text-6xl mb-4">🛒</div>
-                <p class="text-lg font-semibold text-gray-600">Seu carrinho está vazio</p>
-                <p class="text-sm text-gray-400 mt-1">Explore as lojas e adicione produtos!</p>
+            <div class="h-full min-h-96 flex flex-col items-center justify-center py-16 text-center">
+                <div class="w-20 h-20 rounded-full flex items-center justify-center mb-4" style="background: #F4E294;">
+                    <svg class="w-10 h-10" fill="none" stroke="#3D3000" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17"/>
+                    </svg>
+                </div>
+                <p class="text-lg font-bold text-gray-700">Seu carrinho está vazio</p>
+                <p class="text-sm text-gray-500 mt-1">Explore as lojas e adicione produtos.</p>
                 <button wire:click="toggle" class="mt-6 px-6 py-3 rounded-xl font-bold text-white text-base"
                         style="background: #E8A000;">Ver lojas</button>
             </div>
             @endforelse
         </div>
 
-        {{-- Footer --}}
         @if($count > 0)
-        <div class="border-t border-gray-100 px-5 py-5 space-y-3">
+        <div class="border-t border-gray-200 bg-white px-5 py-5 shadow-[0_-12px_30px_rgba(15,23,42,0.08)]">
             <div class="flex items-center justify-between text-base">
-                <span class="text-gray-600 font-medium">Total</span>
-                <span class="text-xl font-bold" style="color: #3D3000;">
+                <span class="text-gray-700 font-bold">Total</span>
+                <span class="text-2xl font-black" style="color: #3D3000;">
                     R$ {{ number_format($total, 2, ',', '.') }}
                 </span>
             </div>
             <a href="{{ route('checkout') }}"
-               class="block w-full text-center py-4 rounded-xl text-white text-lg font-bold transition-colors"
+               class="mt-4 block w-full text-center py-4 rounded-xl text-white text-lg font-bold transition-opacity hover:opacity-90"
                style="background: #E8A000; min-height: 60px;">
                 Finalizar Compra
             </a>
-            <button wire:click="toggle" class="w-full py-3 rounded-xl border-2 font-semibold text-base transition-colors"
+            <button wire:click="toggle" class="mt-3 w-full py-3 rounded-xl border-2 font-semibold text-base transition-colors hover:bg-yellow-50"
                     style="border-color: #E8A000; color: #C47A00;">
                 Continuar Comprando
             </button>
         </div>
         @endif
-    </div>
+    </aside>
 </div>

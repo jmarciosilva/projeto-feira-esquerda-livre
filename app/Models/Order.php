@@ -32,6 +32,14 @@ class Order extends Model
         'shipping_total',
         'shipping_note',
         'total_amount',
+        'payment_method',
+        'payment_provider',
+        'payment_status',
+        'mercado_pago_preference_id',
+        'mercado_pago_payment_id',
+        'mercado_pago_init_point',
+        'mercado_pago_sandbox_init_point',
+        'payment_payload',
         'status',
         'notes',
         'paid_at',
@@ -45,6 +53,7 @@ class Order extends Model
             'items_total'    => 'decimal:2',
             'shipping_total' => 'decimal:2',
             'total_amount'   => 'decimal:2',
+            'payment_payload' => 'array',
             'paid_at'        => 'datetime',
         ];
     }

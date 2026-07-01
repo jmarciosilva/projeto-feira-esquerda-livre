@@ -40,6 +40,7 @@ class AuthenticatedSessionController extends Controller
         $oldSessionId = $request->session()->getId();
         $request->session()->regenerate();
         $cart->reassignSession($oldSessionId, Auth::id());
+        $redirectTo = $this->safeRedirectPath($request);
 
         $default = match (Auth::user()->role) {
             UserRole::Admin, UserRole::Editor => route('admin.dashboard'),
@@ -52,7 +53,9 @@ class AuthenticatedSessionController extends Controller
             return redirect($default);
         }
 
-        return redirect()->intended($default);
+        return $redirectTo
+            ? redirect($redirectTo)
+            : redirect()->intended($default);
     }
 
     public function destroy(Request $request): RedirectResponse
@@ -62,5 +65,29 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerateToken();
 
         return redirect('/');
+    }
+
+    private function safeRedirectPath(Request $request): ?string
+    {
+        $redirectTo = (string) $request->input('redirect_to', '');
+
+        if ($redirectTo === '') {
+            return null;
+        }
+
+        $parts = parse_url($redirectTo);
+
+        if ($parts === false) {
+            return null;
+        }
+
+        if (isset($parts['host']) && $parts['host'] !== $request->getHost()) {
+            return null;
+        }
+
+        $path = $parts['path'] ?? '/';
+        $query = isset($parts['query']) ? '?' . $parts['query'] : '';
+
+        return str_starts_with($path, '/') ? $path . $query : null;
     }
 }

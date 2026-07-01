@@ -64,6 +64,11 @@ class CheckoutSettingsForm extends Component
 
         // MVP: integrações reais permanecem desativadas — os campos abaixo
         // só ficam disponíveis para ativação manual em uma fase futura.
+        if ($this->mercado_pago_ativo && blank($this->mercado_pago_access_token)) {
+            $this->addError('mercado_pago_access_token', 'Informe o Access Token para ativar o Mercado Pago.');
+            return;
+        }
+
         $service->save([
             'frete_modo'                 => 'manual',
             'frete_mensagem_manual'      => $this->frete_mensagem_manual ?: null,
@@ -74,9 +79,9 @@ class CheckoutSettingsForm extends Component
             'melhor_envio_token'         => $this->melhor_envio_token ?: null,
             'melhor_envio_sandbox'       => $this->melhor_envio_sandbox,
 
-            'pagamento_modo'             => 'manual',
+            'pagamento_modo'             => $this->mercado_pago_ativo ? 'mercado_pago' : 'manual',
             'comissao_percentual'        => $this->comissao_percentual,
-            'mercado_pago_ativo'         => false,
+            'mercado_pago_ativo'         => $this->mercado_pago_ativo,
             'mercado_pago_public_key'    => $this->mercado_pago_public_key ?: null,
             'mercado_pago_access_token'  => $this->mercado_pago_access_token ?: null,
             'mercado_pago_sandbox'       => $this->mercado_pago_sandbox,

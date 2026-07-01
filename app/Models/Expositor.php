@@ -21,6 +21,10 @@ class Expositor extends Model
         'eixos',
         'logo_path',
         'image_path',
+        'zipcode',
+        'street',
+        'number',
+        'district',
         'city',
         'state',
         'whatsapp',
@@ -43,8 +47,8 @@ class Expositor extends Model
     {
         return [
             'is_featured' => 'boolean',
-            'is_active'   => 'boolean',
-            'eixos'       => 'array',
+            'is_active' => 'boolean',
+            'eixos' => 'array',
         ];
     }
 
@@ -70,6 +74,11 @@ class Expositor extends Model
     public function orderSplits(): HasMany
     {
         return $this->hasMany(OrderSplit::class);
+    }
+
+    public function feedPosts(): HasMany
+    {
+        return $this->hasMany(FeedPost::class);
     }
 
     public function events(): BelongsToMany

@@ -120,6 +120,11 @@
                                    style="border-color: #E8A000; color: #C47A00; min-height: 40px; display:inline-flex; align-items:center;">
                                     Editar
                                 </a>
+                                <a href="{{ route('lojista.produtos.share-image', $product) }}"
+                                   class="px-3 py-2 rounded-lg text-sm font-semibold border-2 transition-colors"
+                                   style="border-color: #1a472a; color: #1a472a; min-height: 40px; display:inline-flex; align-items:center;">
+                                    Gerar imagem
+                                </a>
                                 <button wire:click="delete({{ $product->id }})"
                                         wire:confirm="Remover o produto '{{ $product->name }}'?"
                                         class="px-3 py-2 rounded-lg text-sm font-semibold border-2 border-red-200 text-red-500 transition-colors hover:bg-red-50"

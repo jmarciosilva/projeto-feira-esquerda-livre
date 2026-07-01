@@ -3,8 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    @php
+        $productUrl = route('loja.produto', [$expositor->slug, $product->slug]);
+        $productDescription = Str::limit($product->description ?? $product->name, 160);
+        $productImages = $product->images ?? [];
+        $productOgImage = ! empty($productImages[0]['medium'])
+            ? Storage::url($productImages[0]['medium'])
+            : ($product->image_path ? Storage::url($product->image_path) : null);
+        $productOgImage = $productOgImage
+            ? url($productOgImage)
+            : route('loja.produto.share-preview', [$expositor->slug, $product->slug]);
+        $sharePrice = $product->price ? 'R$ ' . number_format((float) $product->price, 2, ',', '.') : 'valor sob consulta';
+        $shareText = "Conheça {$product->name} por {$sharePrice} na loja {$expositor->name}: {$productUrl}";
+    @endphp
     <title>{{ $product->name }} — {{ $expositor->name }} — Feira Esquerda Livre</title>
-    <meta name="description" content="{{ Str::limit($product->description ?? $product->name, 160) }}">
+    <meta name="description" content="{{ $productDescription }}">
+    <meta property="og:title" content="{{ $product->name }} — {{ $expositor->name }}">
+    <meta property="og:description" content="{{ $productDescription }}">
+    <meta property="og:type" content="product">
+    <meta property="og:url" content="{{ $productUrl }}">
+    @if($productOgImage)
+    <meta property="og:image" content="{{ $productOgImage }}">
+    @endif
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $product->name }} — {{ $expositor->name }}">
+    <meta name="twitter:description" content="{{ $productDescription }}">
+    @if($productOgImage)
+    <meta name="twitter:image" content="{{ $productOgImage }}">
+    @endif
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -136,6 +162,34 @@
                         Perguntar pelo WhatsApp
                     </a>
                     @endif
+
+                    <div class="pt-3 border-t border-gray-100"
+                         x-data="{ copied: false, copy() { navigator.clipboard.writeText('{{ $productUrl }}'); this.copied = true; setTimeout(() => this.copied = false, 2000); } }">
+                        <p class="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-3">Compartilhar</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <a href="https://wa.me/?text={{ urlencode($shareText) }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="flex items-center justify-center px-4 py-3 rounded-xl border-2 font-semibold text-sm"
+                               style="border-color:#25D366; color:#15803d; min-height:48px;">
+                                WhatsApp
+                            </a>
+                            <a href="https://www.facebook.com/sharer/sharer.php?u={{ urlencode($productUrl) }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="flex items-center justify-center px-4 py-3 rounded-xl border-2 font-semibold text-sm"
+                               style="border-color:#2563eb; color:#1d4ed8; min-height:48px;">
+                                Facebook
+                            </a>
+                            <button type="button"
+                                    @click="copy()"
+                                    class="px-4 py-3 rounded-xl border-2 font-semibold text-sm"
+                                    style="border-color:#E8A000; color:#C47A00; min-height:48px;">
+                                <span x-show="!copied">Copiar link</span>
+                                <span x-show="copied">Link copiado</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {{-- Vendedor --}}
