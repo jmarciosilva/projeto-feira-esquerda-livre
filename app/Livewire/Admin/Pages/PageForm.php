@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Admin\Pages;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\Page;
 use App\Services\PageService;
 use Livewire\Component;
 
 class PageForm extends Component
 {
+    use AuthorizesAdminActions;
+
     public ?Page $page = null;
 
     public string $title            = '';
@@ -39,6 +42,8 @@ class PageForm extends Component
 
     public function save(PageService $service): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->validate([
             'title'            => 'required|string|max:255',
             'slug'             => 'nullable|string|max:255',

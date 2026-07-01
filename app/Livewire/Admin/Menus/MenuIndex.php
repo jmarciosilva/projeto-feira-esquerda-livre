@@ -2,13 +2,14 @@
 
 namespace App\Livewire\Admin\Menus;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\Menu;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class MenuIndex extends Component
 {
-    use WithPagination;
+    use AuthorizesAdminActions, WithPagination;
 
     public bool  $showForm  = false;
     public bool  $confirmDelete = false;
@@ -20,6 +21,8 @@ class MenuIndex extends Component
 
     public function openCreate(): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->reset(['name', 'location', 'is_active', 'editId']);
         $this->location  = 'header';
         $this->is_active = true;
@@ -28,6 +31,8 @@ class MenuIndex extends Component
 
     public function openEdit(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $menu = Menu::findOrFail($id);
         $this->editId    = $id;
         $this->name      = $menu->name;
@@ -38,6 +43,8 @@ class MenuIndex extends Component
 
     public function save(): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->validate([
             'name'     => 'required|string|max:100',
             'location' => 'required|in:header,footer,sidebar,mobile',
@@ -62,12 +69,16 @@ class MenuIndex extends Component
 
     public function confirmDelete(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->deleteId      = $id;
         $this->confirmDelete = true;
     }
 
     public function deleteMenu(): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         Menu::findOrFail($this->deleteId)->delete();
 
         $this->confirmDelete = false;

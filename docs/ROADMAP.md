@@ -1,8 +1,8 @@
 # 🗺️ Roadmap de Desenvolvimento — Feira Esquerda Livre
 
 **Documento de Planejamento Estratégico**
-**Versão:** 1.6 — Julho de 2026
-**Status geral do projeto:** Fase 4 evoluída após o MVP manual — checkout e pagamento manual seguem operacionais; a cotação inicial de frete via Melhor Envio foi implementada para o MVP usando conta única da plataforma, enquanto compra de etiqueta, rastreamento, OAuth por lojista e split de frete continuam planejados para fases futuras. A próxima frente técnica prioritária passa a incluir governança administrativa: gestão de usuários internos, perfis de acesso e permissões por módulo.
+**Versão:** 1.7 — Julho de 2026
+**Status geral do projeto:** Fase 4 evoluída após o MVP manual — checkout e pagamento manual seguem operacionais; a cotação inicial de frete via Melhor Envio foi implementada para o MVP usando conta única da plataforma, enquanto compra de etiqueta, rastreamento, OAuth por lojista e split de frete continuam planejados para fases futuras. A Fase 6 de governança administrativa foi implementada com gestão de usuários internos, perfis de acesso, permissões por módulo, proteção de rotas e bloqueio de ações críticas no backend.
 
 ---
 
@@ -24,7 +24,7 @@
 [FASE 5 ⏳ Semanas 14–17]
   Comunidade & Engajamento
           ↓
-[FASE 6 ⏳ Governança Admin]
+[FASE 6 ✅ CONCLUÍDA]
   Usuários internos, perfis & permissões
 ```
 
@@ -536,9 +536,24 @@ feed_comments
 
 ---
 
-## ⏳ Fase 6 — Governança Administrativa, Usuários Internos e Permissões
+## ✅ Fase 6 — Governança Administrativa, Usuários Internos e Permissões
 
 **Objetivo estratégico:** profissionalizar a operação interna da plataforma, permitindo que a Feira Esquerda Livre tenha administradores, gerentes, supervisores e editores com acessos controlados, auditáveis e coerentes com suas responsabilidades.
+
+**Status:** implementada em julho de 2026.
+
+**Entregas realizadas:**
+- Pacote `spatie/laravel-permission` instalado e configurado
+- Roles iniciais criadas para administrador, gerente, supervisor, editor, lojista e cliente
+- Permissões base versionadas em seeder idempotente
+- Área `/admin/usuarios` para gestão de usuários internos
+- Área `/admin/perfis-acesso` para configuração de permissões por perfil
+- Menu administrativo renderizado conforme permissões
+- Rotas administrativas protegidas com middleware `can:*`
+- Componentes Livewire administrativos protegendo ações críticas no backend
+- Testes automatizados para acesso por perfil, URL direta e ações Livewire bloqueadas
+
+**Pendências futuras fora da Fase 6:** auditoria detalhada de alterações administrativas, logs de alteração de permissões e possível campo auxiliar de contexto de usuário para relatórios.
 
 **Princípio de arquitetura:** separar claramente os três universos de usuários:
 - **Cliente:** comprador da plataforma, com acesso à área de conta, endereços e pedidos.
@@ -659,7 +674,7 @@ feed_comments
 | ✅ Fase 3 — Catálogo & Três Eixos | Semanas 7–9 | 3.1 · 3.2 · 3.3 | Três eixos, CRUD de produtos, loja pública e carrinho multilojas em produção |
 | ✅ Fase 4 — Checkout & Pagamento | Semanas 10–13 | 4.1 · 4.2 · 4.3 | MVP com cotação inicial de frete via Melhor Envio; pagamento/split automáticos seguem em fases futuras |
 | ⏳ Fase 5 — Comunidade | Semanas 14–17 | 5.1 · 5.2 | Feed social + ferramentas de marketing |
-| ⏳ Fase 6 — Governança Admin | A priorizar | 6.1 · 6.2 · 6.3 · 6.4 · 6.5 | Usuários internos, perfis de acesso, permissões e proteção real do painel |
+| ✅ Fase 6 — Governança Admin | Concluída | 6.1 · 6.2 · 6.3 · 6.4 · 6.5 | Usuários internos, perfis de acesso, permissões e proteção real do painel |
 
 ---
 
@@ -693,4 +708,4 @@ Estes princípios se aplicam a todas as fases e devem guiar cada decisão de UX 
 ---
 
 *Documento atualizado em: 1º de julho de 2026*
-*Próxima revisão: ao priorizar a Fase 6 de governança administrativa, OAuth por lojista, compra/geração de etiquetas, rastreamento, split de frete ou ao término da Fase 5 (comunidade)*
+*Próxima revisão: ao priorizar auditoria administrativa, OAuth por lojista, compra/geração de etiquetas, rastreamento, split de frete ou ao término da Fase 5 (comunidade)*

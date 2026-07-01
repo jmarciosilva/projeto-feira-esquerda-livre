@@ -19,7 +19,7 @@ enum UserRole: string
             self::Supervisor => 'Supervisor',
             self::Editor => 'Editor',
             self::Lojista => 'Lojista',
-            self::User => 'Usuário',
+            self::User => 'Cliente',
         };
     }
 

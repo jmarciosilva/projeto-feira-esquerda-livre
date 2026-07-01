@@ -114,6 +114,7 @@
     <div class="mt-6">
         <x-admin.card title="Ações Rápidas">
             <div class="flex flex-wrap gap-3">
+                @can('cms.editar')
                 <a href="{{ route('admin.pages.create') }}">
                     <x-admin.button variant="secondary">+ Nova Página</x-admin.button>
                 </a>
@@ -126,12 +127,17 @@
                 <a href="{{ route('admin.events.create') }}">
                     <x-admin.button variant="secondary">+ Novo Evento</x-admin.button>
                 </a>
+                @endcan
+                @can('cms.visualizar')
                 <a href="{{ route('admin.media.index') }}">
                     <x-admin.button variant="secondary">+ Enviar Mídia</x-admin.button>
                 </a>
+                @endcan
+                @can('lojistas.visualizar')
                 <a href="{{ route('admin.lojistas.solicitacoes') }}">
                     <x-admin.button variant="secondary">Ver Lojistas</x-admin.button>
                 </a>
+                @endcan
             </div>
         </x-admin.card>
     </div>

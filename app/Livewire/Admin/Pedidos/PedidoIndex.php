@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Pedidos;
 
 use App\Enums\OrderStatus;
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\Order;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -10,7 +11,7 @@ use Livewire\WithPagination;
 
 class PedidoIndex extends Component
 {
-    use WithPagination;
+    use AuthorizesAdminActions, WithPagination;
 
     public string $filterStatus = '';
     public string $search       = '';
@@ -27,6 +28,8 @@ class PedidoIndex extends Component
 
     public function updateStatus(int $orderId, string $status): void
     {
+        $this->authorizeAdminAction('pedidos.atualizar_status');
+
         $order = Order::findOrFail($orderId);
         $order->update(['status' => $status]);
 

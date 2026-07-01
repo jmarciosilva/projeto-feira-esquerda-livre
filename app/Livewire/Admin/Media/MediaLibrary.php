@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Media;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Livewire\Concerns\ValidatesFileUploads;
 use App\Models\Media;
 use App\Services\MediaService;
@@ -11,7 +12,7 @@ use Livewire\WithPagination;
 
 class MediaLibrary extends Component
 {
-    use WithPagination, WithFileUploads, ValidatesFileUploads;
+    use AuthorizesAdminActions, WithPagination, WithFileUploads, ValidatesFileUploads;
 
     public string $search        = '';
     public string $filterType    = '';
@@ -26,6 +27,8 @@ class MediaLibrary extends Component
 
     public function uploadFiles(MediaService $service): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         foreach ($this->uploads as $i => $file) {
             if (! $this->checkUploadedFile($file, 10240, "uploads.{$i}")) return;
         }
@@ -45,12 +48,16 @@ class MediaLibrary extends Component
 
     public function confirmDelete(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->deleteId      = $id;
         $this->confirmDelete = true;
     }
 
     public function deleteMedia(MediaService $service): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $media = Media::findOrFail($this->deleteId);
         $service->delete($media);
 

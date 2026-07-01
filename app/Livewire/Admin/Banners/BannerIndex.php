@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Banners;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\Banner;
 use App\Services\BannerService;
 use Livewire\Component;
@@ -9,7 +10,7 @@ use Livewire\WithPagination;
 
 class BannerIndex extends Component
 {
-    use WithPagination;
+    use AuthorizesAdminActions, WithPagination;
 
     public string $search        = '';
     public bool   $confirmDelete = false;
@@ -22,12 +23,16 @@ class BannerIndex extends Component
 
     public function confirmDelete(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->deleteId      = $id;
         $this->confirmDelete = true;
     }
 
     public function deleteBanner(BannerService $service): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $banner = Banner::findOrFail($this->deleteId);
         $service->delete($banner);
 
@@ -39,6 +44,8 @@ class BannerIndex extends Component
 
     public function toggleActive(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         Banner::where('id', $id)->update(['is_active' => \Illuminate\Support\Facades\DB::raw('NOT is_active')]);
     }
 

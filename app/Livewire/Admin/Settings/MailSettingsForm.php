@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Settings;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\SiteSetting;
 use App\Services\SiteSettingService;
 use Illuminate\Support\Facades\Mail;
@@ -9,6 +10,8 @@ use Livewire\Component;
 
 class MailSettingsForm extends Component
 {
+    use AuthorizesAdminActions;
+
     public string  $mail_mailer       = 'smtp';
     public string  $mail_host         = '';
     public string  $mail_port         = '587';
@@ -39,6 +42,8 @@ class MailSettingsForm extends Component
 
     public function save(SiteSettingService $service): void
     {
+        $this->authorizeAdminAction('configuracoes.editar');
+
         $this->validate([
             'mail_mailer'       => 'required|in:smtp,sendmail,log',
             'mail_host'         => 'nullable|string|max:255',
@@ -67,6 +72,8 @@ class MailSettingsForm extends Component
 
     public function sendTest(): void
     {
+        $this->authorizeAdminAction('configuracoes.editar');
+
         $this->validate([
             'test_email' => 'required|email',
         ], [], ['test_email' => 'e-mail de teste']);

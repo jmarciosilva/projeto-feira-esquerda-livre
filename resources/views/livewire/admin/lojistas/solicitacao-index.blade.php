@@ -84,6 +84,7 @@
                         </td>
                         <td class="py-3 px-2">
                             <div class="flex items-center justify-end gap-2">
+                                @can('lojistas.aprovar')
                                 @if($s->status->value === 'pendente')
                                 <button wire:click="confirmApprove({{ $s->id }})"
                                         class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium transition-colors">
@@ -94,6 +95,7 @@
                                     Bloquear
                                 </button>
                                 @endif
+                                @endcan
                                 @if($s->user_id)
                                 <a href="#" class="text-gray-400 hover:text-[#1a472a]" title="Ver usuário">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>

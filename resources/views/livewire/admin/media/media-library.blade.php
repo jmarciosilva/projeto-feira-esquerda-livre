@@ -4,6 +4,7 @@
     @endif
 
     {{-- Upload --}}
+    @can('cms.editar')
     <x-admin.card title="Enviar Arquivos" class="mb-6">
         <div class="space-y-3">
             <input type="file" wire:model="uploads" multiple accept="image/*,video/mp4,application/pdf"
@@ -18,6 +19,7 @@
             </x-admin.button>
         </div>
     </x-admin.card>
+    @endcan
 
     {{-- Filtros --}}
     <div class="flex flex-col sm:flex-row gap-3 mb-6">
@@ -49,11 +51,13 @@
                 <p class="text-xs text-gray-400">{{ $item->humanSize() }}</p>
             </div>
 
+            @can('cms.editar')
             <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button wire:click="confirmDelete({{ $item->id }})" class="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center text-white hover:bg-red-700">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
+            @endcan
         </div>
         @empty
         <div class="col-span-full py-16 text-center text-gray-400">

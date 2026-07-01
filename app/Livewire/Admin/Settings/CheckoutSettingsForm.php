@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Admin\Settings;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\SiteSetting;
 use App\Services\SiteSettingService;
 use Livewire\Component;
 
 class CheckoutSettingsForm extends Component
 {
+    use AuthorizesAdminActions;
+
     // Frete
     public string  $frete_modo             = 'manual';
     public string  $frete_mensagem_manual  = '';
@@ -51,6 +54,8 @@ class CheckoutSettingsForm extends Component
 
     public function save(SiteSettingService $service): void
     {
+        $this->authorizeAdminAction('configuracoes.editar');
+
         $this->validate([
             'frete_mensagem_manual'      => 'nullable|string|max:1000',
             'frete_valor_padrao'         => 'nullable|numeric|min:0',

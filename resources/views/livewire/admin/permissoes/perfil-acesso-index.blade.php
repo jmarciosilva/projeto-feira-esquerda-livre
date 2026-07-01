@@ -15,9 +15,25 @@
             <x-admin.card title="Perfil">
                 <div class="space-y-2">
                     @foreach($roles as $role)
-                    <label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer"
-                           style="{{ $selectedRole === $role->name ? 'border-color:#1a472a; background:#f0fdf4;' : 'border-color:#e5e7eb;' }}">
-                        <input type="radio" wire:model.live="selectedRole" value="{{ $role->name }}" class="w-4 h-4" style="accent-color:#1a472a;">
+                    <label
+                        wire:key="permission-profile-role-{{ $role->id }}"
+                        for="permission-profile-role-{{ $role->id }}"
+                        @class([
+                            'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                            'border-[#1a472a] bg-[#f0fdf4]' => $selectedRole === $role->name,
+                            'border-gray-200 bg-white hover:border-gray-300' => $selectedRole !== $role->name,
+                        ])
+                    >
+                        <input
+                            id="permission-profile-role-{{ $role->id }}"
+                            type="radio"
+                            name="selectedRole"
+                            wire:model.live="selectedRole"
+                            value="{{ $role->name }}"
+                            @checked($selectedRole === $role->name)
+                            class="w-4 h-4"
+                            style="accent-color:#1a472a;"
+                        >
                         <span>
                             <span class="block text-sm font-semibold text-gray-900">{{ ucfirst($role->name) }}</span>
                             <span class="block text-xs text-gray-500">{{ $role->permissions_count ?? $role->permissions()->count() }} permissões</span>
@@ -38,11 +54,11 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     @foreach($permissionGroups as $group => $permissions)
-                    <div class="rounded-xl border border-gray-100 p-4">
+                    <div wire:key="permission-group-{{ $selectedRole }}-{{ $group }}" class="rounded-xl border border-gray-100 p-4">
                         <p class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">{{ $group }}</p>
                         <div class="space-y-2">
                             @foreach($permissions as $permission)
-                            <label class="flex items-center gap-3 text-sm text-gray-700">
+                            <label wire:key="permission-checkbox-{{ $selectedRole }}-{{ $permission->id }}" class="flex items-center gap-3 text-sm text-gray-700">
                                 <input
                                     type="checkbox"
                                     wire:model="selectedPermissions"
@@ -59,7 +75,7 @@
                 </div>
 
                 <div class="mt-6 flex justify-end">
-                    <x-admin.button type="submit" @disabled($selectedRole === 'administrador')>
+                    <x-admin.button type="submit" :disabled="$selectedRole === 'administrador'">
                         Salvar Permissões
                     </x-admin.button>
                 </div>

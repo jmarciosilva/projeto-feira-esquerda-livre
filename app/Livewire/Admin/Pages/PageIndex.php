@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Pages;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\Page;
 use App\Services\PageService;
 use Livewire\Component;
@@ -9,7 +10,7 @@ use Livewire\WithPagination;
 
 class PageIndex extends Component
 {
-    use WithPagination;
+    use AuthorizesAdminActions, WithPagination;
 
     public string $search    = '';
     public bool   $confirmDelete = false;
@@ -22,12 +23,16 @@ class PageIndex extends Component
 
     public function confirmDelete(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->deleteId      = $id;
         $this->confirmDelete = true;
     }
 
     public function deletePage(PageService $service): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $page = Page::findOrFail($this->deleteId);
         $service->delete($page);
 
@@ -39,6 +44,8 @@ class PageIndex extends Component
 
     public function toggleActive(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $page = Page::findOrFail($id);
         $page->update(['is_active' => !$page->is_active]);
     }

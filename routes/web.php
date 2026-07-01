@@ -10,6 +10,7 @@ use App\Livewire\Admin\Banners\BannerForm;
 use App\Livewire\Admin\Banners\BannerIndex;
 use App\Livewire\Admin\Categorias\CategoriaForm;
 use App\Livewire\Admin\Categorias\CategoriaIndex;
+use App\Livewire\Admin\Clientes\ClienteIndex;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\Events\EventForm;
 use App\Livewire\Admin\Events\EventIndex;
@@ -351,6 +352,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/pedidos', AdminPedidoIndex::class)
         ->middleware('can:pedidos.visualizar')
         ->name('pedidos.index');
+
+    Route::get('/clientes', ClienteIndex::class)
+        ->middleware('can:clientes.visualizar')
+        ->name('clientes.index');
 
     Route::get('/feed/reportes', FeedReportIndex::class)
         ->middleware('can:feed.moderar')

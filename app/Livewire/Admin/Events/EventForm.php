@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Events;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Livewire\Concerns\ValidatesFileUploads;
 use App\Models\Event;
 use App\Services\EventService;
@@ -11,7 +12,7 @@ use Livewire\WithFileUploads;
 
 class EventForm extends Component
 {
-    use WithFileUploads, ValidatesFileUploads;
+    use AuthorizesAdminActions, WithFileUploads, ValidatesFileUploads;
 
     public ?Event $event = null;
 
@@ -74,6 +75,8 @@ class EventForm extends Component
 
     public function save(EventService $service): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         if (! $this->checkUploadedFile($this->image_upload, 4096, 'image_upload')) return;
         if (! $this->checkUploadedFile($this->banner_image_upload, 4096, 'banner_image_upload')) return;
 

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Banners;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Livewire\Concerns\ValidatesFileUploads;
 use App\Models\Banner;
 use App\Services\BannerService;
@@ -11,7 +12,7 @@ use Livewire\WithFileUploads;
 
 class BannerForm extends Component
 {
-    use WithFileUploads, ValidatesFileUploads;
+    use AuthorizesAdminActions, WithFileUploads, ValidatesFileUploads;
 
     public ?Banner $banner = null;
 
@@ -47,6 +48,8 @@ class BannerForm extends Component
 
     public function save(BannerService $service): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         if (! $this->checkUploadedFile($this->image_upload, 4096, 'image_upload')) return;
         if (! $this->checkUploadedFile($this->mobile_image_upload, 4096, 'mobile_image_upload')) return;
 

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Expositores;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Livewire\Concerns\ValidatesFileUploads;
 use App\Models\Expositor;
 use Illuminate\Support\Facades\Storage;
@@ -11,7 +12,7 @@ use Livewire\WithFileUploads;
 
 class ExpositoresForm extends Component
 {
-    use WithFileUploads, ValidatesFileUploads;
+    use AuthorizesAdminActions, WithFileUploads, ValidatesFileUploads;
 
     public Expositor $expositor;
 
@@ -64,6 +65,8 @@ class ExpositoresForm extends Component
 
     public function removeImage(): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         if ($this->image_path) {
             Storage::disk('public')->delete($this->image_path);
         }
@@ -73,6 +76,8 @@ class ExpositoresForm extends Component
 
     public function save(): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         if (! $this->checkUploadedFile($this->image_upload, 4096, 'image_upload')) return;
 
         $this->validate([

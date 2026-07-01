@@ -54,12 +54,14 @@
                             <x-admin.badge :color="$order->status->color()">{{ $order->status->label() }}</x-admin.badge>
                         </td>
                         <td class="py-3 px-2 text-right">
+                            @can('pedidos.atualizar_status')
                             <select wire:change="updateStatus({{ $order->id }}, $event.target.value)"
                                     class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#52b788]">
                                 @foreach($statuses as $status)
                                 <option value="{{ $status->value }}" @selected($order->status === $status)>{{ $status->label() }}</option>
                                 @endforeach
                             </select>
+                            @endcan
                             <a href="{{ route('pedido.show', $order->reference) }}" target="_blank"
                                class="ml-2 text-xs font-semibold text-gray-500 hover:text-gray-700">Ver</a>
                         </td>

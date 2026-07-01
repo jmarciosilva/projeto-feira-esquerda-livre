@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Feed;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\FeedModerationLog;
 use App\Models\FeedPost;
 use Illuminate\Support\Facades\Gate;
@@ -11,13 +12,15 @@ use Livewire\WithPagination;
 
 class ReportIndex extends Component
 {
-    use WithPagination;
+    use AuthorizesAdminActions, WithPagination;
 
     public array $moderationReason = [];
     public string $filter = 'pendentes';
 
     public function hidePost(int $postId): void
     {
+        $this->authorizeAdminAction('feed.moderar');
+
         $post = FeedPost::findOrFail($postId);
         Gate::authorize('moderate', FeedPost::class);
 
@@ -39,6 +42,8 @@ class ReportIndex extends Component
 
     public function restorePost(int $postId): void
     {
+        $this->authorizeAdminAction('feed.moderar');
+
         $post = FeedPost::findOrFail($postId);
         Gate::authorize('moderate', FeedPost::class);
 

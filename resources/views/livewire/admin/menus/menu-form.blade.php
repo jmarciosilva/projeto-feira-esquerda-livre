@@ -6,7 +6,9 @@
         <div>
             <p class="text-sm text-gray-500">Menu: <span class="font-medium text-gray-700">{{ $menu->name }}</span> — {{ $menu->location->label() }}</p>
         </div>
+        @can('cms.editar')
         <x-admin.button wire:click="openAddItem" class="ml-auto">+ Adicionar Item</x-admin.button>
+        @endcan
     </div>
 
     <x-admin.card title="Itens do Menu">

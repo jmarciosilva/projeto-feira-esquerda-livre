@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Settings;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Livewire\Concerns\ValidatesFileUploads;
 use App\Models\SiteSetting;
 use App\Services\SiteSettingService;
@@ -11,7 +12,7 @@ use Livewire\WithFileUploads;
 
 class SettingsForm extends Component
 {
-    use WithFileUploads, ValidatesFileUploads;
+    use AuthorizesAdminActions, WithFileUploads, ValidatesFileUploads;
 
     public string $site_name        = '';
     public string $site_description = '';
@@ -74,6 +75,8 @@ class SettingsForm extends Component
 
     public function save(SiteSettingService $service): void
     {
+        $this->authorizeAdminAction('configuracoes.editar');
+
         if (! $this->checkUploadedFile($this->logo_upload, 2048, 'logo_upload')) return;
         if (! $this->checkUploadedFile($this->favicon_upload, 512, 'favicon_upload')) return;
         if (! $this->checkUploadedFile($this->sobre_imagem_upload, 4096, 'sobre_imagem_upload')) return;

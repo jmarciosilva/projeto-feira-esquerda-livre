@@ -37,10 +37,13 @@
                 Dashboard
             </x-admin.nav-item>
 
+            @canany(['configuracoes.visualizar', 'cms.visualizar'])
             <div class="pt-4 pb-1 px-3">
                 <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">CMS</p>
             </div>
+            @endcanany
 
+            @can('configuracoes.visualizar')
             <x-admin.nav-item href="{{ route('admin.settings.edit') }}" icon="cog" :active="request()->routeIs('admin.settings.edit')">
                 Configurações
             </x-admin.nav-item>
@@ -53,6 +56,9 @@
                 Frete & Pagamento
             </x-admin.nav-item>
 
+            @endcan
+
+            @can('cms.visualizar')
             <x-admin.nav-item href="{{ route('admin.pages.index') }}" icon="document" :active="request()->routeIs('admin.pages.*')">
                 Páginas
             </x-admin.nav-item>
@@ -85,6 +91,9 @@
                 Categorias
             </x-admin.nav-item>
 
+            @endcan
+
+            @can('lojistas.visualizar')
             <div class="pt-4 pb-1 px-3">
                 <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Lojistas</p>
             </div>
@@ -98,14 +107,28 @@
                 Solicitações
             </x-admin.nav-item>
 
+            @endcan
+
+            @canany(['pedidos.visualizar', 'clientes.visualizar'])
             <div class="pt-4 pb-1 px-3">
                 <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Marketplace</p>
             </div>
 
+            @can('clientes.visualizar')
+            <x-admin.nav-item href="{{ route('admin.clientes.index') }}" icon="users" :active="request()->routeIs('admin.clientes.*')">
+                Clientes
+            </x-admin.nav-item>
+            @endcan
+
+            @can('pedidos.visualizar')
             <x-admin.nav-item href="{{ route('admin.pedidos.index') }}" icon="store" :active="request()->routeIs('admin.pedidos.*')">
                 Pedidos
             </x-admin.nav-item>
+            @endcan
 
+            @endcanany
+
+            @can('feed.moderar')
             <div class="pt-4 pb-1 px-3">
                 <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Comunidade</p>
             </div>
@@ -124,6 +147,8 @@
                 :badge="$feedReportes > 0 ? $feedReportes : null">
                 Moderação da Comunidade
             </x-admin.nav-item>
+            @endcan
+
             @canany(['usuarios.visualizar', 'permissoes.gerenciar'])
             <div class="pt-4 pb-1 px-3">
                 <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Governança</p>

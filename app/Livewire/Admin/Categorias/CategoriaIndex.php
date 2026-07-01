@@ -3,13 +3,14 @@
 namespace App\Livewire\Admin\Categorias;
 
 use App\Enums\ItemType;
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\ContentCategory;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class CategoriaIndex extends Component
 {
-    use WithPagination;
+    use AuthorizesAdminActions, WithPagination;
 
     public string $search        = '';
     public string $filterEixo    = '';
@@ -23,12 +24,16 @@ class CategoriaIndex extends Component
 
     public function confirmDelete(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->deleteId      = $id;
         $this->confirmDelete = true;
     }
 
     public function deleteCategoria(): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         ContentCategory::findOrFail($this->deleteId)->delete();
 
         $this->confirmDelete = false;
@@ -39,6 +44,8 @@ class CategoriaIndex extends Component
 
     public function toggleActive(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $categoria = ContentCategory::findOrFail($id);
         $categoria->update(['is_active' => ! $categoria->is_active]);
     }

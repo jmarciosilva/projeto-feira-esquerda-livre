@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Admin\Menus;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\Menu;
 use App\Models\MenuItem;
 use Livewire\Component;
 
 class MenuForm extends Component
 {
+    use AuthorizesAdminActions;
+
     public Menu $menu;
 
     public bool   $showItemForm = false;
@@ -29,6 +32,8 @@ class MenuForm extends Component
 
     public function openAddItem(): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->reset(['item_title', 'item_url', 'item_icon', 'item_target', 'item_order', 'item_parent', 'editItemId']);
         $this->item_target = '_self';
         $this->item_active = true;
@@ -37,6 +42,8 @@ class MenuForm extends Component
 
     public function openEditItem(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $item = MenuItem::findOrFail($id);
         $this->editItemId  = $id;
         $this->item_title  = $item->title;
@@ -51,6 +58,8 @@ class MenuForm extends Component
 
     public function saveItem(): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->validate([
             'item_title' => 'required|string|max:100',
             'item_url'   => 'required|string|max:500',
@@ -79,12 +88,16 @@ class MenuForm extends Component
 
     public function confirmDelete(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->deleteId      = $id;
         $this->confirmDelete = true;
     }
 
     public function deleteItem(): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         MenuItem::findOrFail($this->deleteId)->delete();
         $this->confirmDelete = false;
         $this->deleteId      = null;

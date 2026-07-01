@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Expositores;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\Expositor;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -9,7 +10,7 @@ use Livewire\WithPagination;
 
 class ExpositoresIndex extends Component
 {
-    use WithPagination;
+    use AuthorizesAdminActions, WithPagination;
 
     public string $search       = '';
     public string $filterStatus = '';
@@ -27,6 +28,8 @@ class ExpositoresIndex extends Component
 
     public function toggleFeatured(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $expositor = Expositor::findOrFail($id);
         $expositor->is_featured = ! $expositor->is_featured;
         $expositor->save();
@@ -34,6 +37,8 @@ class ExpositoresIndex extends Component
 
     public function toggleActive(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $expositor = Expositor::findOrFail($id);
         $expositor->is_active = ! $expositor->is_active;
         $expositor->save();

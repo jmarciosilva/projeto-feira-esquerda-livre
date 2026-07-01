@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Events;
 
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\Event;
 use App\Services\EventService;
 use Livewire\Component;
@@ -9,7 +10,7 @@ use Livewire\WithPagination;
 
 class EventIndex extends Component
 {
-    use WithPagination;
+    use AuthorizesAdminActions, WithPagination;
 
     public string $search        = '';
     public string $filterState   = '';
@@ -23,12 +24,16 @@ class EventIndex extends Component
 
     public function confirmDelete(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->deleteId      = $id;
         $this->confirmDelete = true;
     }
 
     public function deleteEvent(EventService $service): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $event = Event::findOrFail($this->deleteId);
         $service->delete($event);
 
@@ -40,6 +45,8 @@ class EventIndex extends Component
 
     public function toggleActive(int $id): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $event = Event::findOrFail($id);
         $event->update(['is_active' => !$event->is_active]);
     }

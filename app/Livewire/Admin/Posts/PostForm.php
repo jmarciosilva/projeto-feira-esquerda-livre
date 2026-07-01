@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Posts;
 
 use App\Enums\PostStatus;
 use App\Enums\PostType;
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Livewire\Concerns\ValidatesFileUploads;
 use App\Models\ContentCategory;
 use App\Models\Post;
@@ -14,7 +15,7 @@ use Livewire\WithFileUploads;
 
 class PostForm extends Component
 {
-    use WithFileUploads, ValidatesFileUploads;
+    use AuthorizesAdminActions, WithFileUploads, ValidatesFileUploads;
 
     public ?Post $post = null;
 
@@ -60,6 +61,8 @@ class PostForm extends Component
 
     public function save(PostService $service): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         if (! $this->checkUploadedFile($this->image_upload, 4096, 'image_upload')) return;
 
         $this->validate([

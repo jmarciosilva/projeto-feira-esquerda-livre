@@ -3,12 +3,15 @@
 namespace App\Livewire\Admin\Categorias;
 
 use App\Enums\ItemType;
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\ContentCategory;
 use Illuminate\Support\Str;
 use Livewire\Component;
 
 class CategoriaForm extends Component
 {
+    use AuthorizesAdminActions;
+
     public ?ContentCategory $categoria = null;
 
     public string  $name        = '';
@@ -40,6 +43,8 @@ class CategoriaForm extends Component
 
     public function save(): void
     {
+        $this->authorizeAdminAction('cms.editar');
+
         $this->validate([
             'name'        => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
