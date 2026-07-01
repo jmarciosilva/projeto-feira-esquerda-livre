@@ -33,6 +33,7 @@ class RolePermissionSeeder extends Seeder
         'feed.moderar',
         'relatorios.visualizar',
         'email-marketing.gerenciar',
+        'expositores.visibilidade',
     ];
 
     /**
@@ -58,6 +59,7 @@ class RolePermissionSeeder extends Seeder
                 'feed.moderar',
                 'relatorios.visualizar',
                 'email-marketing.gerenciar',
+                'expositores.visibilidade',
             ],
             'supervisor' => [
                 'admin.acessar',

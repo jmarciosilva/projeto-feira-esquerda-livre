@@ -2,7 +2,7 @@
 
 **Documento de Planejamento Estratégico**
 **Versão:** 2.0 — Julho de 2026
-**Status geral do projeto:** MVP em fase final. Checkout, cotação de frete via Melhor Envio e pagamento manual operacionais. Governança administrativa (usuários internos, permissões, perfis de acesso) implementada com modelo multi-papel: um único e-mail pode ser simultaneamente equipe interna e cliente do marketplace. Dois módulos adicionais foram incorporados à entrega do MVP: rastreio personalizado de entregas (Módulo 4.4) e central de email marketing (Módulo 5.3). Após estes módulos, o MVP estará completo e o produto poderá ser lançado; fases futuras (split automático via Mercado Pago, OAuth por lojista, etiquetas físicas, rede social) seguem planejadas.
+**Status geral do projeto:** MVP em fase final. Checkout, cotação de frete via Melhor Envio e pagamento manual operacionais. Governança administrativa (usuários internos, permissões, perfis de acesso) implementada com modelo multi-papel: um único e-mail pode ser simultaneamente equipe interna e cliente do marketplace. Três módulos adicionais foram incorporados à entrega do MVP: rastreio personalizado de entregas (Módulo 4.4), central de email marketing (Módulo 5.3) e gestão de visibilidade e tempo de exposição de expositores na home (Módulo 5.4). Após estes módulos, o MVP estará completo e o produto poderá ser lançado; fases futuras (split automático via Mercado Pago, OAuth por lojista, etiquetas físicas, rede social) seguem planejadas.
 
 ---
 
@@ -25,6 +25,7 @@
 [FASE 5 ⏳ Em andamento]
   Comunidade & Engajamento
   + [5.3 ⏳] Central de Email Marketing
+  + [5.4 ⏳] Gestão de Visibilidade de Expositores
           ↓
 [FASE 6 ✅ CONCLUÍDA]
   Usuários internos, perfis & permissões
@@ -729,6 +730,132 @@ customer_profiles (alter)
 
 ---
 
+### Módulo 5.4 — Gestão de Visibilidade e Tempo de Exposição de Expositores — ⏳ A implementar
+
+**Objetivo:** tornar a exposição dos expositores na home page justa, transparente e monetizável. Hoje, quem é aprovado por último aparece primeiro — o novo sistema introduz rotação aleatória com rastreio de tempo de exibição, cotas configuráveis por expositor e um painel de relatórios para que cada lojista veja exatamente quanto tempo sua loja ficou visível para o público.
+
+**Problema atual:** a seção "Nossos Expositores" da home exibe os expositores em ordem de cadastro (mais recente primeiro), o que penaliza quem foi aprovado mais cedo e favorece indevidamente os recém-chegados. Não há registro de quantas vezes ou por quanto tempo cada expositor foi exibido.
+
+**Princípio de produto:** o marketplace vende *tempo de exposição* como diferencial comercial — expositores que contratam um plano de destaque têm garantia de presença mínima na vitrine; os demais participam de um pool de rotação aleatória democrática.
+
+---
+
+**5.4.1 — Modelo de dados**
+
+Tabela nova `expositor_visibility_slots`:
+```
+id
+expositor_id          FK → expositores
+slot_type             enum: home_featured | home_rotation
+priority              smallint (0 = rotação democrática; 1–100 = destaque pago)
+active_from           timestamp nullable (início da janela contratada)
+active_until          timestamp nullable (fim da janela contratada; null = indefinido)
+created_by            FK → users
+created_at / updated_at
+```
+
+Tabela nova `expositor_impressions`:
+```
+id
+expositor_id          FK → expositores
+rendered_at           timestamp (quando a home foi renderizada com este expositor)
+session_hash          varchar(64) — hash anônimo da sessão do visitante (SHA-256 do session_id)
+source                enum: home_featured | home_rotation
+created_at
+```
+> `session_hash` garante rastreio sem armazenar dados pessoais (conformidade LGPD).
+
+Alteração na tabela `expositores`:
+```
++ show_on_home         boolean default false  (já existe — sem mudança)
++ home_rotation_weight smallint default 1     (peso na roleta: 1 = normal, >1 = destaque)
++ total_impressions    unsignedInteger default 0  (contador desnormalizado para leitura rápida)
+```
+
+---
+
+**5.4.2 — Lógica de rotação na home**
+
+- A seção "Nossos Expositores" exibe até **N expositores** por renderização (N configurável em `site_settings.home_expositores_count`, padrão: 8).
+- A seleção obedece à seguinte hierarquia:
+  1. **Destaques pagos ativos** (`slot_type = home_featured`, `priority > 0`, dentro da janela `active_from/until`) — sempre exibidos primeiro, até o limite configurado para destaques.
+  2. **Pool de rotação democrática** — expositores com `show_on_home = true` e sem slot de destaque ativo são sorteados aleatoriamente, com peso proporcional a `home_rotation_weight`.
+- A cada renderização da home que inclua expositores, registra-se uma linha em `expositor_impressions` por expositor exibido (disparado via `ExpositorImpressionJob` em fila para não impactar o tempo de resposta).
+- **Cache da seleção:** a lista sorteada é cacheada por **5 minutos** (`expositor_home_selection`) para evitar sorteio a cada pageview, mas garantir rotatividade ao longo do dia.
+
+---
+
+**5.4.3 — Painel admin — Gestão de Visibilidade**
+
+Rota: `/admin/expositores/visibilidade`  
+Permissão: `expositores.visibilidade`
+
+- Listagem de todos os expositores com `show_on_home = true`, exibindo:
+  - Status atual (em destaque / em rotação / fora da home)
+  - Total de impressões (acumulado e últimos 30 dias)
+  - Janela de destaque contratada (se houver)
+  - Peso de rotação atual
+- Ações disponíveis:
+  - **Ativar/desativar destaque pago:** define `slot_type = home_featured`, `priority`, `active_from`, `active_until`
+  - **Ajustar peso de rotação:** edita `home_rotation_weight` (1–10)
+  - **Remover da home:** toggle `show_on_home = false`
+- Gráfico simples de impressões por dia (últimos 30 dias) usando dados de `expositor_impressions`
+
+---
+
+**5.4.4 — Painel do lojista — Relatório de Exposição**
+
+Rota: `/minha-loja/exposicao`  
+Visível apenas para lojistas com `show_on_home = true`
+
+- Card de resumo:
+  - Total de impressões na home (todos os tempos)
+  - Impressões nos últimos 7 e 30 dias
+  - Posição atual: "Em destaque" (com data de fim) ou "Em rotação democrática"
+- Gráfico de barras: impressões por dia (últimos 30 dias)
+- Tabela: top-10 dias com mais impressões
+- Nota informativa: *"Sua loja participou da vitrine da Feira em X dias no último mês"*
+
+---
+
+**5.4.5 — Aprovação de expositor: integração ao fluxo existente**
+
+Ao aprovar uma solicitação de lojista em `/admin/lojistas/solicitacoes`:
+- Se `show_on_home` for marcado como `true` durante a aprovação, o sistema cria automaticamente um slot `home_rotation` com `priority = 0` e `home_rotation_weight = 1`.
+- Um aviso contextual informa ao admin: *"Este expositor entrará no pool de rotação democrática. Para garantir visibilidade prioritária, configure um slot de destaque."*
+
+---
+
+**5.4.6 — Configurações em `site_settings`**
+
+| Chave | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `home_expositores_count` | integer | 8 | Quantos expositores exibir por renderização |
+| `home_featured_max` | integer | 2 | Máximo de slots de destaque pago simultâneos |
+| `home_cache_ttl_minutes` | integer | 5 | TTL do cache de seleção da home |
+
+---
+
+**5.4.7 — Job de impressão assíncrono**
+
+`ExpositorImpressionJob`:
+- Recebe array de `expositor_id` exibidos e `session_hash`
+- Insere registros em `expositor_impressions` em bulk
+- Incrementa `expositores.total_impressions` para cada ID via `increment()`
+- Roda na fila padrão com `tries = 3`
+
+---
+
+**Decisões de produto para o MVP:**
+
+- Impressões são registradas por renderização de página, não por tempo de permanência (sem JavaScript de rastreio de scroll — mantém a filosofia de zero JS pesado).
+- O `session_hash` é derivado do `session()->getId()` hasheado com SHA-256 — nunca armazena IP ou dados pessoais.
+- Expositores não podem ver o `session_hash` nem dados de outros expositores — apenas os próprios relatórios agregados.
+- A cobrança pelo slot de destaque é externa ao sistema (fatura manual / contrato) — o painel apenas registra as datas de vigência informadas pelo admin.
+- Integração futura: webhook para ativar/desativar slots automaticamente mediante confirmação de pagamento via Mercado Pago.
+
+---
+
 ## ✅ Fase 6 — Governança Administrativa, Usuários Internos e Permissões
 
 **Objetivo estratégico:** profissionalizar a operação interna da plataforma, permitindo que a Feira Esquerda Livre tenha administradores, gerentes, supervisores e editores com acessos controlados, auditáveis e coerentes com suas responsabilidades.
@@ -882,7 +1009,7 @@ customer_profiles (alter)
 | ✅ Fase 3 — Catálogo & Três Eixos | Semanas 7–9 | 3.1 · 3.2 · 3.3 | Três eixos, CRUD de produtos, loja pública e carrinho multilojas em produção |
 | ✅ Fase 4 — Checkout & Pagamento | Semanas 10–13 | 4.1 · 4.2 · 4.3 | MVP com cotação inicial de frete via Melhor Envio; pagamento/split automáticos seguem em fases futuras |
 | ⏳ **4.4 — Rastreio de Entrega** | MVP final | 4.4 | Linha do tempo branded, integração Melhor Envio Tracking, notificações ao cliente |
-| ⏳ Fase 5 — Comunidade | Semanas 14–17 | 5.1 · 5.2 · **5.3** | Feed social + compartilhamento + **Central de Email Marketing** |
+| ⏳ Fase 5 — Comunidade | Semanas 14–17 | 5.1 · 5.2 · **5.3** · **5.4** | Feed social + compartilhamento + **Email Marketing** + **Gestão de Visibilidade de Expositores** |
 | ✅ Fase 6 — Governança Admin | Concluída | 6.1 · 6.2 · 6.3 · 6.4 · 6.5 | Usuários internos, perfis de acesso, permissões, modelo multi-papel e proteção real do painel |
 
 ---
@@ -916,6 +1043,6 @@ Estes princípios se aplicam a todas as fases e devem guiar cada decisão de UX 
 
 ---
 
-*Documento atualizado em: 1º de julho de 2026 — Versão 2.0*
+*Documento atualizado em: 1º de julho de 2026 — Versão 2.1*
 *Próxima revisão: após entrega do Módulo 4.4 (rastreio) e Módulo 5.3 (email marketing), marco do lançamento do MVP*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala*

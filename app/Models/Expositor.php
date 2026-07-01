@@ -41,14 +41,18 @@ class Expositor extends Model
         'is_featured',
         'is_active',
         'sort_order',
+        'home_rotation_weight',
+        'total_impressions',
     ];
 
     protected function casts(): array
     {
         return [
-            'is_featured' => 'boolean',
-            'is_active' => 'boolean',
-            'eixos' => 'array',
+            'is_featured'          => 'boolean',
+            'is_active'            => 'boolean',
+            'eixos'                => 'array',
+            'home_rotation_weight' => 'integer',
+            'total_impressions'    => 'integer',
         ];
     }
 
@@ -86,6 +90,36 @@ class Expositor extends Model
         return $this->belongsToMany(Event::class, 'event_expositores')
             ->withPivot('status')
             ->withTimestamps();
+    }
+
+    public function visibilitySlots(): HasMany
+    {
+        return $this->hasMany(ExpositorVisibilitySlot::class);
+    }
+
+    public function activeSlot(): ?ExpositorVisibilitySlot
+    {
+        return $this->visibilitySlots()
+            ->where(function ($q) {
+                $q->whereNull('active_from')->orWhere('active_from', '<=', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('active_until')->orWhere('active_until', '>=', now());
+            })
+            ->orderByDesc('priority')
+            ->first();
+    }
+
+    public function impressions(): HasMany
+    {
+        return $this->hasMany(ExpositorImpression::class);
+    }
+
+    public function impressionsLastDays(int $days): int
+    {
+        return $this->impressions()
+            ->where('rendered_at', '>=', now()->subDays($days))
+            ->count();
     }
 
     public function scopeFeatured(Builder $query): Builder

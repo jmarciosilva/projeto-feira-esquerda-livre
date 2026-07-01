@@ -19,6 +19,7 @@ use App\Livewire\Admin\Events\EventForm;
 use App\Livewire\Admin\Events\EventIndex;
 use App\Livewire\Admin\Expositores\ExpositoresForm;
 use App\Livewire\Admin\Expositores\ExpositoresIndex;
+use App\Livewire\Admin\Expositores\VisibilityIndex as ExpositoresVisibilityIndex;
 use App\Livewire\Admin\Feed\ReportIndex as FeedReportIndex;
 use App\Livewire\Admin\Lojistas\SolicitacaoIndex;
 use App\Livewire\Admin\Media\MediaLibrary;
@@ -39,6 +40,7 @@ use App\Livewire\Cliente\Enderecos\EnderecoForm;
 use App\Livewire\Cliente\Enderecos\EnderecoIndex;
 use App\Livewire\Cliente\Pedidos\PedidoIndex as ClientePedidoIndex;
 use App\Livewire\Lojista\Dashboard as LojistaDashboard;
+use App\Livewire\Lojista\ExposicaoIndex as LojistaExposicaoIndex;
 use App\Livewire\Lojista\Feed\FeedPostIndex;
 use App\Livewire\Lojista\LojaForm;
 use App\Livewire\Lojista\Pedidos\PedidoIndex as LojistaPedidoIndex;
@@ -56,6 +58,7 @@ use App\Models\EmailCampaign;
 use App\Models\EmailCampaignSend;
 use App\Models\Order;
 use App\Models\OrderShipping;
+use App\Services\ExpositorVisibilityService;
 use App\Models\Post;
 use App\Models\Product;
 use App\Models\SiteSetting;
@@ -76,7 +79,9 @@ Route::get('/', function () {
         ->first();
 
     $upcomingEvents = Event::upcoming()->limit(3)->get();
-    $featuredExpositores = Expositor::featured()->limit(6)->get();
+
+    $sessionHash = hash('sha256', session()->getId());
+    $featuredExpositores = app(ExpositorVisibilityService::class)->selectForHome($sessionHash);
     $featuredProducts = Product::featured()->where('item_type', 'produto')->with('expositor')->limit(10)->get();
     $featuredServicos = Product::featured()->where('item_type', 'servico')->with('expositor')->limit(10)->get();
     $featuredCuidados = Product::featured()->where('item_type', 'cuidado')->with('expositor')->limit(10)->get();
@@ -424,6 +429,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
         Route::get('/expositores', ExpositoresIndex::class)->name('expositores.index');
         Route::get('/expositores/{expositor}/edit', ExpositoresForm::class)->middleware('can:cms.editar')->name('expositores.edit');
+        Route::get('/expositores/visibilidade', ExpositoresVisibilityIndex::class)->middleware('can:expositores.visibilidade')->name('expositores.visibilidade');
 
         Route::get('/categorias', CategoriaIndex::class)->name('categorias.index');
         Route::get('/categorias/create', CategoriaForm::class)->middleware('can:cms.editar')->name('categorias.create');
@@ -469,6 +475,7 @@ Route::middleware(['auth', 'lojista'])->prefix('minha-loja')->name('lojista.')->
     Route::get('/feed', FeedPostIndex::class)->name('feed.index');
 
     Route::get('/pedidos', LojistaPedidoIndex::class)->name('pedidos.index');
+    Route::get('/exposicao', LojistaExposicaoIndex::class)->name('exposicao.index');
 });
 
 // ─── Minha Conta (cliente) ─────────────────────────────────────────────────────

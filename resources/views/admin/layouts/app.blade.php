@@ -83,9 +83,15 @@
                 Eventos
             </x-admin.nav-item>
 
-            <x-admin.nav-item href="{{ route('admin.expositores.index') }}" icon="store" :active="request()->routeIs('admin.expositores.*')">
+            <x-admin.nav-item href="{{ route('admin.expositores.index') }}" icon="store" :active="request()->routeIs('admin.expositores.index') || request()->routeIs('admin.expositores.edit')">
                 Expositores
             </x-admin.nav-item>
+
+            @can('expositores.visibilidade')
+            <x-admin.nav-item href="{{ route('admin.expositores.visibilidade') }}" icon="photo" :active="request()->routeIs('admin.expositores.visibilidade')">
+                Visibilidade na Home
+            </x-admin.nav-item>
+            @endcan
 
             <x-admin.nav-item href="{{ route('admin.categorias.index') }}" icon="tag" :active="request()->routeIs('admin.categorias.*')">
                 Categorias
