@@ -217,6 +217,41 @@
         </div>
     </div>
 
+    {{-- FAQ --}}
+    @php $faqs = $product->faqs; @endphp
+    @if($faqs->isNotEmpty())
+    <div class="mt-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">Perguntas Frequentes</h2>
+        <div class="space-y-2" x-data="{ open: null }">
+            @foreach($faqs as $i => $faq)
+            <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <button type="button"
+                        @click="open = open === {{ $i }} ? null : {{ $i }}"
+                        class="w-full flex items-center justify-between px-5 py-4 text-left gap-4">
+                    <span class="font-semibold text-gray-900 text-base leading-snug">{{ $faq->question }}</span>
+                    <svg class="w-5 h-5 flex-shrink-0 text-gray-400 transition-transform duration-200"
+                         :class="open === {{ $i }} ? 'rotate-180' : ''"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open === {{ $i }}"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0 -translate-y-1"
+                     x-transition:enter-end="opacity-100 translate-y-0"
+                     class="px-5 pb-5 text-gray-600 text-base leading-relaxed border-t border-gray-50">
+                    <div class="pt-3">
+                        @foreach(explode("\n", $faq->answer) as $line)
+                        @if(trim($line))<p>{{ trim($line) }}</p>@endif
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     {{-- Outros produtos da loja --}}
     @if($otherProducts->isNotEmpty())
     <div class="mt-10">

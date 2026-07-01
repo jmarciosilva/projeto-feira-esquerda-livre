@@ -8,6 +8,7 @@ use App\Enums\PriceType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -72,6 +73,11 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(ContentCategory::class);
+    }
+
+    public function faqs(): HasMany
+    {
+        return $this->hasMany(ProductFaq::class)->orderBy('sort_order');
     }
 
     /** Retorna a URL da primeira imagem médio, ou image_path legado. */

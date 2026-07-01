@@ -219,6 +219,71 @@
                     @endif
                 </div>
 
+                {{-- FAQ --}}
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <div class="flex items-start justify-between mb-1">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Perguntas Frequentes</h2>
+                            <p class="text-sm text-gray-500 mt-0.5">
+                                Antecipe as dúvidas dos clientes. Exibido na página pública do produto.
+                            </p>
+                        </div>
+                        @if(count($faqs) < 15)
+                        <button type="button" wire:click="addFaq"
+                                class="flex-shrink-0 ml-4 px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+                                style="background:#FFFBEB; color:#C47A00; border:2px solid #E8A000;">
+                            + Adicionar
+                        </button>
+                        @endif
+                    </div>
+
+                    @if(count($faqs) === 0)
+                    <div class="mt-5 py-8 text-center rounded-xl border-2 border-dashed border-gray-200">
+                        <p class="text-3xl mb-2">❓</p>
+                        <p class="text-sm text-gray-500">Nenhuma pergunta ainda.</p>
+                        <p class="text-xs text-gray-400 mt-1">Exemplos: "Qual o prazo de entrega?", "Tem garantia?", "Aceita encomenda?"</p>
+                        <button type="button" wire:click="addFaq"
+                                class="mt-4 px-5 py-2 rounded-xl text-sm font-bold"
+                                style="background:#E8A000; color:#fff;">
+                            Adicionar primeira pergunta
+                        </button>
+                    </div>
+                    @else
+                    <div class="mt-5 space-y-4">
+                        @foreach($faqs as $i => $faq)
+                        <div class="p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Pergunta {{ $i + 1 }}</span>
+                                <button type="button" wire:click="removeFaq({{ $i }})"
+                                        class="text-xs font-semibold text-red-500 hover:text-red-700 transition-colors">
+                                    Remover
+                                </button>
+                            </div>
+                            <div>
+                                <input wire:model="faqs.{{ $i }}.question"
+                                       type="text"
+                                       placeholder="Ex.: Qual o prazo de entrega?"
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base bg-white focus:outline-none focus:ring-2 focus:ring-[#E8A000]"
+                                       style="min-height:48px;">
+                                @error("faqs.{$i}.question")
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <div>
+                                <textarea wire:model="faqs.{{ $i }}.answer"
+                                          rows="3"
+                                          placeholder="Escreva a resposta..."
+                                          class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base bg-white focus:outline-none focus:ring-2 focus:ring-[#E8A000] resize-none"></textarea>
+                                @error("faqs.{$i}.answer")
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                    @endif
+                </div>
+
             </div>
 
             {{-- Coluna Lateral --}}

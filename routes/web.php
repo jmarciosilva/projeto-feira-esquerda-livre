@@ -370,6 +370,7 @@ Route::get('/loja/{slug}/{productSlug}', function (string $slug, string $product
     $product = Product::where('expositor_id', $expositor->id)
         ->where('slug', $productSlug)
         ->where('is_active', true)
+        ->with('faqs')
         ->firstOrFail();
 
     $otherProducts = Product::where('expositor_id', $expositor->id)

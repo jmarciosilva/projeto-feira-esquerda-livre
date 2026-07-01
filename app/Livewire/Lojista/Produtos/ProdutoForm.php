@@ -8,6 +8,7 @@ use App\Enums\PriceType;
 use App\Livewire\Concerns\ValidatesFileUploads;
 use App\Models\ContentCategory;
 use App\Models\Product;
+use App\Models\ProductFaq;
 use App\Services\ImageService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -59,6 +60,9 @@ class ProdutoForm extends Component
 
     public array $images = [];
 
+    /** @var array<int, array{question: string, answer: string}> */
+    public array $faqs = [];
+
     public $upload1 = null;
 
     public $upload2 = null;
@@ -90,7 +94,24 @@ class ProdutoForm extends Component
             $this->is_featured = $product->is_featured;
             $this->sort_order = $product->sort_order ?? 0;
             $this->images = $product->images ?? [];
+            $this->faqs = $product->faqs
+                ->map(fn ($f) => ['question' => $f->question, 'answer' => $f->answer])
+                ->toArray();
         }
+    }
+
+    public function addFaq(): void
+    {
+        if (count($this->faqs) >= 15) {
+            return;
+        }
+        $this->faqs[] = ['question' => '', 'answer' => ''];
+    }
+
+    public function removeFaq(int $index): void
+    {
+        array_splice($this->faqs, $index, 1);
+        $this->faqs = array_values($this->faqs);
     }
 
     public function updatedName(): void
@@ -177,10 +198,12 @@ class ProdutoForm extends Component
 
         if ($this->product && $this->product->exists) {
             $this->product->update($data);
+            $this->syncFaqs($this->product->id);
             $label = ItemType::from($this->item_type)->label();
             session()->flash('success', "{$label} atualizado com sucesso!");
         } else {
             $product = Product::create($data);
+            $this->syncFaqs($product->id);
             $this->redirect(route('lojista.produtos.edit', $product));
 
             return;
@@ -188,6 +211,25 @@ class ProdutoForm extends Component
 
         $this->images = $this->product->fresh()->images ?? [];
         $this->upload1 = $this->upload2 = $this->upload3 = $this->upload4 = null;
+    }
+
+    private function syncFaqs(int $productId): void
+    {
+        ProductFaq::where('product_id', $productId)->delete();
+
+        $valid = array_values(array_filter(
+            $this->faqs,
+            fn ($f) => ! empty(trim($f['question'] ?? '')) && ! empty(trim($f['answer'] ?? '')),
+        ));
+
+        foreach ($valid as $i => $faq) {
+            ProductFaq::create([
+                'product_id' => $productId,
+                'question'   => trim($faq['question']),
+                'answer'     => trim($faq['answer']),
+                'sort_order' => $i,
+            ]);
+        }
     }
 
     public function render(): View
