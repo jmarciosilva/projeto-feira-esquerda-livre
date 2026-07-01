@@ -10,7 +10,13 @@ class AdminMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (!auth()->check() || !auth()->user()->isEditor()) {
+        $user = auth()->user();
+
+        if (! $user || ! $user->is_active || ! $user->isInternalUser()) {
+            abort(403, 'Acesso não autorizado.');
+        }
+
+        if (! $user->isAdmin() && ! $user->can('admin.acessar')) {
             abort(403, 'Acesso não autorizado.');
         }
 

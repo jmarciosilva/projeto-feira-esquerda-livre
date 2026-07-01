@@ -124,6 +124,23 @@
                 :badge="$feedReportes > 0 ? $feedReportes : null">
                 Moderação da Comunidade
             </x-admin.nav-item>
+            @canany(['usuarios.visualizar', 'permissoes.gerenciar'])
+            <div class="pt-4 pb-1 px-3">
+                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Governança</p>
+            </div>
+
+            @can('usuarios.visualizar')
+            <x-admin.nav-item href="{{ route('admin.usuarios.index') }}" icon="users" :active="request()->routeIs('admin.usuarios.*')">
+                Usuários Internos
+            </x-admin.nav-item>
+            @endcan
+
+            @can('permissoes.gerenciar')
+            <x-admin.nav-item href="{{ route('admin.permissoes.index') }}" icon="cog" :active="request()->routeIs('admin.permissoes.*')">
+                Perfis de Acesso
+            </x-admin.nav-item>
+            @endcan
+            @endcanany
         </nav>
 
         {{-- User --}}

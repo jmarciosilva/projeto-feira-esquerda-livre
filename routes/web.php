@@ -23,11 +23,14 @@ use App\Livewire\Admin\Menus\MenuIndex;
 use App\Livewire\Admin\Pages\PageForm;
 use App\Livewire\Admin\Pages\PageIndex;
 use App\Livewire\Admin\Pedidos\PedidoIndex as AdminPedidoIndex;
+use App\Livewire\Admin\Permissoes\PerfilAcessoIndex;
 use App\Livewire\Admin\Posts\PostForm;
 use App\Livewire\Admin\Posts\PostIndex;
 use App\Livewire\Admin\Settings\CheckoutSettingsForm;
 use App\Livewire\Admin\Settings\MailSettingsForm;
 use App\Livewire\Admin\Settings\SettingsForm;
+use App\Livewire\Admin\Usuarios\UsuarioForm;
+use App\Livewire\Admin\Usuarios\UsuarioIndex;
 use App\Livewire\Cliente\Enderecos\EnderecoForm;
 use App\Livewire\Cliente\Enderecos\EnderecoIndex;
 use App\Livewire\Cliente\Pedidos\PedidoIndex as ClientePedidoIndex;
@@ -37,6 +40,7 @@ use App\Livewire\Lojista\LojaForm;
 use App\Livewire\Lojista\Pedidos\PedidoIndex as LojistaPedidoIndex;
 use App\Livewire\Lojista\Produtos\ProdutoForm;
 use App\Livewire\Lojista\Produtos\ProdutoIndex;
+use App\Mail\LojistaSolicitacaoRecebida;
 use App\Models\Banner;
 use App\Models\ContentCategory;
 use App\Models\Event;
@@ -49,6 +53,7 @@ use App\Models\Post;
 use App\Models\Product;
 use App\Models\SiteSetting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 
 // ─── Homepage pública ────────────────────────────────────────────────────────
@@ -153,10 +158,16 @@ Route::post('/seja-um-expositor', function (Request $request) {
         'pix_chave.required' => 'Informe a chave PIX.',
     ]);
 
-    LojistasSolicitacao::create($validated);
+    $solicitacao = LojistasSolicitacao::create($validated);
+
+    try {
+        Mail::to($solicitacao->email)->send(new LojistaSolicitacaoRecebida($solicitacao));
+    } catch (Throwable $exception) {
+        report($exception);
+    }
 
     return back()->with('solicitacao_success',
-        'Solicitação enviada! Nossa equipe entrará em contato em até 3 dias úteis pelo WhatsApp ou e-mail informado.'
+        'Solicitação enviada! Enviamos um e-mail de confirmação e nossa equipe entrará em contato em até 3 dias úteis.'
     );
 })->name('seja-um-expositor.post');
 
@@ -283,44 +294,67 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/', Dashboard::class)->name('dashboard');
 
-    Route::get('/settings', SettingsForm::class)->name('settings.edit');
-    Route::get('/settings/mail', MailSettingsForm::class)->name('settings.mail');
-    Route::get('/settings/checkout', CheckoutSettingsForm::class)->name('settings.checkout');
+    Route::middleware('can:configuracoes.visualizar')->group(function () {
+        Route::get('/settings', SettingsForm::class)->name('settings.edit');
+        Route::get('/settings/mail', MailSettingsForm::class)->name('settings.mail');
+        Route::get('/settings/checkout', CheckoutSettingsForm::class)->name('settings.checkout');
+    });
 
-    Route::get('/pages', PageIndex::class)->name('pages.index');
-    Route::get('/pages/create', PageForm::class)->name('pages.create');
-    Route::get('/pages/{page}/edit', PageForm::class)->name('pages.edit');
+    Route::middleware('can:usuarios.visualizar')->group(function () {
+        Route::get('/usuarios', UsuarioIndex::class)->name('usuarios.index');
+    });
 
-    Route::get('/banners', BannerIndex::class)->name('banners.index');
-    Route::get('/banners/create', BannerForm::class)->name('banners.create');
-    Route::get('/banners/{banner}/edit', BannerForm::class)->name('banners.edit');
+    Route::middleware('can:usuarios.gerenciar')->group(function () {
+        Route::get('/usuarios/novo', UsuarioForm::class)->name('usuarios.create');
+        Route::get('/usuarios/{user}/editar', UsuarioForm::class)->name('usuarios.edit');
+    });
 
-    Route::get('/menus', MenuIndex::class)->name('menus.index');
-    Route::get('/menus/{menu}/edit', MenuForm::class)->name('menus.edit');
+    Route::get('/perfis-acesso', PerfilAcessoIndex::class)
+        ->middleware('can:permissoes.gerenciar')
+        ->name('permissoes.index');
 
-    Route::get('/media', MediaLibrary::class)->name('media.index');
+    Route::middleware('can:cms.visualizar')->group(function () {
+        Route::get('/pages', PageIndex::class)->name('pages.index');
+        Route::get('/pages/create', PageForm::class)->middleware('can:cms.editar')->name('pages.create');
+        Route::get('/pages/{page}/edit', PageForm::class)->middleware('can:cms.editar')->name('pages.edit');
 
-    Route::get('/posts', PostIndex::class)->name('posts.index');
-    Route::get('/posts/create', PostForm::class)->name('posts.create');
-    Route::get('/posts/{post}/edit', PostForm::class)->name('posts.edit');
+        Route::get('/banners', BannerIndex::class)->name('banners.index');
+        Route::get('/banners/create', BannerForm::class)->middleware('can:cms.editar')->name('banners.create');
+        Route::get('/banners/{banner}/edit', BannerForm::class)->middleware('can:cms.editar')->name('banners.edit');
 
-    Route::get('/events', EventIndex::class)->name('events.index');
-    Route::get('/events/create', EventForm::class)->name('events.create');
-    Route::get('/events/{event}/edit', EventForm::class)->name('events.edit');
+        Route::get('/menus', MenuIndex::class)->name('menus.index');
+        Route::get('/menus/{menu}/edit', MenuForm::class)->middleware('can:cms.editar')->name('menus.edit');
 
-    Route::get('/expositores', ExpositoresIndex::class)->name('expositores.index');
-    Route::get('/expositores/{expositor}/edit', ExpositoresForm::class)->name('expositores.edit');
+        Route::get('/media', MediaLibrary::class)->name('media.index');
 
-    Route::get('/categorias', CategoriaIndex::class)->name('categorias.index');
-    Route::get('/categorias/create', CategoriaForm::class)->name('categorias.create');
-    Route::get('/categorias/{categoria}/edit', CategoriaForm::class)->name('categorias.edit');
+        Route::get('/posts', PostIndex::class)->name('posts.index');
+        Route::get('/posts/create', PostForm::class)->middleware('can:cms.editar')->name('posts.create');
+        Route::get('/posts/{post}/edit', PostForm::class)->middleware('can:cms.editar')->name('posts.edit');
+
+        Route::get('/events', EventIndex::class)->name('events.index');
+        Route::get('/events/create', EventForm::class)->middleware('can:cms.editar')->name('events.create');
+        Route::get('/events/{event}/edit', EventForm::class)->middleware('can:cms.editar')->name('events.edit');
+
+        Route::get('/expositores', ExpositoresIndex::class)->name('expositores.index');
+        Route::get('/expositores/{expositor}/edit', ExpositoresForm::class)->middleware('can:cms.editar')->name('expositores.edit');
+
+        Route::get('/categorias', CategoriaIndex::class)->name('categorias.index');
+        Route::get('/categorias/create', CategoriaForm::class)->middleware('can:cms.editar')->name('categorias.create');
+        Route::get('/categorias/{categoria}/edit', CategoriaForm::class)->middleware('can:cms.editar')->name('categorias.edit');
+    });
 
     // Lojistas
-    Route::get('/lojistas/solicitacoes', SolicitacaoIndex::class)->name('lojistas.solicitacoes');
+    Route::get('/lojistas/solicitacoes', SolicitacaoIndex::class)
+        ->middleware('can:lojistas.visualizar')
+        ->name('lojistas.solicitacoes');
 
-    Route::get('/pedidos', AdminPedidoIndex::class)->name('pedidos.index');
+    Route::get('/pedidos', AdminPedidoIndex::class)
+        ->middleware('can:pedidos.visualizar')
+        ->name('pedidos.index');
 
-    Route::get('/feed/reportes', FeedReportIndex::class)->name('feed.reportes');
+    Route::get('/feed/reportes', FeedReportIndex::class)
+        ->middleware('can:feed.moderar')
+        ->name('feed.reportes');
 });
 
 // ─── Painel do Lojista ────────────────────────────────────────────────────────

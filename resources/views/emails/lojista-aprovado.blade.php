@@ -44,6 +44,7 @@
             </p>
 
             <p class="text">
+                Sua conta foi validada pela administração e já está liberada para autenticação.
                 Abaixo estão seus dados de acesso ao painel de lojista, onde você poderá configurar
                 sua loja, adicionar produtos e gerenciar sua participação nas feiras.
             </p>

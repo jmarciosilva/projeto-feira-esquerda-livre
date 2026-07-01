@@ -1,8 +1,8 @@
 # 🗺️ Roadmap de Desenvolvimento — Feira Esquerda Livre
 
 **Documento de Planejamento Estratégico**
-**Versão:** 1.5 — Julho de 2026
-**Status geral do projeto:** Fase 4 evoluída após o MVP manual — checkout e pagamento manual seguem operacionais; a cotação inicial de frete via Melhor Envio foi implementada para o MVP usando conta única da plataforma, enquanto compra de etiqueta, rastreamento, OAuth por lojista e split de frete continuam planejados para fases futuras
+**Versão:** 1.6 — Julho de 2026
+**Status geral do projeto:** Fase 4 evoluída após o MVP manual — checkout e pagamento manual seguem operacionais; a cotação inicial de frete via Melhor Envio foi implementada para o MVP usando conta única da plataforma, enquanto compra de etiqueta, rastreamento, OAuth por lojista e split de frete continuam planejados para fases futuras. A próxima frente técnica prioritária passa a incluir governança administrativa: gestão de usuários internos, perfis de acesso e permissões por módulo.
 
 ---
 
@@ -23,6 +23,9 @@
            ↓
 [FASE 5 ⏳ Semanas 14–17]
   Comunidade & Engajamento
+          ↓
+[FASE 6 ⏳ Governança Admin]
+  Usuários internos, perfis & permissões
 ```
 
 ---
@@ -533,6 +536,120 @@ feed_comments
 
 ---
 
+## ⏳ Fase 6 — Governança Administrativa, Usuários Internos e Permissões
+
+**Objetivo estratégico:** profissionalizar a operação interna da plataforma, permitindo que a Feira Esquerda Livre tenha administradores, gerentes, supervisores e editores com acessos controlados, auditáveis e coerentes com suas responsabilidades.
+
+**Princípio de arquitetura:** separar claramente os três universos de usuários:
+- **Cliente:** comprador da plataforma, com acesso à área de conta, endereços e pedidos.
+- **Lojista:** dono de loja/expositor, com acesso à área `/minha-loja`.
+- **Equipe interna:** usuários operacionais da Feira, com acesso ao painel `/admin` conforme perfil e permissões.
+
+### Módulo 6.1 — Gestão de Usuários Internos
+
+**Objetivo:** criar no painel administrativo uma área dedicada para cadastro e manutenção de usuários internos.
+
+**Entregas planejadas:**
+- Nova área `/admin/usuarios`
+- Listagem de usuários internos com busca por nome, e-mail, papel e status
+- Cadastro de usuário interno pelo administrador
+- Edição de nome, e-mail, WhatsApp, papel/perfil e status
+- Ativar/desativar acesso sem apagar histórico
+- Redefinição de senha pelo administrador
+- Envio de e-mail com credenciais temporárias quando aplicável
+- Bloqueio para impedir que usuários sem permissão gerenciem outros usuários
+
+**Papéis iniciais:**
+- `administrador` — acesso total ao painel e configurações
+- `gerente` — gestão operacional ampla, sem permissões sensíveis de sistema por padrão
+- `supervisor` — acompanhamento e execução de rotinas específicas
+- `editor` — conteúdo, CMS, posts, páginas e mídia
+
+**Fora deste módulo:** clientes e lojistas não devem ser misturados com a gestão de equipe interna, mesmo estando tecnicamente na tabela `users`.
+
+---
+
+### Módulo 6.2 — Perfis de Acesso e Permissões
+
+**Objetivo:** criar uma camada de autorização por perfil, evitando regras rígidas espalhadas pelo código.
+
+**Permissões base sugeridas:**
+- `cms.visualizar`
+- `cms.editar`
+- `lojistas.visualizar`
+- `lojistas.aprovar`
+- `produtos.visualizar`
+- `produtos.moderar`
+- `pedidos.visualizar`
+- `pedidos.atualizar_status`
+- `configuracoes.visualizar`
+- `configuracoes.editar`
+- `usuarios.visualizar`
+- `usuarios.gerenciar`
+- `permissoes.gerenciar`
+- `feed.moderar`
+- `relatorios.visualizar`
+
+**Regras planejadas:**
+- Administrador recebe todas as permissões.
+- Gerente recebe permissões operacionais amplas, exceto gerenciamento de permissões sensíveis por padrão.
+- Supervisor recebe permissões limitadas por módulo.
+- Editor recebe permissões focadas em CMS, mídia e conteúdo.
+- Permissões devem ser versionadas em seeders para garantir reprodutibilidade entre ambientes.
+
+---
+
+### Módulo 6.3 — Aplicação de Permissões em Menus, Rotas e Ações
+
+**Objetivo:** garantir que a autorização não seja apenas visual. Esconder itens de menu melhora a experiência, mas a segurança deve estar nas rotas, componentes e ações.
+
+**Entregas planejadas:**
+- Menu administrativo renderizado conforme permissões do usuário
+- Middleware/policies/gates protegendo rotas administrativas
+- Proteção em componentes Livewire administrativos
+- Bloqueio de ações críticas, como aprovar lojista, alterar pedido, editar configurações e gerenciar usuários
+- Respostas claras para acesso negado
+- Testes automatizados para permissões de rota e ações críticas
+
+**Critério de aceite:** acessar uma URL administrativa diretamente sem permissão deve retornar bloqueio, mesmo que o link não apareça no menu.
+
+---
+
+### Módulo 6.4 — Base Técnica com `spatie/laravel-permission`
+
+**Objetivo:** adotar uma solução madura para roles e permissions em Laravel, evitando criar uma camada própria desnecessária.
+
+**Decisão técnica recomendada:**
+- Usar o pacote `spatie/laravel-permission`
+- Mapear os papéis internos para roles do pacote
+- Mapear permissões de módulo/ação para permissions do pacote
+- Migrar gradualmente o uso atual de `UserRole` para a nova estrutura, mantendo compatibilidade temporária com `admin`, `editor`, `lojista` e `user`
+
+**Cuidados de implantação:**
+- Avaliar impacto nas migrations existentes de `users.role`
+- Criar seeders idempotentes para roles e permissões
+- Evitar quebrar o login de lojistas e clientes
+- Garantir que o primeiro administrador sempre tenha acesso total
+
+---
+
+### Módulo 6.5 — Separação de Contextos de Usuário
+
+**Objetivo:** tornar explícito no código e na interface que existem usuários com naturezas diferentes, ainda que todos autentiquem pelo mesmo mecanismo.
+
+**Diretrizes:**
+- Cliente acessa `/minha-conta`
+- Lojista acessa `/minha-loja`
+- Equipe interna acessa `/admin`
+- Usuários internos não precisam ter loja
+- Lojistas não devem herdar permissões administrativas
+- Clientes não devem aparecer como equipe interna
+- Telas administrativas devem filtrar e exibir usuários pelo contexto correto
+
+**Próxima decisão técnica:** definir se a separação será feita apenas por roles/permissões ou se haverá campos auxiliares como `user_type`/`context` para facilitar filtros e relatórios.
+
+---
+
 ## 📊 Resumo do Roadmap
 
 | Fase | Período | Módulos | Entregável Principal |
@@ -542,6 +659,7 @@ feed_comments
 | ✅ Fase 3 — Catálogo & Três Eixos | Semanas 7–9 | 3.1 · 3.2 · 3.3 | Três eixos, CRUD de produtos, loja pública e carrinho multilojas em produção |
 | ✅ Fase 4 — Checkout & Pagamento | Semanas 10–13 | 4.1 · 4.2 · 4.3 | MVP com cotação inicial de frete via Melhor Envio; pagamento/split automáticos seguem em fases futuras |
 | ⏳ Fase 5 — Comunidade | Semanas 14–17 | 5.1 · 5.2 | Feed social + ferramentas de marketing |
+| ⏳ Fase 6 — Governança Admin | A priorizar | 6.1 · 6.2 · 6.3 · 6.4 · 6.5 | Usuários internos, perfis de acesso, permissões e proteção real do painel |
 
 ---
 
@@ -575,4 +693,4 @@ Estes princípios se aplicam a todas as fases e devem guiar cada decisão de UX 
 ---
 
 *Documento atualizado em: 1º de julho de 2026*
-*Próxima revisão: ao priorizar OAuth por lojista, compra/geração de etiquetas, rastreamento, split de frete ou ao término da Fase 5 (comunidade)*
+*Próxima revisão: ao priorizar a Fase 6 de governança administrativa, OAuth por lojista, compra/geração de etiquetas, rastreamento, split de frete ou ao término da Fase 5 (comunidade)*
