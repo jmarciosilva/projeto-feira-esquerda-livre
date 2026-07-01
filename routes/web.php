@@ -12,6 +12,9 @@ use App\Livewire\Admin\Categorias\CategoriaForm;
 use App\Livewire\Admin\Categorias\CategoriaIndex;
 use App\Livewire\Admin\Clientes\ClienteIndex;
 use App\Livewire\Admin\Dashboard;
+use App\Livewire\Admin\EmailMarketing\CampaignForm as CampaignFormLivewire;
+use App\Livewire\Admin\EmailMarketing\CampaignIndex as CampaignIndexLivewire;
+use App\Livewire\Admin\EmailMarketing\CampaignReport;
 use App\Livewire\Admin\Events\EventForm;
 use App\Livewire\Admin\Events\EventIndex;
 use App\Livewire\Admin\Expositores\ExpositoresForm;
@@ -49,6 +52,8 @@ use App\Models\Expositor;
 use App\Models\LojistasSolicitacao;
 use App\Models\Menu;
 use App\Models\NewsletterSubscriber;
+use App\Models\EmailCampaign;
+use App\Models\EmailCampaignSend;
 use App\Models\Order;
 use App\Models\OrderShipping;
 use App\Models\Post;
@@ -254,6 +259,78 @@ Route::get('/pedido/{reference}', function (string $reference) {
     return view('pedido.show', compact('order'));
 })->name('pedido.show');
 
+// ─── Tracking de e-mail marketing ─────────────────────────────────────────────
+
+// Pixel de abertura (1×1 GIF)
+Route::get('/mk/o/{token}', function (string $token) {
+    $send = EmailCampaignSend::where('tracking_pixel_token', $token)->first();
+    if ($send && ! $send->opened_at) {
+        $send->update(['opened_at' => now()]);
+    }
+
+    $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+
+    return response($gif, 200, [
+        'Content-Type'  => 'image/gif',
+        'Cache-Control' => 'no-store, no-cache, must-revalidate',
+    ]);
+})->name('mk.open');
+
+// Rastreio de clique (redirect)
+Route::get('/mk/c/{token}', function (string $token) {
+    $send = EmailCampaignSend::where('tracking_pixel_token', $token)->first();
+    $url  = request()->query('url', url('/'));
+
+    if ($send && ! $send->clicked_at) {
+        $send->update(['clicked_at' => now()]);
+    }
+
+    return redirect()->away($url);
+})->name('mk.click');
+
+// Descadastro
+Route::get('/newsletter/descadastro/{token}', function (string $token) {
+    $email      = request()->query('email', '');
+    $campaignId = request()->query('campaign', 0);
+
+    $secret   = config('app.marketing_unsubscribe_secret', config('app.key'));
+    $expected = hash_hmac('sha256', $email . '|' . $campaignId, $secret);
+
+    if (! hash_equals($expected, $token)) {
+        session()->flash('error', 'Link de descadastro inválido ou expirado.');
+        return view('newsletter.unsubscribe');
+    }
+
+    return view('newsletter.unsubscribe', compact('token', 'email', 'campaignId'));
+})->name('newsletter.unsubscribe');
+
+Route::post('/newsletter/descadastro/confirmar', function () {
+    $token      = request('token');
+    $email      = request('email', '');
+    $campaignId = request('campaign', 0);
+
+    $secret   = config('app.marketing_unsubscribe_secret', config('app.key'));
+    $expected = hash_hmac('sha256', $email . '|' . $campaignId, $secret);
+
+    abort_unless(hash_equals($expected, $token), 403);
+
+    // Marcar descadastro no envio específico
+    EmailCampaignSend::where('campaign_id', $campaignId)
+        ->where('email', $email)
+        ->whereNull('unsubscribed_at')
+        ->update(['unsubscribed_at' => now()]);
+
+    // Desativar na newsletter
+    NewsletterSubscriber::where('email', $email)
+        ->update(['is_active' => false]);
+
+    session()->flash('success', 'Inscrição cancelada com sucesso. Você não receberá mais comunicações de marketing da Feira Esquerda Livre.');
+
+    return redirect()->route('newsletter.unsubscribe', ['token' => $token, 'email' => $email, 'campaign' => $campaignId]);
+})->name('newsletter.unsubscribe.confirm');
+
+// ─── Rastreio de entrega ──────────────────────────────────────────────────────
+
 Route::get('/rastreio/{trackingCode}', function (string $trackingCode) {
     $shipping = OrderShipping::where('tracking_code', strtoupper($trackingCode))
         ->with(['order', 'expositor', 'trackingEvents'])
@@ -369,6 +446,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/feed/reportes', FeedReportIndex::class)
         ->middleware('can:feed.moderar')
         ->name('feed.reportes');
+
+    // Email Marketing
+    Route::middleware('can:email-marketing.gerenciar')->prefix('/email-marketing')->name('email-marketing.')->group(function () {
+        Route::get('/', CampaignIndexLivewire::class)->name('index');
+        Route::get('/create', CampaignFormLivewire::class)->name('create');
+        Route::get('/{id}/edit', CampaignFormLivewire::class)->name('edit');
+        Route::get('/{id}/relatorio', CampaignReport::class)->name('report');
+    });
 });
 
 // ─── Painel do Lojista ────────────────────────────────────────────────────────

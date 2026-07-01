@@ -11,12 +11,16 @@ class CustomerProfile extends Model
     protected $fillable = [
         'user_id',
         'marketplace_status',
+        'marketing_opt_in',
+        'marketing_opt_in_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'marketplace_status' => MarketplaceStatus::class,
+            'marketplace_status'  => MarketplaceStatus::class,
+            'marketing_opt_in'    => 'boolean',
+            'marketing_opt_in_at' => 'datetime',
         ];
     }
 

@@ -128,6 +128,15 @@
 
             @endcanany
 
+            @can('email-marketing.gerenciar')
+            <div class="pt-4 pb-1 px-3">
+                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Marketing</p>
+            </div>
+            <x-admin.nav-item href="{{ route('admin.email-marketing.index') }}" icon="mail" :active="request()->routeIs('admin.email-marketing.*')">
+                Email Marketing
+            </x-admin.nav-item>
+            @endcan
+
             @can('feed.moderar')
             <div class="pt-4 pb-1 px-3">
                 <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Comunidade</p>
