@@ -217,6 +217,9 @@
         </div>
     </div>
 
+    {{-- Q&A --}}
+    <livewire:product-q-and-a :product="$product" />
+
     {{-- FAQ --}}
     @php $faqs = $product->faqs; @endphp
     @if($faqs->isNotEmpty())

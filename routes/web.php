@@ -41,6 +41,7 @@ use App\Livewire\Cliente\Enderecos\EnderecoIndex;
 use App\Livewire\Cliente\Pedidos\PedidoIndex as ClientePedidoIndex;
 use App\Livewire\Lojista\Dashboard as LojistaDashboard;
 use App\Livewire\Lojista\ExposicaoIndex as LojistaExposicaoIndex;
+use App\Livewire\Lojista\Perguntas\PerguntaIndex as LojistaPerguntaIndex;
 use App\Livewire\Lojista\Feed\FeedPostIndex;
 use App\Livewire\Lojista\LojaForm;
 use App\Livewire\Lojista\Pedidos\PedidoIndex as LojistaPedidoIndex;
@@ -477,6 +478,7 @@ Route::middleware(['auth', 'lojista'])->prefix('minha-loja')->name('lojista.')->
 
     Route::get('/pedidos', LojistaPedidoIndex::class)->name('pedidos.index');
     Route::get('/exposicao', LojistaExposicaoIndex::class)->name('exposicao.index');
+    Route::get('/perguntas', LojistaPerguntaIndex::class)->name('perguntas.index');
 });
 
 // ─── Minha Conta (cliente) ─────────────────────────────────────────────────────

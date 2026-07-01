@@ -80,6 +80,11 @@ class Product extends Model
         return $this->hasMany(ProductFaq::class)->orderBy('sort_order');
     }
 
+    public function questions(): HasMany
+    {
+        return $this->hasMany(ProductQuestion::class)->orderByDesc('created_at');
+    }
+
     /** Retorna a URL da primeira imagem médio, ou image_path legado. */
     public function getMainImageUrlAttribute(): ?string
     {
