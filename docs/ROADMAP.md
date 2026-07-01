@@ -1,8 +1,8 @@
 # 🗺️ Roadmap de Desenvolvimento — Feira Esquerda Livre
 
 **Documento de Planejamento Estratégico**
-**Versão:** 1.4 — Junho de 2026
-**Status geral do projeto:** Fase 4 concluída em modo MVP manual — checkout, frete e pagamento funcionam sem integrações externas, prontos para demonstração ao Gerente de Produto e ao cliente; ativação do Melhor Envio e do Mercado Pago fica para uma fase técnica futura
+**Versão:** 1.5 — Julho de 2026
+**Status geral do projeto:** Fase 4 evoluída após o MVP manual — checkout e pagamento manual seguem operacionais; a cotação inicial de frete via Melhor Envio foi implementada para o MVP usando conta única da plataforma, enquanto compra de etiqueta, rastreamento, OAuth por lojista e split de frete continuam planejados para fases futuras
 
 ---
 
@@ -18,8 +18,8 @@
 [FASE 3 ✅ CONCLUÍDA]
   Catálogo & Três Eixos
            ↓
-[FASE 4 ✅ MVP MANUAL CONCLUÍDO]
-  Checkout & Pagamentos (sem integrações externas ainda)
+[FASE 4 ✅ MVP + COTAÇÃO DE FRETE]
+  Checkout, cotação inicial de frete & pagamentos manuais
            ↓
 [FASE 5 ⏳ Semanas 14–17]
   Comunidade & Engajamento
@@ -335,17 +335,20 @@ Itens descritos na Fase 3 original que não bloqueiam o checkout e foram conscie
 
 ---
 
-## ✅ Fase 4 — Checkout, Logística e Split de Pagamento (MVP manual concluído)
+## ✅ Fase 4 — Checkout, Logística e Split de Pagamento (MVP com cotação inicial de frete)
 
 **Período:** Semanas 10 a 13
 **Objetivo estratégico:** A fase mais crítica do core do negócio — calcular frete, cobrar e distribuir o dinheiro automaticamente.
 
 **Decisão de produto (16/06/2026):** para validar o fluxo completo de compra com o Gerente de Produto e o cliente o mais rápido possível,
-a Fase 4 foi entregue como um **MVP 100% manual**: sem integração real com Correios/Melhor Envio e sem Mercado Pago.
-O frete é combinado diretamente entre cliente e lojista (WhatsApp) e o pagamento é feito via PIX/dados bancários do
-próprio lojista (já cadastrados no perfil da loja), confirmado manualmente. As **telas de configuração das duas
-integrações já existem no admin** e guardam as credenciais — a ativação automática fica para uma fase técnica futura,
-sem precisar refazer o checkout, o modelo de pedidos ou o split.
+a Fase 4 foi entregue inicialmente como um **MVP 100% manual**: frete combinado diretamente entre cliente e lojista
+(WhatsApp) e pagamento via PIX/dados bancários do próprio lojista, confirmado manualmente.
+
+**Atualização técnica (01/07/2026):** a integração inicial com o Melhor Envio foi implementada para cálculo de frete
+no checkout. O MVP usa uma conta única da plataforma Feira Esquerda Livre, com credenciais via `.env`/configuração,
+busca CEP de origem por loja, envia peso e dimensões dos produtos e retorna opções padronizadas para seleção no checkout.
+Compra de etiqueta, geração de etiqueta, rastreamento, OAuth por lojista, split de frete e painel financeiro permanecem
+fora do escopo atual.
 
 ### O que foi entregue
 
@@ -358,39 +361,44 @@ sem precisar refazer o checkout, o modelo de pedidos ou o split.
 | Checkout público `/checkout` (dados do cliente + endereço, sem login obrigatório) | ✅ Concluído |
 | Página de confirmação `/pedido/{reference}` com instruções de PIX/banco por loja | ✅ Concluído |
 | Admin → `/admin/settings/checkout`: mensagem de frete manual e comissão da plataforma | ✅ Concluído |
-| Admin → campos placeholder para Melhor Envio (client id/secret/token) e Mercado Pago (public key/access token) | ✅ Concluído — salvos, integração inativa |
+| Admin → campos placeholder para Melhor Envio (client id/secret/token) e Mercado Pago (public key/access token) | ✅ Concluído — salvos para uso operacional/futuro |
 | Admin → `/admin/pedidos`: visão geral de todos os pedidos, com atualização de status | ✅ Concluído |
 | Lojista → `/minha-loja/pedidos`: confirmação manual de pagamento recebido por loja | ✅ Concluído |
 | Botão "Finalizar Compra" do carrinho ligado ao checkout | ✅ Concluído |
 | Cálculo automático de comissão (%) para fins de relatório (não retida de fato) | ✅ Concluído |
-| Cotação real de frete (Melhor Envio) | ❌ Adiado — ver Módulo 4.1 |
+| Cotação real de frete (Melhor Envio) | ✅ Implementado no MVP — ver Módulo 4.1 |
 | Cobrança e split automático (Mercado Pago) | ❌ Adiado — ver Módulo 4.3 |
 | Login simplificado por link mágico/Google no checkout | ❌ Adiado — checkout aceita convidado com nome/WhatsApp/e-mail |
 
 ---
 
-### Módulo 4.1 — Cálculo de Frete (Melhor Envio) — ⏳ Adiado (config pronta)
+### Módulo 4.1 — Cálculo de Frete (Melhor Envio) — ✅ Cotação MVP implementada
 
 **Objetivo:** Cotação de frete automatizada por lojista no carrinho.
 
-**Status atual:** o checkout exibe uma mensagem fixa ("frete a combinar com o lojista via WhatsApp"), configurável pelo
-admin em `/admin/settings/checkout`. Os campos de credenciais do Melhor Envio (Client ID, Client Secret, Access Token,
-sandbox) já existem na mesma tela e são persistidos — faltando apenas implementar as chamadas de API quando a
-integração for priorizada.
+**Status atual:** o checkout permite consultar frete por CEP de destino, agrupando itens por loja. Para cada loja,
+o sistema usa o CEP de origem cadastrado no perfil do lojista e envia ao Melhor Envio os produtos físicos com peso,
+altura, largura, comprimento, valor e quantidade. O retorno é normalizado para exibir transportadora, serviço, prazo,
+preço e mensagens de erro. O cliente pode selecionar uma opção por loja e o resumo do pedido soma o frete ao total.
 
-**Entregas futuras:**
+**Entregas concluídas no MVP:**
+- Configuração via `.env`: `MELHOR_ENVIO_BASE_URL`, `MELHOR_ENVIO_TOKEN`, `MELHOR_ENVIO_ENVIRONMENT`
+- `config/melhorenvio.php`
+- Service `App\Services\Shipping\MelhorEnvioService`
+- DTO `App\DTO\ShippingQuoteData`
+- Endpoint `POST /shipping/quote`
+- Campos de origem da loja: CEP, rua, número, bairro, cidade e estado
+- Campos logísticos de produto: peso, altura, largura e comprimento
+- Tratamento claro para produtos sem dados logísticos, sem quebrar o checkout
+- Documentação técnica em `docs/INTEGRACAO_FRETE_MELHOR_ENVIO.md`
 
-**4.1.1 — Integração com API Melhor Envio**
-- Autenticação OAuth2 (token por lojista, não por plataforma)
-- Cada lojista cadastra seu CEP de origem no painel da loja
-- Cotação chamada no momento em que o cliente informa o CEP de entrega
-- Exibe: transportadora, prazo e preço para cada loja do carrinho
-- Modalidades exibidas: Correios PAC, Sedex, transportadoras privadas (quando disponíveis)
-- Fallback: se a API falhar, mantém o texto manual atual
-
-**4.1.2 — Seleção de Frete por Loja**
-- Interface clara: o cliente escolhe a transportadora de cada loja separadamente
-- Resumo final: frete total = soma dos fretes de cada loja
+**Pendências futuras:**
+- OAuth2 por lojista, com token individual por loja
+- Compra de etiqueta
+- Geração e impressão de etiqueta
+- Rastreamento
+- Persistência detalhada das opções selecionadas em `order_shippings`
+- Split de frete e conciliação financeira por loja
 
 **Tabela planejada (ainda não criada):**
 ```
@@ -532,7 +540,7 @@ feed_comments
 | ✅ Fase 1 — Fundação | Semanas 1–3 | CMS · Admin · Home | Plataforma funcional com conteúdo dinâmico |
 | ✅ Fase 2 — Lojistas & Agenda | Semanas 4–6 | 2.1 · 2.2 · 2.3 | Lojistas cadastráveis · Agenda pública navegável |
 | ✅ Fase 3 — Catálogo & Três Eixos | Semanas 7–9 | 3.1 · 3.2 · 3.3 | Três eixos, CRUD de produtos, loja pública e carrinho multilojas em produção |
-| ✅ Fase 4 — Checkout & Pagamento | Semanas 10–13 | 4.1 · 4.2 · 4.3 | MVP manual em produção; frete e split automáticos ficam para depois (config já existe) |
+| ✅ Fase 4 — Checkout & Pagamento | Semanas 10–13 | 4.1 · 4.2 · 4.3 | MVP com cotação inicial de frete via Melhor Envio; pagamento/split automáticos seguem em fases futuras |
 | ⏳ Fase 5 — Comunidade | Semanas 14–17 | 5.1 · 5.2 | Feed social + ferramentas de marketing |
 
 ---
@@ -566,5 +574,5 @@ Estes princípios se aplicam a todas as fases e devem guiar cada decisão de UX 
 
 ---
 
-*Documento atualizado em: 16 de junho de 2026*
-*Próxima revisão: ao priorizar a ativação real do Melhor Envio e do Mercado Pago, ou ao término da Fase 5 (comunidade)*
+*Documento atualizado em: 1º de julho de 2026*
+*Próxima revisão: ao priorizar OAuth por lojista, compra/geração de etiquetas, rastreamento, split de frete ou ao término da Fase 5 (comunidade)*
