@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\OrderSplitStatus;
+use App\Events\OrderSplitConfirmed;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -59,5 +60,7 @@ class OrderSplit extends Model
             'status'       => OrderSplitStatus::Confirmado,
             'confirmed_at' => now(),
         ]);
+
+        event(new OrderSplitConfirmed($this));
     }
 }

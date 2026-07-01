@@ -36,6 +36,7 @@ use App\Livewire\Admin\Settings\MailSettingsForm;
 use App\Livewire\Admin\Settings\SettingsForm;
 use App\Livewire\Admin\Usuarios\UsuarioForm;
 use App\Livewire\Admin\Usuarios\UsuarioIndex;
+use App\Livewire\Cliente\Ava\AprendizadoIndex;
 use App\Livewire\Cliente\Enderecos\EnderecoForm;
 use App\Livewire\Cliente\Enderecos\EnderecoIndex;
 use App\Livewire\Cliente\Pedidos\PedidoIndex as ClientePedidoIndex;
@@ -492,6 +493,8 @@ Route::middleware('auth')->prefix('minha-conta')->name('cliente.')->group(functi
     Route::get('/enderecos', EnderecoIndex::class)->name('enderecos.index');
     Route::get('/enderecos/novo', EnderecoForm::class)->name('enderecos.create');
     Route::get('/enderecos/{endereco}/editar', EnderecoForm::class)->name('enderecos.edit');
+
+    Route::get('/aprendizado', AprendizadoIndex::class)->name('ava.index');
 });
 
 // ─── Autenticação ─────────────────────────────────────────────────────────────

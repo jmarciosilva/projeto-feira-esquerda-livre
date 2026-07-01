@@ -5,10 +5,12 @@ namespace App\Models;
 use App\Enums\ItemType;
 use App\Enums\Modality;
 use App\Enums\PriceType;
+use App\Models\Ava\AvaCourse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -35,6 +37,7 @@ class Product extends Model
         'stock_quantity',
         'is_featured',
         'is_active',
+        'is_digital',
         'sort_order',
     ];
 
@@ -52,6 +55,7 @@ class Product extends Model
             'has_stock' => 'boolean',
             'is_featured' => 'boolean',
             'is_active' => 'boolean',
+            'is_digital' => 'boolean',
             'images' => 'array',
         ];
     }
@@ -83,6 +87,16 @@ class Product extends Model
     public function questions(): HasMany
     {
         return $this->hasMany(ProductQuestion::class)->orderByDesc('created_at');
+    }
+
+    public function avaCourse(): HasOne
+    {
+        return $this->hasOne(AvaCourse::class);
+    }
+
+    public function isDigital(): bool
+    {
+        return (bool) $this->is_digital;
     }
 
     /** Retorna a URL da primeira imagem médio, ou image_path legado. */

@@ -122,8 +122,14 @@ class Checkout extends Component
                 continue;
             }
 
+            $physicalItems = $storeItems->filter(fn ($item) => ! ($item->product?->is_digital));
+
+            if ($physicalItems->isEmpty()) {
+                continue;
+            }
+
             $this->shipping_quotes[$expositorId] = collect(
-                $shipping->quoteForStore($store, $this->shipping_destination_zipcode, $storeItems)
+                $shipping->quoteForStore($store, $this->shipping_destination_zipcode, $physicalItems)
             )->map->toArray()->all();
         }
     }
@@ -227,7 +233,9 @@ class Checkout extends Component
 
         $address = null;
 
-        if ($this->delivery_type === 'entrega') {
+        $allDigital = $cart->items()->every(fn ($item) => $item->product?->is_digital);
+
+        if ($this->delivery_type === 'entrega' && ! $allDigital) {
             $address = auth()->user()->addresses()->find($this->customer_address_id);
 
             if (! $address) {

@@ -327,6 +327,20 @@
                             <p class="text-sm text-gray-400">Aparece na página inicial</p>
                         </div>
                     </label>
+                    <div class="border-t border-gray-100 pt-4">
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input type="checkbox" wire:model.live="is_digital" class="mt-0.5 w-5 h-5 rounded border-gray-300" style="accent-color: #E8A000;">
+                            <div>
+                                <span class="text-base font-medium text-gray-700">Produto digital / Curso online</span>
+                                <p class="text-sm text-gray-400">Entregue digitalmente — sem necessidade de frete. O comprador recebe acesso imediato ao conteúdo.</p>
+                            </div>
+                        </label>
+                        @if($is_digital && $product?->avaCourse)
+                        <p class="mt-2 ml-8 text-sm font-medium" style="color:#E8A000;">
+                            ✓ Curso AVA criado — conteúdo configurável na Fase 8.2
+                        </p>
+                        @endif
+                    </div>
                 </div>
 
                 {{-- Salvar --}}

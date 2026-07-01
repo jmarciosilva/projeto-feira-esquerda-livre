@@ -6,6 +6,7 @@ use App\Enums\ItemType;
 use App\Enums\Modality;
 use App\Enums\PriceType;
 use App\Livewire\Concerns\ValidatesFileUploads;
+use App\Models\Ava\AvaCourse;
 use App\Models\ContentCategory;
 use App\Models\Product;
 use App\Models\ProductFaq;
@@ -56,6 +57,8 @@ class ProdutoForm extends Component
 
     public bool $is_featured = false;
 
+    public bool $is_digital = false;
+
     public int $sort_order = 0;
 
     public array $images = [];
@@ -92,6 +95,7 @@ class ProdutoForm extends Component
             $this->stock_quantity = $product->stock_quantity;
             $this->is_active = $product->is_active;
             $this->is_featured = $product->is_featured;
+            $this->is_digital = (bool) $product->is_digital;
             $this->sort_order = $product->sort_order ?? 0;
             $this->images = $product->images ?? [];
             $this->faqs = $product->faqs
@@ -191,6 +195,7 @@ class ProdutoForm extends Component
             'stock_quantity' => ($isProduto && $this->has_stock) ? $this->stock_quantity : null,
             'is_active' => $this->is_active,
             'is_featured' => $this->is_featured,
+            'is_digital' => $this->is_digital,
             'sort_order' => $this->sort_order,
             'images' => array_values($images),
             'image_path' => $images[0]['medium'] ?? ($this->product?->image_path),
@@ -199,11 +204,13 @@ class ProdutoForm extends Component
         if ($this->product && $this->product->exists) {
             $this->product->update($data);
             $this->syncFaqs($this->product->id);
+            $this->syncAvaCourse($this->product);
             $label = ItemType::from($this->item_type)->label();
             session()->flash('success', "{$label} atualizado com sucesso!");
         } else {
             $product = Product::create($data);
             $this->syncFaqs($product->id);
+            $this->syncAvaCourse($product);
             $this->redirect(route('lojista.produtos.edit', $product));
 
             return;
@@ -211,6 +218,13 @@ class ProdutoForm extends Component
 
         $this->images = $this->product->fresh()->images ?? [];
         $this->upload1 = $this->upload2 = $this->upload3 = $this->upload4 = null;
+    }
+
+    private function syncAvaCourse(Product $product): void
+    {
+        if ($this->is_digital && ! $product->avaCourse) {
+            AvaCourse::create(['product_id' => $product->id]);
+        }
     }
 
     private function syncFaqs(int $productId): void

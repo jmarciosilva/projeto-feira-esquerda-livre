@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use App\Events\OrderSplitConfirmed;
+use App\Listeners\HandleAvaEnrollmentOnSplitConfirmed;
 use App\Models\SiteSetting;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -13,6 +16,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::before(fn ($user) => $user->isAdmin() ? true : null);
+
+        Event::listen(OrderSplitConfirmed::class, HandleAvaEnrollmentOnSplitConfirmed::class);
 
         $this->applyMailConfigFromDatabase();
     }
