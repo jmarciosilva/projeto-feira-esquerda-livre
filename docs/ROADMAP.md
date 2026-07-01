@@ -2,7 +2,7 @@
 
 **Documento de Planejamento Estratégico**
 **Versão:** 2.0 — Julho de 2026
-**Status geral do projeto:** MVP em fase final. Checkout, cotação de frete via Melhor Envio e pagamento manual operacionais. Governança administrativa (usuários internos, permissões, perfis de acesso) implementada com modelo multi-papel: um único e-mail pode ser simultaneamente equipe interna e cliente do marketplace. Três módulos adicionais foram incorporados à entrega do MVP: rastreio personalizado de entregas (Módulo 4.4), central de email marketing (Módulo 5.3) e gestão de visibilidade e tempo de exposição de expositores na home (Módulo 5.4). Após estes módulos, o MVP estará completo e o produto poderá ser lançado; fases futuras (split automático via Mercado Pago, OAuth por lojista, etiquetas físicas, rede social) seguem planejadas.
+**Status geral do projeto:** MVP em fase final. Checkout, cotação de frete via Melhor Envio e pagamento manual operacionais. Governança administrativa (usuários internos, permissões, perfis de acesso) implementada com modelo multi-papel. Camada de comunicação entre loja e cliente entregue: FAQ estático por produto (Módulo 7.1), perguntas públicas Q&A (Módulo 7.2) e chat pós-pedido por split (Módulo 7.3). Três módulos adicionais permanecem pendentes para encerrar o MVP: rastreio personalizado de entregas (4.4), central de email marketing (5.3) e gestão de visibilidade de expositores (5.4). Fases futuras (split automático via Mercado Pago, OAuth por lojista, etiquetas físicas, rede social) seguem planejadas.
 
 ---
 
@@ -26,9 +26,13 @@
   Comunidade & Engajamento
   + [5.3 ⏳] Central de Email Marketing
   + [5.4 ⏳] Gestão de Visibilidade de Expositores
-          ↓
+           ↓
 [FASE 6 ✅ CONCLUÍDA]
   Usuários internos, perfis & permissões
+           ↓
+[FASE 7 ✅ CONCLUÍDA]
+  Comunicação entre Loja e Cliente
+  FAQ · Q&A Público · Chat pós-pedido
 ```
 
 ---
@@ -1000,6 +1004,125 @@ Ao aprovar uma solicitação de lojista em `/admin/lojistas/solicitacoes`:
 
 ---
 
+## ✅ Fase 7 — Comunicação entre Loja e Cliente (Concluída)
+
+**Período:** Julho de 2026
+**Objetivo estratégico:** criar os três canais de comunicação que transformam a plataforma de vitrine em marketplace com relacionamento real: conteúdo educativo no produto (FAQ), diálogo público pré-venda (Q&A) e conversa privada pós-pedido (Chat).
+
+### O que foi entregue
+
+| Componente | Status |
+|---|---|
+| Tabela `product_faqs` e Model `ProductFaq` | ✅ Concluído |
+| FAQ estático editável pelo lojista no formulário de produto | ✅ Concluído |
+| Accordion público de FAQ na página do produto | ✅ Concluído |
+| Tabela `product_questions` e Model `ProductQuestion` | ✅ Concluído |
+| Componente `ProductQandA` — envio público de perguntas e exibição de respondidas | ✅ Concluído |
+| Painel `PerguntaIndex` no lojista — resposta inline, edição, toggle de visibilidade | ✅ Concluído |
+| Badge de perguntas pendentes na sidebar do lojista | ✅ Concluído |
+| Tabela `order_messages` e Model `OrderMessage` | ✅ Concluído |
+| Componente `OrderChat` (compartilhado) — chat por split com polling 5s | ✅ Concluído |
+| Chat embutido na página do pedido do cliente (por split) | ✅ Concluído |
+| Página dedicada `/minha-loja/pedidos/{split}/chat` para o lojista | ✅ Concluído |
+| Badge de mensagens não lidas na sidebar do lojista | ✅ Concluído |
+| Botão "Chat" por split na listagem de pedidos do lojista | ✅ Concluído |
+| 31 testes automatizados cobrindo os três módulos | ✅ Concluído |
+
+---
+
+### Módulo 7.1 — FAQ Estático por Produto
+
+**Objetivo:** o lojista cadastra perguntas e respostas fixas sobre um produto no próprio formulário de criação/edição, e o visitante as consulta na página pública do produto.
+
+**Entregas:**
+
+**7.1.1 — Cadastro pelo lojista**
+- Seção "Perguntas Frequentes" no `ProdutoForm`, após a galeria de fotos
+- Até 15 pares pergunta/resposta por produto
+- Botão "+ Adicionar pergunta" e remoção individual
+- Binding aninhado Livewire: `wire:model="faqs.{{ $i }}.question"` / `faqs.{{ $i }}.answer`
+- Salvo em `product_faqs` (cascata no delete do produto)
+
+**7.1.2 — Exibição pública**
+- Accordion Alpine.js na página `/loja/{slug}/{produto-slug}`, acima da seção Q&A
+- Abre/fecha por clique — somente uma pergunta aberta por vez
+- Não renderizado se não houver FAQs cadastradas
+
+**Tabela nova:**
+```
+product_faqs
+  - id, product_id FK, question, answer, sort_order, timestamps
+```
+
+---
+
+### Módulo 7.2 — Perguntas Públicas por Produto (Q&A)
+
+**Objetivo:** canal aberto onde qualquer usuário cadastrado pode enviar perguntas ao lojista; as respondidas ficam visíveis para todos; as não respondidas ficam visíveis apenas para quem perguntou.
+
+**Entregas:**
+
+**7.2.1 — Componente público `ProductQandA`**
+- Usuário logado: textarea de envio com validação (min 5 / max 500 chars)
+- Visitante: botão "Faça login para perguntar"
+- Perguntas respondidas: accordion público com nome do comprador (só primeiro nome) e data relativa
+- Perguntas pendentes do próprio usuário: badge "aguardando resposta" visível só para ele
+- Perguntas ocultas (`is_visible = false`) nunca aparecem para outros visitantes
+
+**7.2.2 — Painel do lojista `PerguntaIndex`**
+- Filtros: Aguardando / Respondidas / Todas — com badge de contagem
+- Resposta inline por textarea, sem página separada; edição de resposta publicada
+- Toggle "Ocultar / Tornar visível" para moderação
+- Autorização por `expositor_id` — lojista só vê produtos da própria loja
+
+**Tabela nova:**
+```
+product_questions
+  - id, product_id FK, user_id FK, question, answer (nullable)
+  - answered_at (nullable), answered_by FK users (nullable)
+  - is_visible (boolean, default true)
+  - timestamps
+```
+
+---
+
+### Módulo 7.3 — Chat Pós-Pedido
+
+**Objetivo:** canal de mensagens privado entre o cliente e o lojista, organizado por split de pedido — cada loja tem sua conversa separada dentro do mesmo pedido.
+
+**Entregas:**
+
+**7.3.1 — Componente compartilhado `OrderChat`**
+- Balões de conversa: amarelo-âmbar (mensagens do usuário logado, à direita) e cinza (outra parte, à esquerda)
+- `wire:poll.5s` — atualiza sem WebSocket nem JavaScript externo
+- Auto-scroll ao fundo via Alpine.js (no mount e a cada mensagem enviada)
+- Enter para enviar, Shift+Enter para nova linha
+- Marca mensagens da outra parte como lidas em cada `render()` (aproveitando o ciclo do poll)
+- Autorização interna: aborta 403 se o usuário não for o cliente dono do pedido nem o lojista dono do split
+
+**7.3.2 — Área do cliente**
+- Chat embutido abaixo dos dados de cada split na página `/pedido/{reference}`
+- Um componente `OrderChat` isolado por split (`:key="'chat-'.$split->id"`)
+- Visível apenas para o usuário autenticado dono do pedido
+
+**7.3.3 — Painel do lojista**
+- Página dedicada `/minha-loja/pedidos/{split}/chat` (`lojista.pedidos.chat`)
+- Layout em duas colunas: resumo do pedido (referência, cliente, data, situação, valor, itens) + chat
+- Botão "Chat" por split na listagem `PedidoIndex`
+- Badge vermelho na sidebar com total de mensagens não lidas de todos os splits do expositor
+
+**Tabela nova:**
+```
+order_messages
+  - id, order_split_id FK, sender_id FK users
+  - body (text), read_at (nullable)
+  - created_at (imutável — sem updated_at)
+  - índice composto (order_split_id, created_at)
+  - índice composto (order_split_id, sender_id, read_at)
+```
+
+---
+
 ## 📊 Resumo do Roadmap
 
 | Fase | Período | Módulos | Entregável Principal |
@@ -1011,6 +1134,7 @@ Ao aprovar uma solicitação de lojista em `/admin/lojistas/solicitacoes`:
 | ⏳ **4.4 — Rastreio de Entrega** | MVP final | 4.4 | Linha do tempo branded, integração Melhor Envio Tracking, notificações ao cliente |
 | ⏳ Fase 5 — Comunidade | Semanas 14–17 | 5.1 · 5.2 · **5.3** · **5.4** | Feed social + compartilhamento + **Email Marketing** + **Gestão de Visibilidade de Expositores** |
 | ✅ Fase 6 — Governança Admin | Concluída | 6.1 · 6.2 · 6.3 · 6.4 · 6.5 | Usuários internos, perfis de acesso, permissões, modelo multi-papel e proteção real do painel |
+| ✅ **Fase 7 — Comunicação** | Julho 2026 | **7.1 · 7.2 · 7.3** | **FAQ estático, Q&A público e chat pós-pedido por split — 31 testes** |
 
 ---
 
@@ -1043,6 +1167,6 @@ Estes princípios se aplicam a todas as fases e devem guiar cada decisão de UX 
 
 ---
 
-*Documento atualizado em: 1º de julho de 2026 — Versão 2.1*
-*Próxima revisão: após entrega do Módulo 4.4 (rastreio) e Módulo 5.3 (email marketing), marco do lançamento do MVP*
+*Documento atualizado em: 1º de julho de 2026 — Versão 2.2*
+*Próxima revisão: após entrega do Módulo 4.4 (rastreio), Módulo 5.3 (email marketing) e Módulo 5.4 (visibilidade de expositores) — marco do lançamento do MVP*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala*
