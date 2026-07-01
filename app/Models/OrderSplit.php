@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\OrderSplitStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class OrderSplit extends Model
@@ -45,6 +46,11 @@ class OrderSplit extends Model
     public function shipping(): HasOne
     {
         return $this->hasOne(OrderShipping::class, 'order_split_id');
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(OrderMessage::class, 'order_split_id')->orderBy('created_at');
     }
 
     public function confirmar(): void

@@ -90,6 +90,15 @@
                 Falar com a loja no WhatsApp
             </a>
             @endif
+
+            @auth
+            @if(auth()->id() === $order->user_id)
+            <div class="mt-5 border-t border-gray-100 pt-5">
+                <p class="text-sm font-semibold text-gray-700 mb-3">Mensagens com a loja</p>
+                <livewire:order-chat :split="$split" :key="'chat-'.$split->id" />
+            </div>
+            @endif
+            @endauth
         </div>
         @endforeach
     </div>

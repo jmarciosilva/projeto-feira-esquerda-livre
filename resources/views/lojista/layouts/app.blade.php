@@ -101,13 +101,21 @@
             @php
                 try {
                     $perguntasPendentes = 0;
+                    $chatNaoLidos = 0;
                     if (auth()->check() && auth()->user()->expositor) {
+                        $expId = auth()->user()->expositor->id;
                         $perguntasPendentes = \App\Models\ProductQuestion::whereHas('product',
-                            fn ($q) => $q->where('expositor_id', auth()->user()->expositor->id)
+                            fn ($q) => $q->where('expositor_id', $expId)
                         )->whereNull('answered_at')->count();
+                        $chatNaoLidos = \App\Models\OrderMessage::whereHas('split',
+                            fn ($q) => $q->where('expositor_id', $expId)
+                        )->where('sender_id', '!=', auth()->id())
+                         ->whereNull('read_at')
+                         ->count();
                     }
                 } catch (\Throwable) {
                     $perguntasPendentes = 0;
+                    $chatNaoLidos = 0;
                 }
             @endphp
             <a href="{{ route('lojista.perguntas.index') }}"
@@ -120,6 +128,20 @@
                 @if($perguntasPendentes > 0)
                 <span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-extrabold"
                       style="background:#E8A000; color:#fff;">{{ $perguntasPendentes }}</span>
+                @endif
+            </a>
+
+            <a href="{{ route('lojista.pedidos.index') }}"
+               class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('lojista.pedidos.chat') ? 'text-[#3D3000] font-semibold' : 'text-[#D4B800] hover:text-white hover:bg-[#5C4500]' }}"
+               style="{{ request()->routeIs('lojista.pedidos.chat') ? 'background:#F4E294;' : '' }}">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                </svg>
+                <span class="flex-1">Chat de Pedidos</span>
+                @if($chatNaoLidos > 0)
+                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-extrabold"
+                      style="background:#dc2626; color:#fff;">{{ $chatNaoLidos }}</span>
                 @endif
             </a>
 

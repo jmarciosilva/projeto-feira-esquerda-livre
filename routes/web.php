@@ -44,6 +44,7 @@ use App\Livewire\Lojista\ExposicaoIndex as LojistaExposicaoIndex;
 use App\Livewire\Lojista\Perguntas\PerguntaIndex as LojistaPerguntaIndex;
 use App\Livewire\Lojista\Feed\FeedPostIndex;
 use App\Livewire\Lojista\LojaForm;
+use App\Livewire\Lojista\Pedidos\PedidoChat as LojistaPedidoChat;
 use App\Livewire\Lojista\Pedidos\PedidoIndex as LojistaPedidoIndex;
 use App\Livewire\Lojista\Produtos\ProdutoForm;
 use App\Livewire\Lojista\Produtos\ProdutoIndex;
@@ -477,6 +478,7 @@ Route::middleware(['auth', 'lojista'])->prefix('minha-loja')->name('lojista.')->
     Route::get('/feed', FeedPostIndex::class)->name('feed.index');
 
     Route::get('/pedidos', LojistaPedidoIndex::class)->name('pedidos.index');
+    Route::get('/pedidos/{split}/chat', LojistaPedidoChat::class)->name('pedidos.chat');
     Route::get('/exposicao', LojistaExposicaoIndex::class)->name('exposicao.index');
     Route::get('/perguntas', LojistaPerguntaIndex::class)->name('perguntas.index');
 });
