@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\MarketplaceStatus;
+use App\Models\CustomerProfile;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderSplit;
@@ -75,6 +77,14 @@ class OrderService
             }
 
             $cart->clear();
+
+            // Garante que usuários autenticados (incluindo admins que compram) tenham perfil de cliente
+            if ($userId = Auth::id()) {
+                CustomerProfile::firstOrCreate(
+                    ['user_id' => $userId],
+                    ['marketplace_status' => MarketplaceStatus::Active->value]
+                );
+            }
 
             return $order->load(['items', 'splits.expositor']);
         });

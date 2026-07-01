@@ -1,8 +1,8 @@
 # 🗺️ Roadmap de Desenvolvimento — Feira Esquerda Livre
 
 **Documento de Planejamento Estratégico**
-**Versão:** 1.7 — Julho de 2026
-**Status geral do projeto:** Fase 4 evoluída após o MVP manual — checkout e pagamento manual seguem operacionais; a cotação inicial de frete via Melhor Envio foi implementada para o MVP usando conta única da plataforma, enquanto compra de etiqueta, rastreamento, OAuth por lojista e split de frete continuam planejados para fases futuras. A Fase 6 de governança administrativa foi implementada com gestão de usuários internos, perfis de acesso, permissões por módulo, proteção de rotas e bloqueio de ações críticas no backend.
+**Versão:** 1.8 — Julho de 2026
+**Status geral do projeto:** Fase 4 evoluída após o MVP manual — checkout e pagamento manual seguem operacionais; a cotação inicial de frete via Melhor Envio foi implementada para o MVP usando conta única da plataforma, enquanto compra de etiqueta, rastreamento, OAuth por lojista e split de frete continuam planejados para fases futuras. A Fase 6 de governança administrativa foi implementada com gestão de usuários internos, perfis de acesso, permissões por módulo, proteção de rotas e bloqueio de ações críticas no backend. A área de clientes foi aprimorada com a tabela `customer_profiles` separando o status no marketplace do status global do usuário, permitindo que administradores também sejam clientes e que a inativação no marketplace não bloqueie o acesso administrativo.
 
 ---
 
@@ -548,6 +548,11 @@ feed_comments
 - Permissões base versionadas em seeder idempotente
 - Área `/admin/usuarios` para gestão de usuários internos
 - Área `/admin/perfis-acesso` para configuração de permissões por perfil
+- Área `/admin/clientes` com listagem de compradores, filtros e ações de inativação
+- Tabela `customer_profiles` separando status no marketplace do status global do usuário
+- Suporte a usuários com duplo papel (ex: administrador que também é cliente)
+- Inativação de cliente no marketplace preserva acesso administrativo do usuário
+- Permissões `clientes.visualizar` (leitura) e `clientes.gerenciar` (ações) implementadas
 - Menu administrativo renderizado conforme permissões
 - Rotas administrativas protegidas com middleware `can:*`
 - Componentes Livewire administrativos protegendo ações críticas no backend
@@ -661,7 +666,7 @@ feed_comments
 - Clientes não devem aparecer como equipe interna
 - Telas administrativas devem filtrar e exibir usuários pelo contexto correto
 
-**Próxima decisão técnica:** definir se a separação será feita apenas por roles/permissões ou se haverá campos auxiliares como `user_type`/`context` para facilitar filtros e relatórios.
+**Decisão técnica adotada:** separação feita via tabela `customer_profiles` com campo `marketplace_status`, preservando `users.is_active` para controle de acesso global. Um usuário pode ter qualquer papel e ainda possuir um perfil de cliente no marketplace. O perfil é criado automaticamente para novos usuários com papel `user` e para qualquer usuário autenticado ao finalizar o primeiro pedido.
 
 ---
 

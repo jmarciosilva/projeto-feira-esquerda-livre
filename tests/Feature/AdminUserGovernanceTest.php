@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Enums\MarketplaceStatus;
 use App\Enums\UserRole;
+use App\Livewire\Admin\Clientes\ClienteIndex;
 use App\Livewire\Admin\Pages\PageIndex;
 use App\Livewire\Admin\Pedidos\PedidoIndex;
 use App\Livewire\Admin\Permissoes\PerfilAcessoIndex;
 use App\Livewire\Admin\Usuarios\UsuarioForm;
 use App\Mail\InternalUserAccessCreated;
+use App\Models\CustomerProfile;
 use App\Models\Order;
 use App\Models\Page;
 use App\Models\User;
@@ -195,6 +198,103 @@ class AdminUserGovernanceTest extends TestCase
             ->test(PedidoIndex::class)
             ->call('updateStatus', $order->id, 'concluido')
             ->assertForbidden();
+    }
+
+    public function test_admin_user_with_customer_profile_appears_in_clients_list(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin = $this->makeUser(UserRole::Admin);
+
+        CustomerProfile::create([
+            'user_id' => $admin->id,
+            'marketplace_status' => MarketplaceStatus::Active,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.clientes.index'))
+            ->assertOk()
+            ->assertSee($admin->name);
+    }
+
+    public function test_gerente_can_inactivate_customer(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $gerente = $this->makeUser(UserRole::Gerente);
+        $client = $this->makeUser(UserRole::User, ['name' => 'Cliente para Inativar']);
+
+        Livewire::actingAs($gerente)
+            ->test(ClienteIndex::class)
+            ->call('inactivateCustomer', $client->id)
+            ->assertHasNoErrors();
+
+        $this->assertSame(
+            MarketplaceStatus::Inactive,
+            $client->fresh()->customerProfile->marketplace_status
+        );
+    }
+
+    public function test_inactivating_customer_who_is_also_admin_preserves_admin_access(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin = $this->makeUser(UserRole::Admin);
+
+        CustomerProfile::create([
+            'user_id' => $admin->id,
+            'marketplace_status' => MarketplaceStatus::Active,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ClienteIndex::class)
+            ->call('inactivateCustomer', $admin->id)
+            ->assertHasNoErrors();
+
+        // is_active do usuário permanece true — acesso ao painel preservado
+        $this->assertTrue($admin->fresh()->is_active);
+
+        // marketplace_status é inativo
+        $this->assertSame(
+            MarketplaceStatus::Inactive,
+            $admin->fresh()->customerProfile->marketplace_status
+        );
+
+        // Admin ainda acessa o painel normalmente
+        $this->actingAs($admin->fresh())
+            ->get(route('admin.clientes.index'))
+            ->assertOk();
+    }
+
+    public function test_supervisor_cannot_inactivate_customer_without_manage_permission(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $supervisor = $this->makeUser(UserRole::Supervisor);
+        $client = $this->makeUser(UserRole::User);
+
+        Livewire::actingAs($supervisor)
+            ->test(ClienteIndex::class)
+            ->call('inactivateCustomer', $client->id)
+            ->assertForbidden();
+    }
+
+    public function test_status_filter_uses_marketplace_status_not_global_is_active(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin = $this->makeUser(UserRole::Admin);
+
+        $activeClient = $this->makeUser(UserRole::User, ['name' => 'Cliente Ativo']);
+        $inactiveClient = $this->makeUser(UserRole::User, ['name' => 'Cliente Inativo']);
+        $inactiveClient->customerProfile()->update(['marketplace_status' => MarketplaceStatus::Inactive]);
+
+        Livewire::actingAs($admin)
+            ->test(ClienteIndex::class)
+            ->set('status', 'active')
+            ->assertSee($activeClient->name)
+            ->assertDontSee($inactiveClient->name);
+
+        Livewire::actingAs($admin)
+            ->test(ClienteIndex::class)
+            ->set('status', 'inactive')
+            ->assertSee($inactiveClient->name)
+            ->assertDontSee($activeClient->name);
     }
 
     /**

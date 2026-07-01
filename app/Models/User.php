@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\MarketplaceStatus;
 use App\Enums\UserRole;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -40,6 +41,17 @@ class User extends Authenticatable
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::created(function (User $user) {
+            if ($user->role === UserRole::User) {
+                $user->customerProfile()->create([
+                    'marketplace_status' => MarketplaceStatus::Active,
+                ]);
+            }
+        });
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === UserRole::Admin;
@@ -63,6 +75,17 @@ class User extends Authenticatable
     public function isCliente(): bool
     {
         return $this->role === UserRole::User;
+    }
+
+    public function isMarketplaceActive(): bool
+    {
+        // Sem perfil de cliente significa que não foi bloqueado ainda — pode comprar
+        return $this->customerProfile?->marketplace_status !== MarketplaceStatus::Inactive;
+    }
+
+    public function customerProfile(): HasOne
+    {
+        return $this->hasOne(CustomerProfile::class);
     }
 
     public function media(): HasMany

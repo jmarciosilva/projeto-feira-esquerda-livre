@@ -203,6 +203,12 @@ class Checkout extends Component
             return;
         }
 
+        if (! auth()->user()->isMarketplaceActive()) {
+            session()->flash('error', 'Sua conta de cliente está inativa no marketplace. Entre em contato com a plataforma.');
+
+            return;
+        }
+
         if ($cart->items()->isEmpty()) {
             session()->flash('error', 'Seu carrinho está vazio.');
 

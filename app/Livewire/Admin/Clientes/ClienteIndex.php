@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Admin\Clientes;
 
-use App\Enums\UserRole;
+use App\Enums\MarketplaceStatus;
+use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
+use App\Models\CustomerProfile;
 use App\Models\User;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -10,6 +12,7 @@ use Livewire\WithPagination;
 
 class ClienteIndex extends Component
 {
+    use AuthorizesAdminActions;
     use WithPagination;
 
     public string $search = '';
@@ -31,18 +34,53 @@ class ClienteIndex extends Component
         $this->resetPage();
     }
 
+    public function inactivateCustomer(int $userId): void
+    {
+        $this->authorizeAdminAction('clientes.gerenciar');
+
+        $user = User::findOrFail($userId);
+
+        CustomerProfile::updateOrCreate(
+            ['user_id' => $userId],
+            ['marketplace_status' => MarketplaceStatus::Inactive]
+        );
+
+        session()->flash('success', "Cliente {$user->name} inativado no marketplace.");
+    }
+
+    public function activateCustomer(int $userId): void
+    {
+        $this->authorizeAdminAction('clientes.gerenciar');
+
+        $user = User::findOrFail($userId);
+
+        CustomerProfile::updateOrCreate(
+            ['user_id' => $userId],
+            ['marketplace_status' => MarketplaceStatus::Active]
+        );
+
+        session()->flash('success', "Cliente {$user->name} reativado no marketplace.");
+    }
+
     public function render(): View
     {
         $clients = User::query()
-            ->where('role', UserRole::User->value)
+            ->whereHas('customerProfile')
+            ->with('customerProfile')
             ->withCount(['addresses', 'orders'])
             ->when($this->search, fn ($query) => $query->where(function ($query) {
                 $query->where('name', 'like', "%{$this->search}%")
                     ->orWhere('email', 'like', "%{$this->search}%")
                     ->orWhere('whatsapp', 'like', "%{$this->search}%");
             }))
-            ->when($this->status === 'active', fn ($query) => $query->where('is_active', true))
-            ->when($this->status === 'inactive', fn ($query) => $query->where('is_active', false))
+            ->when($this->status === 'active', fn ($query) => $query->whereHas(
+                'customerProfile',
+                fn ($q) => $q->where('marketplace_status', MarketplaceStatus::Active->value)
+            ))
+            ->when($this->status === 'inactive', fn ($query) => $query->whereHas(
+                'customerProfile',
+                fn ($q) => $q->where('marketplace_status', MarketplaceStatus::Inactive->value)
+            ))
             ->latest()
             ->paginate(15);
 
