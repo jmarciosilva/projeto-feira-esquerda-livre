@@ -33,6 +33,10 @@
 [FASE 7 ✅ CONCLUÍDA]
   Comunicação entre Loja e Cliente
   FAQ · Q&A Público · Chat pós-pedido
+           ↓
+[FASE 8 ✅ CONCLUÍDA]
+  AVA — Ambiente Virtual de Aprendizagem
+  Infraestrutura · Course Builder · Player · Materiais · Certificado PDF
 ```
 
 ---
@@ -1167,6 +1171,78 @@ Estes princípios se aplicam a todas as fases e devem guiar cada decisão de UX 
 
 ---
 
-*Documento atualizado em: 1º de julho de 2026 — Versão 2.2*
+---
+
+## ✅ Fase 8 — AVA (Ambiente Virtual de Aprendizagem) (Concluída)
+
+**Período:** Julho de 2026
+**Objetivo estratégico:** transformar a plataforma em marketplace de cursos digitais, permitindo que lojistas vendam e gerenciem conteúdo educativo online e que alunos acessem, assistam e acompanhem seu progresso — tudo integrado ao fluxo de checkout existente.
+
+### Módulo 8.1 — Infraestrutura AVA
+
+| Componente | Status |
+|---|---|
+| Campo `is_digital` em `products` | ✅ Concluído |
+| Tabelas `ava_courses`, `ava_modules`, `ava_lessons`, `ava_lesson_materials` | ✅ Concluído |
+| Tabelas `ava_enrollments`, `ava_lesson_progress` | ✅ Concluído |
+| Enum `AvaEnrollmentStatus` (Active/Expired/Cancelled/Refunded) | ✅ Concluído |
+| Models em `App\Models\Ava\` com métodos de domínio | ✅ Concluído |
+| Event `OrderSplitConfirmed` + Listener `HandleAvaEnrollmentOnSplitConfirmed` | ✅ Concluído |
+| `AvaEnrollmentService::createFromOrderSplit()` — desacoplado do marketplace | ✅ Concluído |
+| Mail `AvaEnrollmentConfirmedMail` enviado na matrícula | ✅ Concluído |
+| Toggle `is_digital` no formulário do lojista + auto-criação do `AvaCourse` | ✅ Concluído |
+| Checkout: skip de frete e endereço para carrinho 100% digital | ✅ Concluído |
+| Painel `/minha-conta/aprendizado` — listagem de matrículas do aluno | ✅ Concluído |
+| 10 testes automatizados cobrindo o fluxo de matrícula | ✅ Concluído |
+
+### Módulo 8.2 — Course Builder & Player
+
+| Componente | Status |
+|---|---|
+| `CursoIndex` — listagem dos cursos do lojista com status e métricas | ✅ Concluído |
+| `CursoBuilder` — editor completo: configurações, módulos e aulas inline | ✅ Concluído |
+| Configurações: nível, carga horária, acesso, drip, certificado, intro, requisitos | ✅ Concluído |
+| Gerenciamento de módulos: criar, editar, excluir, reordenar | ✅ Concluído |
+| Gerenciamento de aulas: criar, editar, excluir, reordenar (vídeo/texto/pdf/áudio) | ✅ Concluído |
+| Publicação/despublicação de curso com um clique | ✅ Concluído |
+| `CursoPlayer` — player do aluno com sidebar de índice, embed YouTube/Vimeo | ✅ Concluído |
+| Progresso por aula: `started_at`, `completed_at`, barra de progresso | ✅ Concluído |
+| "Marcar como concluída e avançar" com atualização de `completion_percent` | ✅ Concluído |
+| Link "Meus Cursos" na sidebar do lojista | ✅ Concluído |
+| Link "Começar/Continuar" no painel do aluno apontando para o player | ✅ Concluído |
+| Testes: CursoIndex, CursoBuilder (módulos/aulas), CursoPlayer (marcação) | ✅ Concluído |
+
+**Tabelas criadas:**
+```
+ava_courses          — product_id (unique), level, estimated_hours, access_duration_days, is_drip, certificate_enabled, intro_video_url, requirements, what_youll_learn, published_at
+ava_modules          — course_id, title, description, sort_order, is_visible
+ava_lessons          — module_id, title, description, content_type, video_url, video_provider, video_duration_sec, text_content, is_preview, is_visible, sort_order, drip_day
+ava_lesson_materials — lesson_id, title, file_path, file_type, file_size_kb, sort_order (sem updated_at)
+ava_enrollments      — user_id, course_id, order_split_id (nullable), status, enrolled_at, expires_at, completed_at, completion_percent, last_accessed_at
+ava_lesson_progress  — enrollment_id, lesson_id, started_at, completed_at, watched_seconds, last_position_sec
+```
+
+**Arquitetura de desacoplamento:**
+`OrderSplit::confirmar()` → dispara `OrderSplitConfirmed` → `HandleAvaEnrollmentOnSplitConfirmed` → `AvaEnrollmentService::createFromOrderSplit()` — o marketplace nunca importa código AVA diretamente.
+
+### Módulo 8.3 — Materiais Complementares & Certificado
+
+| Componente | Status |
+|---|---|
+| Upload de materiais por aula no `CursoBuilder` (`WithFileUploads`, até 20MB, pdf/pptx/docx/xlsx/zip/mp3/mp4) | ✅ Concluído |
+| Download protegido via URL temporária assinada (`URL::temporarySignedRoute`, 15min TTL) | ✅ Concluído |
+| `AvaMateriaisController` — valida matrícula ativa antes de servir o arquivo | ✅ Concluído |
+| Lista de materiais por aula no `CursoPlayer` com link de download | ✅ Concluído |
+| `AvaCertificateService` — gera PDF A4 paisagem via `barryvdh/laravel-dompdf` | ✅ Concluído |
+| Certificado auto-gerado na primeira vez que o aluno atinge 100% | ✅ Concluído |
+| `AvaCertificateMail` — email com PDF anexado ao concluir curso | ✅ Concluído |
+| Não re-gera certificado se já existe (idempotente) | ✅ Concluído |
+| Botão "Baixar Certificado" no player e no painel de aprendizado | ✅ Concluído |
+| `AvaCertificadoController` — download sob demanda (re-gera se arquivo perdido) | ✅ Concluído |
+| 10 testes: upload, delete, download protegido, assinatura, certificado, email, idempotência | ✅ Concluído |
+
+---
+
+*Documento atualizado em: 1º de julho de 2026 — Versão 2.3*
 *Próxima revisão: após entrega do Módulo 4.4 (rastreio), Módulo 5.3 (email marketing) e Módulo 5.4 (visibilidade de expositores) — marco do lançamento do MVP*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala*

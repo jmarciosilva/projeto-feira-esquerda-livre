@@ -5,6 +5,7 @@ namespace App\Models\Ava;
 use App\Enums\AvaEnrollmentStatus;
 use App\Models\OrderSplit;
 use App\Models\User;
+use App\Services\AvaCertificateService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -20,6 +21,7 @@ class AvaEnrollment extends Model
         'expires_at',
         'completed_at',
         'completion_percent',
+        'certificate_path',
         'last_accessed_at',
     ];
 
@@ -78,6 +80,8 @@ class AvaEnrollment extends Model
             return;
         }
 
+        $wasCompleted = $this->isCompleted();
+
         $completedCount = $this->progress()->whereNotNull('completed_at')->count();
         $percent = round(($completedCount / $totalLessons) * 100, 2);
 
@@ -86,5 +90,14 @@ class AvaEnrollment extends Model
             'completed_at'       => $percent >= 100 ? now() : null,
             'last_accessed_at'   => now(),
         ]);
+
+        // Gera certificado na primeira vez que atinge 100%
+        if (! $wasCompleted && $percent >= 100) {
+            try {
+                app(AvaCertificateService::class)->generate($this);
+            } catch (\Throwable) {
+                // Não impede o progresso se a geração falhar
+            }
+        }
     }
 }

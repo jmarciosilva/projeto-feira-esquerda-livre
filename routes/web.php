@@ -36,7 +36,12 @@ use App\Livewire\Admin\Settings\MailSettingsForm;
 use App\Livewire\Admin\Settings\SettingsForm;
 use App\Livewire\Admin\Usuarios\UsuarioForm;
 use App\Livewire\Admin\Usuarios\UsuarioIndex;
+use App\Http\Controllers\AvaCertificadoController;
+use App\Http\Controllers\AvaMateriaisController;
 use App\Livewire\Cliente\Ava\AprendizadoIndex;
+use App\Livewire\Cliente\Ava\CursoPlayer;
+use App\Livewire\Lojista\Ava\CursoBuilder;
+use App\Livewire\Lojista\Ava\CursoIndex as LojistaCursoIndex;
 use App\Livewire\Cliente\Enderecos\EnderecoForm;
 use App\Livewire\Cliente\Enderecos\EnderecoIndex;
 use App\Livewire\Cliente\Pedidos\PedidoIndex as ClientePedidoIndex;
@@ -482,6 +487,9 @@ Route::middleware(['auth', 'lojista'])->prefix('minha-loja')->name('lojista.')->
     Route::get('/pedidos/{split}/chat', LojistaPedidoChat::class)->name('pedidos.chat');
     Route::get('/exposicao', LojistaExposicaoIndex::class)->name('exposicao.index');
     Route::get('/perguntas', LojistaPerguntaIndex::class)->name('perguntas.index');
+
+    Route::get('/cursos', LojistaCursoIndex::class)->name('ava.index');
+    Route::get('/cursos/{course}/builder', CursoBuilder::class)->name('ava.builder');
 });
 
 // ─── Minha Conta (cliente) ─────────────────────────────────────────────────────
@@ -495,7 +503,15 @@ Route::middleware('auth')->prefix('minha-conta')->name('cliente.')->group(functi
     Route::get('/enderecos/{endereco}/editar', EnderecoForm::class)->name('enderecos.edit');
 
     Route::get('/aprendizado', AprendizadoIndex::class)->name('ava.index');
+    Route::get('/aprendizado/{enrollment}/player', CursoPlayer::class)->name('ava.player');
+    Route::get('/aprendizado/{enrollment}/certificado', [AvaCertificadoController::class, 'download'])->name('ava.certificado.download');
 });
+
+// ─── AVA — download de materiais (URL assinada, sem prefix minha-conta) ───────
+Route::middleware('auth')->get(
+    '/ava/materiais/{material}/download',
+    [AvaMateriaisController::class, 'download']
+)->name('ava.materiais.download');
 
 // ─── Autenticação ─────────────────────────────────────────────────────────────
 require __DIR__.'/auth.php';

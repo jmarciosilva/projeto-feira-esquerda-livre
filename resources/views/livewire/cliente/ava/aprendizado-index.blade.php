@@ -74,16 +74,22 @@
                 </div>
 
                 {{-- CTA --}}
-                <div class="mt-auto pt-2">
+                <div class="mt-auto pt-2 flex flex-col gap-2">
                     @if($enrollment->isCompleted())
-                        <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-green-700">
+                        <a href="{{ route('cliente.ava.player', $enrollment) }}"
+                           class="inline-flex items-center gap-1.5 text-sm font-semibold text-green-700 justify-center py-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            Concluído
-                        </span>
+                            Concluído — Rever
+                        </a>
+                        <a href="{{ route('cliente.ava.certificado.download', $enrollment) }}"
+                           class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border border-[#E8A000] text-[#C47A00] w-full justify-center hover:bg-[#FFFBEB] transition-colors">
+                            🎓 Baixar Certificado
+                        </a>
                     @elseif($accessible)
-                        <a href="#" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white w-full justify-center" style="background:#E8A000;">
+                        <a href="{{ route('cliente.ava.player', $enrollment) }}"
+                           class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white w-full justify-center" style="background:#E8A000;">
                             {{ $percent > 0 ? 'Continuar' : 'Começar agora' }}
                         </a>
                     @endif
