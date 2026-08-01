@@ -1,6 +1,8 @@
 # Feira Esquerda Livre
 
-Plataforma de marketplace e agenda de feiras para lojistas e expositores populares, com CMS integrado, painel administrativo e área restrita para lojistas. Desenvolvida para funcionar bem em redes lentas (3G/4G) e para o público 40+.
+Plataforma de marketplace, agenda de feiras, comunidade e AVA para lojistas, expositores populares, clientes e equipe interna. O projeto combina CMS, painel administrativo, área do lojista, área do cliente, catálogo por eixos, checkout, comunicação pós-venda, email marketing e cursos digitais.
+
+A experiência foi desenhada para funcionar bem em redes lentas (3G/4G), com navegação mobile first e foco em público 40+.
 
 ---
 
@@ -12,36 +14,53 @@ Plataforma de marketplace e agenda de feiras para lojistas e expositores popular
 | Frontend reativo | Livewire 4 · AlpineJS 3 |
 | Estilização | TailwindCSS 4 |
 | Build | Vite 7 |
-| Banco de dados | MySQL (produção) · SQLite (desenvolvimento) |
+| Banco de dados | MySQL em produção · SQLite suportado em desenvolvimento/testes |
+| Permissões | spatie/laravel-permission |
 | Processamento de imagens | Intervention/Image 3 |
+| PDF | barryvdh/laravel-dompdf |
+| Filas | Laravel Queue |
+
+---
+
+## Visão do Produto
+
+A Feira Esquerda Livre está organizada em seis grandes áreas funcionais:
+
+| Área | Descrição |
+|---|---|
+| CMS e conteúdo | Banners, páginas, menus, posts/notícias, mídia, eventos e configurações globais |
+| Marketplace | Catálogo público, lojas, produtos, serviços, cuidados, carrinho, checkout e pedidos multilojas |
+| Lojistas | Solicitação pública, aprovação administrativa, painel da loja, produtos, cursos, pedidos, perguntas, feed e relatório de exposição |
+| Clientes | Cadastro, pedidos, endereços, checkout autenticado, chats por pedido, aprendizado e certificados |
+| Comunidade e marketing | Feed social, moderação, compartilhamento, campanhas de email marketing e descadastro LGPD |
+| AVA | Cursos digitais, módulos, aulas, materiais protegidos, progresso do aluno e certificado PDF |
 
 ---
 
 ## Requisitos
 
-- PHP >= 8.2 com extensões: `pdo`, `pdo_mysql` (ou `pdo_sqlite`), `mbstring`, `fileinfo`, `gd` ou `imagick`
+- PHP >= 8.2 com extensões: `pdo`, `pdo_mysql` ou `pdo_sqlite`, `mbstring`, `fileinfo`, `gd` ou `imagick`
 - Composer >= 2
 - Node.js >= 20 e npm
-- MySQL 8+ (produção) ou SQLite (desenvolvimento local)
+- MySQL 8+ para ambiente persistente de desenvolvimento/produção
+- SQLite para testes ou desenvolvimento local simplificado
 
 ---
 
 ## Instalação
 
 ```bash
-# 1. Clonar o repositório
 git clone <url-do-repositorio> feira-esquerda-livre
 cd feira-esquerda-livre
-
-# 2. Instalar dependências PHP e JS, gerar chave e rodar migrations
 composer run setup
 ```
 
-O script `composer run setup` executa automaticamente:
+O script `composer run setup` executa:
+
 - `composer install`
-- Cópia de `.env.example` para `.env`
+- cópia de `.env.example` para `.env`
 - `php artisan key:generate`
-- `php artisan migrate`
+- `php artisan migrate --force`
 - `npm install`
 - `npm run build`
 
@@ -49,7 +68,7 @@ O script `composer run setup` executa automaticamente:
 
 ```env
 APP_NAME="Feira Esquerda Livre"
-APP_URL=http://localhost
+APP_URL=http://localhost:8000
 
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -57,141 +76,256 @@ DB_PORT=3306
 DB_DATABASE=feira_esquerda_livre
 DB_USERNAME=root
 DB_PASSWORD=
+
+QUEUE_CONNECTION=database
 ```
 
-### Seeders (dados de demonstração)
+Integrações opcionais usadas por módulos específicos:
+
+- Melhor Envio: cotação de frete e rastreio.
+- Mercado Pago: fluxo de pagamento iniciado por `/pedido/{reference}/pagar`.
+- Email SMTP: notificações, campanhas, AVA e rastreio de entrega.
+
+Consulte também [`docs/INTEGRACAO_FRETE_MELHOR_ENVIO.md`](docs/INTEGRACAO_FRETE_MELHOR_ENVIO.md).
+
+### Seeders
 
 ```bash
 php artisan db:seed
 ```
 
+Os seeders incluem dados de base para configurações, usuários, permissões, categorias, banners, eventos, expositores, produtos, serviços e cuidados.
+
 ---
 
-## Rodando em desenvolvimento
+## Desenvolvimento
 
 ```bash
 composer run dev
 ```
 
-Sobe em paralelo: servidor Laravel, queue worker, log stream (Pail) e Vite HMR.
+Esse comando sobe em paralelo:
+
+- servidor Laravel
+- worker de filas
+- stream de logs com Pail
+- Vite HMR
 
 Acesse `http://localhost:8000`.
+
+Para compilar assets de produção:
+
+```bash
+npm run build
+```
 
 ---
 
 ## Os Três Eixos do Marketplace
 
-O catálogo está estruturado em três eixos, cada um com rotas e campos específicos:
+O catálogo é unificado na tabela `products`, mas separado por `item_type` para navegação pública, filtros e campos específicos.
 
 | Eixo | Rota pública | Campos exclusivos |
 |---|---|---|
-| 🛍️ Produtos | `/produtos` | Estoque, quantidade |
-| 🎯 Serviços | `/servicos` | Modalidade, tipo de preço, duração |
-| 🌿 Cuidados & Bem Viver | `/cuidados` | Modalidade, tipo de preço, duração |
+| Produtos | `/produtos` | Estoque, quantidade, peso e dimensões de frete |
+| Serviços | `/servicos` | Modalidade, tipo de preço e duração |
+| Cuidados & Bem Viver | `/cuidados` | Modalidade, tipo de preço e duração |
 
-Um mesmo lojista pode atuar em todos os eixos simultaneamente. O carrinho é unificado para os três tipos.
+Um mesmo lojista pode atuar em todos os eixos. O carrinho e o checkout agrupam itens por loja para gerar splits de pedido.
 
 ---
 
-## Estrutura de Rotas
+## Rotas Principais
 
 ### Público
 
 | Rota | Descrição |
 |---|---|
-| `GET /` | Homepage com banners, eventos, expositores e posts |
+| `GET /` | Homepage com banners, eventos, expositores rotacionados, produtos, serviços, cuidados e posts |
 | `GET /produtos` | Catálogo de produtos físicos |
 | `GET /servicos` | Catálogo de serviços |
 | `GET /cuidados` | Catálogo de cuidados e bem viver |
+| `GET /feed` | Feed social público |
 | `POST /newsletter` | Inscrição na newsletter |
-| `GET /seja-um-expositor` | Formulário de solicitação para novos lojistas |
-| `GET /agenda` | Agenda de feiras com filtro por estado e mês |
-| `GET /agenda/{slug}` | Detalhe de um evento/feira |
+| `GET /newsletter/descadastro/{token}` | Página de descadastro de campanhas |
+| `GET /seja-um-expositor` | Formulário público de solicitação para novos lojistas |
+| `GET /agenda` | Agenda de feiras com filtros |
+| `GET /agenda/{slug}` | Detalhe de evento/feira |
 | `GET /blog/{slug}` | Detalhe de post/notícia |
-| `GET /loja/{slug}` | Página pública de uma loja (agrupa por eixo) |
-| `GET /loja/{slug}/{produto-slug}` | Página pública de um item |
-| `GET /checkout` | Finalização de compra (dados do cliente + endereço) |
-| `GET /pedido/{reference}` | Confirmação do pedido com instruções de pagamento manual por loja |
+| `GET /loja/{slug}` | Página pública de uma loja |
+| `GET /loja/{slug}/{productSlug}` | Página pública de produto, serviço ou cuidado |
+| `GET /loja/{slug}/{productSlug}/compartilhar.png` | Imagem dinâmica para compartilhamento |
+| `GET /checkout` | Finalização de compra |
+| `POST /shipping/quote` | Cotação de frete via Melhor Envio |
+| `GET /pedido/{reference}` | Confirmação e acompanhamento do pedido |
+| `GET /pedido/{reference}/pagar` | Início do pagamento Mercado Pago |
+| `GET /rastreio/{trackingCode}` | Página pública de rastreio de entrega |
 
 ### Painel Administrativo (`/admin`)
 
-Requer autenticação com role `admin`.
+Requer autenticação, papel interno e permissões via `spatie/laravel-permission`.
 
 | Rota | Descrição |
 |---|---|
-| `/admin` | Dashboard com resumo do sistema |
-| `/admin/settings` | Configurações gerais do site |
-| `/admin/settings/mail` | Configurações de e-mail |
-| `/admin/settings/checkout` | Configuração de frete e pagamento (modo manual + credenciais para integração futura) |
-| `/admin/banners` | Gestão de banners do carousel |
-| `/admin/menus` | Gestão de menus de navegação |
-| `/admin/pages` | Gestão de páginas estáticas |
-| `/admin/posts` | Gestão de posts e notícias |
-| `/admin/events` | Gestão de eventos/feiras |
-| `/admin/expositores` | Gestão de expositores |
-| `/admin/categorias` | Gestão de categorias de conteúdo (vinculadas a um eixo) |
+| `/admin` | Dashboard administrativo |
+| `/admin/settings` | Configurações gerais |
+| `/admin/settings/mail` | Configurações de email |
+| `/admin/settings/checkout` | Frete, checkout e credenciais de pagamento/frete |
+| `/admin/usuarios` | Gestão de usuários internos |
+| `/admin/perfis-acesso` | Perfis e permissões |
+| `/admin/pages` | Páginas estáticas |
+| `/admin/banners` | Banners da home |
+| `/admin/menus` | Menus de navegação |
 | `/admin/media` | Biblioteca de mídia |
-| `/admin/lojistas/solicitacoes` | Aprovação de novos lojistas |
-| `/admin/pedidos` | Visão geral de todos os pedidos |
+| `/admin/posts` | Posts, notícias e campanhas editoriais |
+| `/admin/events` | Eventos e feiras |
+| `/admin/expositores` | Gestão de expositores |
+| `/admin/expositores/visibilidade` | Rotação, pesos, slots e visibilidade de expositores |
+| `/admin/categorias` | Categorias por eixo |
+| `/admin/lojistas/solicitacoes` | Aprovação de lojistas |
+| `/admin/pedidos` | Pedidos e acompanhamento operacional |
+| `/admin/clientes` | Gestão de clientes |
+| `/admin/feed/reportes` | Moderação de denúncias do feed |
+| `/admin/email-marketing` | Campanhas de email marketing |
 
 ### Painel do Lojista (`/minha-loja`)
 
-Requer autenticação com role `lojista`.
+Requer autenticação com papel `lojista` e expositor ativo.
 
 | Rota | Descrição |
 |---|---|
 | `/minha-loja` | Dashboard do lojista |
-| `/minha-loja/loja` | Configuração do perfil da loja |
-| `/minha-loja/produtos` | Listagem dos produtos |
-| `/minha-loja/produtos/novo` | Cadastro de novo produto |
-| `/minha-loja/produtos/{id}/editar` | Edição de produto |
-| `/minha-loja/pedidos` | Pedidos recebidos, com confirmação manual de pagamento |
+| `/minha-loja/loja` | Perfil público da loja |
+| `/minha-loja/produtos` | Produtos, serviços e cuidados |
+| `/minha-loja/produtos/novo` | Cadastro de item |
+| `/minha-loja/produtos/{product}/editar` | Edição de item |
+| `/minha-loja/produtos/{product}/imagem-compartilhamento` | Imagem dinâmica para divulgação |
+| `/minha-loja/pedidos` | Pedidos recebidos, pagamento, envio e rastreio |
+| `/minha-loja/pedidos/{split}/chat` | Chat pós-pedido por loja |
+| `/minha-loja/perguntas` | Perguntas públicas de produtos |
+| `/minha-loja/feed` | Publicações do lojista no feed |
+| `/minha-loja/exposicao` | Relatório de visibilidade na home |
+| `/minha-loja/cursos` | Cursos digitais vinculados aos produtos |
+| `/minha-loja/cursos/{course}/builder` | Course builder do AVA |
+
+### Área do Cliente (`/minha-conta`)
+
+Requer autenticação.
+
+| Rota | Descrição |
+|---|---|
+| `/minha-conta/pedidos` | Pedidos do cliente |
+| `/minha-conta/enderecos` | Endereços salvos |
+| `/minha-conta/aprendizado` | Cursos em que o cliente está matriculado |
+| `/minha-conta/aprendizado/{enrollment}/player` | Player do curso |
+| `/minha-conta/aprendizado/{enrollment}/certificado` | Download do certificado |
+| `/ava/materiais/{material}/download` | Download protegido de materiais por URL assinada |
 
 ---
 
-## Roles de Usuário
+## Perfis de Usuário
 
-| Role | Acesso |
-|---|---|
-| `admin` | Painel completo de administração |
-| `lojista` | Painel restrito da própria loja e produtos |
-| _(sem role)_ | Apenas área pública e autenticação |
+| Papel | Contexto | Acesso |
+|---|---|---|
+| `admin` | Equipe interna | Administração completa |
+| `gerente` | Equipe interna | Gestão operacional conforme permissões |
+| `supervisor` | Equipe interna | Rotinas operacionais específicas |
+| `editor` | Equipe interna | CMS, mídia e conteúdo |
+| `lojista` | Expositor | Painel da própria loja, produtos, cursos e pedidos |
+| `user` | Cliente | Minha conta, pedidos, endereços e aprendizado |
+
+A autorização administrativa combina o enum `UserRole` com roles e permissions do pacote Spatie. O campo `users.role` permanece como compatibilidade e separação de contexto.
 
 ---
 
 ## Modelos Principais
 
-```
-User               → roles: admin, lojista
-SiteSetting        → configurações globais (singleton)
-Banner             → carousel da homepage
-Menu / MenuItem    → navegação dinâmica
-Page / PageSection → páginas estáticas com seções
-Post               → posts, notícias, blog
-Event              → feiras/eventos com agenda; pivot event_expositores
-Expositor          → perfil público da loja (vinculado ao User lojista); campo eixos (JSON)
-Product            → catálogo unificado dos três eixos; discriminado por item_type
-CartItem           → carrinho multilojas (sessão + banco para usuários logados)
-NewsletterSubscriber
-LojistasSolicitacao → solicitações de novos lojistas; campo eixos declarados
-Media              → biblioteca de mídia
-ContentCategory    → categorias de conteúdo; campo eixo para filtro por catálogo
-Order              → pedido (frete e pagamento manuais nesta fase); referência pública única
-OrderItem          → itens do pedido (snapshot de nome/preço no momento da compra)
-OrderSplit         → valor por loja dentro do pedido; confirmação manual de pagamento pelo lojista
+```text
+User                     -> autenticação, papel base e roles Spatie
+CustomerProfile          -> perfil comprador e opt-in de marketing
+CustomerAddress          -> endereços do cliente
+SiteSetting              -> configurações globais
+Banner                   -> banners da homepage
+Menu / MenuItem          -> navegação dinâmica
+Page / PageSection       -> páginas estáticas
+Post                     -> posts, notícias e campanhas editoriais
+Event                    -> feiras/eventos; pivot event_expositores
+Expositor                -> loja pública vinculada ao lojista
+ExpositorVisibilitySlot  -> slots e prioridades de visibilidade
+ExpositorImpression      -> registros assíncronos de impressão
+Product                  -> catálogo unificado dos três eixos
+ProductFaq               -> FAQ estático por produto
+ProductQuestion          -> Q&A público por produto
+CartItem                 -> carrinho por sessão/usuário
+Order                    -> pedido principal
+OrderItem                -> snapshot dos itens comprados
+OrderSplit               -> divisão por loja
+OrderShipping            -> envio/rastreio por split
+OrderTrackingEvent       -> linha do tempo de entrega
+OrderMessage             -> chat pós-pedido
+NewsletterSubscriber     -> base de newsletter
+EmailCampaign            -> campanhas de email marketing
+EmailCampaignSend        -> envios, abertura, clique e descadastro
+LojistasSolicitacao      -> entrada e aprovação de lojistas
+Media                    -> biblioteca de mídia
+ContentCategory          -> categorias filtradas por eixo
+FeedPost / FeedComment   -> feed social
+FeedLike / FeedReport    -> curtidas, denúncias e moderação
+AvaCourse                -> curso digital vinculado ao produto
+AvaModule / AvaLesson    -> estrutura do curso
+AvaLessonMaterial        -> materiais complementares protegidos
+AvaEnrollment            -> matrícula do aluno
+AvaLessonProgress        -> progresso por aula
 ```
 
-### Enums
+---
 
-| Enum | Valores |
+## Enums
+
+| Enum | Valores principais |
 |---|---|
-| `ItemType` | `produto` · `servico` · `cuidado` |
-| `PriceType` | `fixo` · `por_hora` · `por_sessao` · `sob_consulta` |
-| `Modality` | `presencial` · `online` · `ambos` |
-| `UserRole` | `admin` · `lojista` |
-| `SolicitacaoStatus` | `pendente` · `aprovado` · `bloqueado` |
-| `OrderStatus` | `aguardando_pagamento` · `pagamento_confirmado` · `concluido` · `cancelado` |
-| `OrderSplitStatus` | `pendente` · `confirmado` |
+| `ItemType` | `produto`, `servico`, `cuidado` |
+| `PriceType` | `fixo`, `por_hora`, `por_sessao`, `sob_consulta` |
+| `Modality` | `presencial`, `online`, `ambos` |
+| `UserRole` | `admin`, `gerente`, `supervisor`, `editor`, `lojista`, `user` |
+| `SolicitacaoStatus` | `pendente`, `aprovado`, `bloqueado` |
+| `OrderStatus` | `aguardando_pagamento`, `pagamento_confirmado`, `concluido`, `cancelado` |
+| `OrderSplitStatus` | `pendente`, `confirmado` |
+| `ShippingStatus` | ciclo de envio e entrega |
+| `TrackingEventSource` | origem manual ou integração |
+| `DeliveryType` | tipos de entrega/retirada |
+| `CampaignStatus` | rascunho, agendada, enviada e estados relacionados |
+| `RecipientType` | públicos-alvo de campanhas |
+| `MarketplaceStatus` | status do perfil de cliente |
+| `AvaEnrollmentStatus` | matrícula ativa, expirada, cancelada ou reembolsada |
+| `FeedPostType` | tipos de publicação do feed |
+| `VisibilitySlotType` | tipos de slot de exposição |
+
+---
+
+## Status do Projeto
+
+Consulte [`docs/ROADMAP.md`](docs/ROADMAP.md) para o planejamento detalhado. O código atual já contém rotas, models, jobs e testes para módulos que o roadmap ainda marcava como pendentes na revisão de 1º de julho de 2026.
+
+| Fase | Status no código | Entregável |
+|---|---|---|
+| Fase 1 — CMS, Admin & Home | Concluída | Plataforma funcional com conteúdo dinâmico |
+| Fase 2 — Lojistas & Agenda | Concluída | Entrada de lojistas, painel da loja e agenda pública |
+| Fase 3 — Catálogo & Três Eixos | Concluída | Produtos, serviços, cuidados, loja pública e carrinho multilojas |
+| Fase 4 — Checkout, Frete & Pagamentos | MVP avançado | Checkout, pedidos, cotação Melhor Envio, Mercado Pago, envio e rastreio por split |
+| Fase 5 — Comunidade & Marketing | Implementada no código | Feed social, moderação, email marketing e visibilidade de expositores |
+| Fase 6 — Governança Admin | Concluída | Usuários internos, perfis, permissões e proteção de rotas/ações |
+| Fase 7 — Comunicação Loja-Cliente | Concluída | FAQ, Q&A público e chat pós-pedido |
+| Fase 8 — AVA | Concluída | Course builder, player, materiais protegidos, progresso e certificado PDF |
+
+### Pós-MVP planejado
+
+- Split automático completo via Mercado Pago.
+- OAuth por lojista para Melhor Envio.
+- Compra e geração de etiquetas físicas.
+- Auditoria administrativa ampliada.
+- Recuperação de carrinho abandonado.
+- Integração SendGrid/SES para campanhas em larga escala.
 
 ---
 
@@ -201,25 +335,24 @@ OrderSplit         → valor por loja dentro do pedido; confirmação manual de 
 composer run test
 ```
 
----
+A suíte cobre, entre outros módulos:
 
-## Status do Projeto
-
-Consulte [`docs/ROADMAP.md`](docs/ROADMAP.md) para o planejamento completo.
-
-| Fase | Status | Entregável |
-|---|---|---|
-| Fase 1 — CMS, Admin & Home | ✅ Concluída | Plataforma funcional com conteúdo dinâmico |
-| Fase 2 — Lojistas & Agenda | ✅ Concluída | Cadastro de lojistas, agenda pública, painel do lojista |
-| Fase 3 — Catálogo & Loja | ✅ Concluída | Três eixos, CRUD de produtos do lojista, loja pública e carrinho multilojas |
-| Fase 4 — Checkout & Pagamento | ✅ MVP manual concluído | Checkout, frete e pagamento manuais; telas de configuração prontas para integrar Melhor Envio e Mercado Pago depois |
-| Fase 5 — Comunidade | ⏳ Pendente | Feed social e ferramentas de compartilhamento |
+- carrinho e checkout autenticado
+- cotação de frete
+- Mercado Pago
+- governança administrativa
+- email marketing
+- visibilidade de expositores
+- rastreio de pedidos
+- FAQ, Q&A e chat
+- AVA, materiais e certificados
 
 ---
 
-## Princípios de Design
+## Princípios Transversais
 
-- **Público 40+ First** — fonte mínima 16px, botões de no mínimo 48×48px, sem gestos complexos
-- **Performance em redes lentas** — imagens comprimidas (WebP), lazy loading, sem libs JS acima de 30 KB gzipped
-- **Mobile First** — layout parte de 360px; breakpoints 390, 414, 768, 1024, 1280
-- **LGPD** — CPF/CNPJ armazenado encriptado, dados pessoais não repassados sem consentimento
+- **Público 40+ first:** fonte mínima de 16px, botões com área de toque generosa e fluxos sem gestos complexos.
+- **Performance em redes lentas:** compressão de imagens, WebP, lazy loading e dependências JavaScript enxutas.
+- **Mobile first:** layout pensado a partir de 360px e escalado para tablets/desktops.
+- **LGPD:** CPF/CNPJ e dados pessoais tratados com cuidado, consentimento explícito para marketing e descadastro disponível.
+- **Autorização real:** menus podem esconder opções, mas a proteção precisa estar nas rotas, policies, middlewares e ações Livewire.
