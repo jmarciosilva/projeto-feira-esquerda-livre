@@ -56,6 +56,7 @@ use App\Livewire\Lojista\Produtos\ProdutoForm;
 use App\Livewire\Lojista\Produtos\ProdutoIndex;
 use App\Mail\LojistaSolicitacaoRecebida;
 use App\Mail\ContatoMensagemRecebida;
+use App\Mail\ContatoConfirmacaoUsuario;
 use App\Models\Banner;
 use App\Models\ContentCategory;
 use App\Models\Event;
@@ -150,6 +151,7 @@ Route::post('/contato', function (Request $request) {
 
     try {
         Mail::to($recipient)->send(new ContatoMensagemRecebida($validated));
+        Mail::to($validated['email'])->send(new ContatoConfirmacaoUsuario($validated));
     } catch (Throwable $exception) {
         report($exception);
 
