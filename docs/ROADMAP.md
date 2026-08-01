@@ -1,8 +1,8 @@
 # 🗺️ Roadmap de Desenvolvimento — Feira Esquerda Livre
 
 **Documento de Planejamento Estratégico**
-**Versão:** 2.0 — Julho de 2026
-**Status geral do projeto:** MVP em fase final. Checkout, cotação de frete via Melhor Envio e pagamento manual operacionais. Governança administrativa (usuários internos, permissões, perfis de acesso) implementada com modelo multi-papel. Camada de comunicação entre loja e cliente entregue: FAQ estático por produto (Módulo 7.1), perguntas públicas Q&A (Módulo 7.2) e chat pós-pedido por split (Módulo 7.3). Três módulos adicionais permanecem pendentes para encerrar o MVP: rastreio personalizado de entregas (4.4), central de email marketing (5.3) e gestão de visibilidade de expositores (5.4). Fases futuras (split automático via Mercado Pago, OAuth por lojista, etiquetas físicas, rede social) seguem planejadas.
+**Versão:** 2.4 — Agosto de 2026
+**Status geral do projeto:** MVP demonstrável. A plataforma já permite apresentar a jornada pública da feira, navegação por eixos, expositores, marketplace, carrinho, checkout, integração inicial com Mercado Pago, páginas institucionais, formulário de contato com resposta automática, painel administrativo com identidade visual, comunidade/feed, email marketing, visibilidade de expositores, rastreio, comunicação loja-cliente e AVA com curso online, progresso e certificado PDF. Fases futuras seguem concentradas em automações de escala: split automático completo via Mercado Pago, OAuth por lojista no Melhor Envio, compra/geração de etiquetas físicas, auditoria ampliada e recuperação de carrinho abandonado.
 
 ---
 
@@ -18,14 +18,11 @@
 [FASE 3 ✅ CONCLUÍDA]
   Catálogo & Três Eixos
            ↓
-[FASE 4 ✅ MVP + COTAÇÃO DE FRETE]
-  Checkout, cotação de frete & pagamentos manuais
-  + [4.4 ⏳] Rastreio personalizado de entregas
+[FASE 4 ✅ MVP AVANÇADO]
+  Checkout, cotação de frete, Mercado Pago inicial, pedidos e rastreio
            ↓
-[FASE 5 ⏳ Em andamento]
-  Comunidade & Engajamento
-  + [5.3 ⏳] Central de Email Marketing
-  + [5.4 ⏳] Gestão de Visibilidade de Expositores
+[FASE 5 ✅ IMPLEMENTADA]
+  Comunidade, feed, email marketing e visibilidade de expositores
            ↓
 [FASE 6 ✅ CONCLUÍDA]
   Usuários internos, perfis & permissões
@@ -38,6 +35,22 @@
   AVA — Ambiente Virtual de Aprendizagem
   Infraestrutura · Course Builder · Player · Materiais · Certificado PDF
 ```
+
+---
+
+## Marco Atual — MVP Demonstrável
+
+O projeto atingiu um ponto mínimo viável para demonstração completa ao cliente:
+
+| Jornada | Situação |
+|---|---|
+| Visitante público | Home responsiva, navbar/footer padronizados, banners, agenda, expositores, marketplace, blog, contato, privacidade e termos |
+| Cliente comprador | Cadastro/login, carrinho, checkout, Mercado Pago inicial, pedido, comunicação pós-venda e aprendizado |
+| Expositor/lojista | Painel da loja, cadastro de produtos/serviços/cuidados, feed, pedidos, perguntas, cursos digitais e exposição |
+| Equipe interna | Dashboard administrativo, CMS, configurações, logo/favicon, banners, páginas, eventos, mídia, usuários, permissões e checkout |
+| Demonstração de AVA | Produto digital `Curso Online de Informática Popular`, matrícula demo, quatro aulas, progresso e certificado PDF |
+
+Credencial de demonstração do curso: `cliente.curso@teste.com` / `password`, com acesso em `/minha-conta/aprendizado`.
 
 ---
 
@@ -349,7 +362,7 @@ Itens descritos na Fase 3 original que não bloqueiam o checkout e foram conscie
 
 ---
 
-## ✅ Fase 4 — Checkout, Logística e Split de Pagamento (MVP com cotação inicial de frete)
+## ✅ Fase 4 — Checkout, Frete, Pagamento e Rastreio (MVP avançado)
 
 **Período:** Semanas 10 a 13
 **Objetivo estratégico:** A fase mais crítica do core do negócio — calcular frete, cobrar e distribuir o dinheiro automaticamente.
@@ -361,8 +374,11 @@ a Fase 4 foi entregue inicialmente como um **MVP 100% manual**: frete combinado 
 **Atualização técnica (01/07/2026):** a integração inicial com o Melhor Envio foi implementada para cálculo de frete
 no checkout. O MVP usa uma conta única da plataforma Feira Esquerda Livre, com credenciais via `.env`/configuração,
 busca CEP de origem por loja, envia peso e dimensões dos produtos e retorna opções padronizadas para seleção no checkout.
-Compra de etiqueta, geração de etiqueta, rastreamento, OAuth por lojista, split de frete e painel financeiro permanecem
-fora do escopo atual.
+Compra de etiqueta, geração de etiqueta, OAuth por lojista, split de frete e painel financeiro permanecem fora do escopo atual.
+
+**Atualização técnica (01/08/2026):** o checkout evoluiu para o MVP avançado, com Mercado Pago inicial configurável pelo
+painel, tratamento adequado para testes locais, rastreio personalizado, pedidos por split e base operacional suficiente
+para demonstração do fluxo de compra. O split automático completo e a geração de etiquetas seguem como pós-MVP.
 
 ### O que foi entregue
 
@@ -446,18 +462,17 @@ order_shippings
 
 ---
 
-### Módulo 4.3 — Split de Pagamento Mercado Pago — ⏳ Adiado (config pronta)
+### Módulo 4.3 — Mercado Pago — ✅ Integração inicial concluída; split automático pós-MVP
 
 **Objetivo:** Cobrar o cliente uma vez e distribuir automaticamente para cada lojista, retendo a comissão da plataforma.
 
-**Status atual:** como o pagamento ainda é manual (cliente paga direto na chave PIX/conta do lojista), não há
-cobrança centralizada para "splitar". O que já existe:
+**Status atual:** o checkout já permite iniciar pagamento via Mercado Pago quando a integração está ativa nas configurações. O split automático entre lojistas permanece pós-MVP; a plataforma ainda registra os valores por loja para controle operacional. O que já existe:
 - Campo de comissão da plataforma (%) configurável em `/admin/settings/checkout`
 - `OrderSplit` calcula e registra `gross_amount`, `commission_amount` e `net_amount` por loja para fins de relatório,
   mesmo sem retenção real
 - Campos de credenciais do Mercado Pago (Public Key, Access Token, sandbox) já salvos na mesma tela de configuração
-- Confirmação manual do recebimento pelo lojista em `/minha-loja/pedidos` (equivalente ao status "Pago" do fluxo
-  original, só que registrado manualmente em vez de via webhook)
+- Confirmação manual/operacional do recebimento pelo lojista em `/minha-loja/pedidos`
+- Ajuste para testes locais: URLs de retorno automático são tratadas com segurança quando `APP_URL` está em `localhost`
 
 **Entregas futuras:**
 
@@ -479,7 +494,7 @@ cobrança centralizada para "splitar". O que já existe:
 
 ---
 
-### Módulo 4.4 — Rastreio Personalizado de Entrega — ⏳ A implementar
+### Módulo 4.4 — Rastreio Personalizado de Entrega — ✅ Implementado
 
 **Objetivo:** dar ao cliente visibilidade total sobre o ciclo de vida da entrega com uma experiência de rastreio com a identidade visual da Feira Esquerda Livre — não apenas um link para o site dos Correios ou transportadora.
 
@@ -497,7 +512,7 @@ Pedido confirmado
     → E-mail + link WhatsApp notificam o cliente a cada mudança de status
 ```
 
-**Entregas planejadas:**
+**Entregas implementadas/planejadas como base técnica:**
 
 **4.4.1 — Tabelas e Modelos**
 ```
@@ -634,7 +649,7 @@ feed_comments
 
 ---
 
-### Módulo 5.3 — Central de Email Marketing — ⏳ A implementar
+### Módulo 5.3 — Central de Email Marketing — ✅ Implementada
 
 **Objetivo:** dar ao time de marketing e aos administradores da Feira Esquerda Livre uma ferramenta para criar, enviar e acompanhar campanhas de e-mail para a base de clientes e assinantes, dentro do próprio painel — sem depender de plataformas externas pagas para o MVP.
 
@@ -644,7 +659,7 @@ feed_comments
 - Combinação filtrada (ex.: clientes ativos que compraram nos últimos 60 dias)
 - Segmento manual (lista de e-mails colados no campo de edição)
 
-**Entregas planejadas:**
+**Entregas implementadas/planejadas como base técnica:**
 
 **5.3.1 — Gerenciamento de Campanhas (Admin)**
 - Rota: `/admin/email-marketing`
@@ -738,7 +753,7 @@ customer_profiles (alter)
 
 ---
 
-### Módulo 5.4 — Gestão de Visibilidade e Tempo de Exposição de Expositores — ⏳ A implementar
+### Módulo 5.4 — Gestão de Visibilidade e Tempo de Exposição de Expositores — ✅ Implementada
 
 **Objetivo:** tornar a exposição dos expositores na home page justa, transparente e monetizável. Hoje, quem é aprovado por último aparece primeiro — o novo sistema introduz rotação aleatória com rastreio de tempo de exibição, cotas configuráveis por expositor e um painel de relatórios para que cada lojista veja exatamente quanto tempo sua loja ficou visível para o público.
 
@@ -1134,11 +1149,11 @@ order_messages
 | ✅ Fase 1 — Fundação | Semanas 1–3 | CMS · Admin · Home | Plataforma funcional com conteúdo dinâmico |
 | ✅ Fase 2 — Lojistas & Agenda | Semanas 4–6 | 2.1 · 2.2 · 2.3 | Lojistas cadastráveis · Agenda pública navegável |
 | ✅ Fase 3 — Catálogo & Três Eixos | Semanas 7–9 | 3.1 · 3.2 · 3.3 | Três eixos, CRUD de produtos, loja pública e carrinho multilojas em produção |
-| ✅ Fase 4 — Checkout & Pagamento | Semanas 10–13 | 4.1 · 4.2 · 4.3 | MVP com cotação inicial de frete via Melhor Envio; pagamento/split automáticos seguem em fases futuras |
-| ⏳ **4.4 — Rastreio de Entrega** | MVP final | 4.4 | Linha do tempo branded, integração Melhor Envio Tracking, notificações ao cliente |
-| ⏳ Fase 5 — Comunidade | Semanas 14–17 | 5.1 · 5.2 · **5.3** · **5.4** | Feed social + compartilhamento + **Email Marketing** + **Gestão de Visibilidade de Expositores** |
+| ✅ Fase 4 — Checkout, Frete & Pagamento | Semanas 10–13 | 4.1 · 4.2 · 4.3 · 4.4 | Checkout, pedidos, cotação Melhor Envio, Mercado Pago inicial e rastreio |
+| ✅ Fase 5 — Comunidade & Marketing | Semanas 14–17 | 5.1 · 5.2 · 5.3 · 5.4 | Feed social, compartilhamento, email marketing e gestão de visibilidade de expositores |
 | ✅ Fase 6 — Governança Admin | Concluída | 6.1 · 6.2 · 6.3 · 6.4 · 6.5 | Usuários internos, perfis de acesso, permissões, modelo multi-papel e proteção real do painel |
 | ✅ **Fase 7 — Comunicação** | Julho 2026 | **7.1 · 7.2 · 7.3** | **FAQ estático, Q&A público e chat pós-pedido por split — 31 testes** |
+| ✅ Fase 8 — AVA | Julho 2026 | 8.1 · 8.2 · 8.3 | Cursos digitais, course builder, player, materiais protegidos, progresso e certificado PDF |
 
 ---
 
@@ -1243,6 +1258,6 @@ ava_lesson_progress  — enrollment_id, lesson_id, started_at, completed_at, wat
 
 ---
 
-*Documento atualizado em: 1º de julho de 2026 — Versão 2.3*
-*Próxima revisão: após entrega do Módulo 4.4 (rastreio), Módulo 5.3 (email marketing) e Módulo 5.4 (visibilidade de expositores) — marco do lançamento do MVP*
-*Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala*
+*Documento atualizado em: 1º de agosto de 2026 — Versão 2.4*
+*Próxima revisão: após validação do MVP demonstrável com diretores, sócios e cliente.*
+*Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala e melhorias de escala operacional.*

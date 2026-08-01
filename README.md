@@ -6,6 +6,20 @@ A experiência foi desenhada para funcionar bem em redes lentas (3G/4G), com nav
 
 ---
 
+## MVP Demonstrável
+
+O projeto já possui um fluxo mínimo viável para apresentação a clientes, diretores e sócios da feira:
+
+- Home pública com identidade visual aplicada, banners responsivos, próximas feiras, expositores, marketplace, blog, chamada para expositores e newsletter.
+- Navbar, footer, botão de voltar ao topo e páginas institucionais padronizadas.
+- Página de contato com canais oficiais, formulário e resposta automática em HTML para o usuário.
+- Política de Privacidade e Termos de Uso com contatos oficiais e link para o formulário.
+- Painel administrativo com dashboard, configurações do site, logo/favicon, banners, conteúdos, eventos, expositores, visibilidade e checkout.
+- Marketplace com produtos, serviços, cuidados, carrinho, checkout autenticado e integração inicial com Mercado Pago.
+- Dados demonstrativos para produtos, expositores, posts de comunidade e curso online com certificado.
+
+---
+
 ## Stack Técnica
 
 | Camada | Tecnologia |
@@ -94,7 +108,17 @@ Consulte também [`docs/INTEGRACAO_FRETE_MELHOR_ENVIO.md`](docs/INTEGRACAO_FRETE
 php artisan db:seed
 ```
 
-Os seeders incluem dados de base para configurações, usuários, permissões, categorias, banners, eventos, expositores, produtos, serviços e cuidados.
+Os seeders incluem dados de base para configurações, usuários, permissões, categorias, banners, eventos, expositores, produtos, serviços, cuidados, posts de comunidade, imagens demonstrativas e um curso online de demonstração no AVA.
+
+### Usuários demonstrativos
+
+| Perfil | E-mail | Senha | Uso sugerido |
+|---|---|---|---|
+| Administrador | `admin@feiraesquerdalivre.com.br` | `password` | Painel administrativo |
+| Lojista demo | `tech@teste.com` | `password` | Loja Tecnologia Solidária e curso digital |
+| Cliente curso demo | `cliente.curso@teste.com` | `password` | Acessar `/minha-conta/aprendizado`, concluir curso e baixar certificado |
+
+O seeder `DemoAvaCourseSeeder` cria o produto digital `Curso Online de Informática Popular`, com valor `R$ 0,01`, quatro aulas, matrícula ativa para o cliente demo e certificado habilitado.
 
 ---
 
@@ -146,6 +170,10 @@ Um mesmo lojista pode atuar em todos os eixos. O carrinho e o checkout agrupam i
 | `GET /servicos` | Catálogo de serviços |
 | `GET /cuidados` | Catálogo de cuidados e bem viver |
 | `GET /feed` | Feed social público |
+| `GET /contato` | Página de contato com telefones, e-mail, endereço e formulário |
+| `POST /contato` | Envio do formulário de contato e confirmação automática por e-mail |
+| `GET /politica-de-privacidade` | Política de Privacidade |
+| `GET /termos-de-uso` | Termos de Uso |
 | `POST /newsletter` | Inscrição na newsletter |
 | `GET /newsletter/descadastro/{token}` | Página de descadastro de campanhas |
 | `GET /seja-um-expositor` | Formulário público de solicitação para novos lojistas |
@@ -305,7 +333,7 @@ AvaLessonProgress        -> progresso por aula
 
 ## Status do Projeto
 
-Consulte [`docs/ROADMAP.md`](docs/ROADMAP.md) para o planejamento detalhado. O código atual já contém rotas, models, jobs e testes para módulos que o roadmap ainda marcava como pendentes na revisão de 1º de julho de 2026.
+Consulte [`docs/ROADMAP.md`](docs/ROADMAP.md) para o planejamento detalhado. O código atual representa um MVP demonstrável, com os principais fluxos públicos, administrativos, de marketplace, comunicação, marketing e AVA já implementados.
 
 | Fase | Status no código | Entregável |
 |---|---|---|
@@ -317,6 +345,15 @@ Consulte [`docs/ROADMAP.md`](docs/ROADMAP.md) para o planejamento detalhado. O c
 | Fase 6 — Governança Admin | Concluída | Usuários internos, perfis, permissões e proteção de rotas/ações |
 | Fase 7 — Comunicação Loja-Cliente | Concluída | FAQ, Q&A público e chat pós-pedido |
 | Fase 8 — AVA | Concluída | Course builder, player, materiais protegidos, progresso e certificado PDF |
+
+### Cenário demo do AVA
+
+O MVP inclui um curso online demonstrativo para validar a jornada de produto digital:
+
+1. O expositor `Tecnologia Solidária` possui o produto `Curso Online de Informática Popular`.
+2. O produto é digital, custa `R$ 0,01` e pode ser usado em testes de checkout.
+3. O cliente `cliente.curso@teste.com` já possui matrícula ativa.
+4. Em `/minha-conta/aprendizado`, o cliente pode abrir o player, marcar as quatro aulas como concluídas e baixar o certificado em PDF.
 
 ### Pós-MVP planejado
 
