@@ -30,6 +30,7 @@ O projeto já possui um fluxo mínimo viável para apresentação a clientes, di
 | Build | Vite 7 |
 | Banco de dados | MySQL em produção · SQLite suportado em desenvolvimento/testes |
 | Permissões | spatie/laravel-permission |
+| API mobile | Laravel Sanctum (tokens Bearer, consumidos pelo app Flutter) |
 | Processamento de imagens | Intervention/Image 3 |
 | PDF | barryvdh/laravel-dompdf |
 | Filas | Laravel Queue |
@@ -251,6 +252,16 @@ Requer autenticação.
 
 ---
 
+## API Mobile (Flutter)
+
+API REST versionada em `/api/v1`, autenticada via Laravel Sanctum (tokens Bearer), consumida pelo app mobile em Flutter para clientes compradores e lojistas. Reaproveita os mesmos Services do site (`CartService`, `OrderService`, `MercadoPagoService`, `Shipping\MelhorEnvioService`, `AvaEnrollmentService`) — mesmo comportamento de negócio, exposto em JSON.
+
+Cobre: cadastro/login, catálogo público, perguntas de produto, carrinho (exige login), cotação de frete, checkout, pedidos, chat pós-pedido, endereços, AVA (Meu Aprendizado, progresso e certificado) e, para o lojista, perfil da loja, CRUD de produtos, gestão de pedidos recebidos, perguntas, exposição na home e publicação de cursos.
+
+Documentação completa de rotas, formatos de resposta e exemplos: [`docs/API.md`](docs/API.md).
+
+---
+
 ## Perfis de Usuário
 
 | Papel | Contexto | Acesso |
@@ -345,6 +356,7 @@ Consulte [`docs/ROADMAP.md`](docs/ROADMAP.md) para o planejamento detalhado. O c
 | Fase 6 — Governança Admin | Concluída | Usuários internos, perfis, permissões e proteção de rotas/ações |
 | Fase 7 — Comunicação Loja-Cliente | Concluída | FAQ, Q&A público e chat pós-pedido |
 | Fase 8 — AVA | Concluída | Course builder, player, materiais protegidos, progresso e certificado PDF |
+| Fase 9 — API Mobile (Flutter) | Concluída (v1) | API `/api/v1` com Sanctum, catálogo, carrinho, checkout, pedidos, chat, endereços, AVA e endpoints de lojista |
 
 ### Cenário demo do AVA
 
@@ -363,6 +375,7 @@ O MVP inclui um curso online demonstrativo para validar a jornada de produto dig
 - Auditoria administrativa ampliada.
 - Recuperação de carrinho abandonado.
 - Integração SendGrid/SES para campanhas em larga escala.
+- API: construtor de curso AVA, feed/comunidade e recuperação de senha para o app Flutter.
 
 ---
 
@@ -383,6 +396,7 @@ A suíte cobre, entre outros módulos:
 - rastreio de pedidos
 - FAQ, Q&A e chat
 - AVA, materiais e certificados
+- API mobile `/api/v1` (autenticação, catálogo, carrinho, checkout, pedidos, chat, endereços, AVA e lojista)
 
 ---
 

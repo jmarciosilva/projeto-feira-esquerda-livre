@@ -1,8 +1,8 @@
 # 🗺️ Roadmap de Desenvolvimento — Feira Esquerda Livre
 
 **Documento de Planejamento Estratégico**
-**Versão:** 2.4 — Agosto de 2026
-**Status geral do projeto:** MVP demonstrável. A plataforma já permite apresentar a jornada pública da feira, navegação por eixos, expositores, marketplace, carrinho, checkout, integração inicial com Mercado Pago, páginas institucionais, formulário de contato com resposta automática, painel administrativo com identidade visual, comunidade/feed, email marketing, visibilidade de expositores, rastreio, comunicação loja-cliente e AVA com curso online, progresso e certificado PDF. Fases futuras seguem concentradas em automações de escala: split automático completo via Mercado Pago, OAuth por lojista no Melhor Envio, compra/geração de etiquetas físicas, auditoria ampliada e recuperação de carrinho abandonado.
+**Versão:** 2.5 — Agosto de 2026
+**Status geral do projeto:** MVP demonstrável. A plataforma já permite apresentar a jornada pública da feira, navegação por eixos, expositores, marketplace, carrinho, checkout, integração inicial com Mercado Pago, páginas institucionais, formulário de contato com resposta automática, painel administrativo com identidade visual, comunidade/feed, email marketing, visibilidade de expositores, rastreio, comunicação loja-cliente, AVA com curso online, progresso e certificado PDF, e uma API REST (`/api/v1`, Sanctum) pronta para o app mobile em Flutter (cliente e lojista). Fases futuras seguem concentradas em automações de escala: split automático completo via Mercado Pago, OAuth por lojista no Melhor Envio, compra/geração de etiquetas físicas, auditoria ampliada, recuperação de carrinho abandonado e ampliação da API mobile (construtor de curso e feed).
 
 ---
 
@@ -34,6 +34,10 @@
 [FASE 8 ✅ CONCLUÍDA]
   AVA — Ambiente Virtual de Aprendizagem
   Infraestrutura · Course Builder · Player · Materiais · Certificado PDF
+           ↓
+[FASE 9 ✅ CONCLUÍDA — v1]
+  API Mobile (Flutter)
+  Sanctum · Catálogo · Carrinho · Checkout · Pedidos · Chat · AVA · Lojista
 ```
 
 ---
@@ -48,6 +52,7 @@ O projeto atingiu um ponto mínimo viável para demonstração completa ao clien
 | Cliente comprador | Cadastro/login, carrinho, checkout, Mercado Pago inicial, pedido, comunicação pós-venda e aprendizado |
 | Expositor/lojista | Painel da loja, cadastro de produtos/serviços/cuidados, feed, pedidos, perguntas, cursos digitais e exposição |
 | Equipe interna | Dashboard administrativo, CMS, configurações, logo/favicon, banners, páginas, eventos, mídia, usuários, permissões e checkout |
+| App mobile (Flutter) | Backend pronto: API `/api/v1` com Sanctum cobrindo catálogo, carrinho, checkout, pedidos, chat, endereços, AVA e gestão da loja — ver `docs/API.md` |
 | Demonstração de AVA | Produto digital `Curso Online de Informática Popular`, matrícula demo, quatro aulas, progresso e certificado PDF |
 
 Credencial de demonstração do curso: `cliente.curso@teste.com` / `password`, com acesso em `/minha-conta/aprendizado`.
@@ -1154,6 +1159,7 @@ order_messages
 | ✅ Fase 6 — Governança Admin | Concluída | 6.1 · 6.2 · 6.3 · 6.4 · 6.5 | Usuários internos, perfis de acesso, permissões, modelo multi-papel e proteção real do painel |
 | ✅ **Fase 7 — Comunicação** | Julho 2026 | **7.1 · 7.2 · 7.3** | **FAQ estático, Q&A público e chat pós-pedido por split — 31 testes** |
 | ✅ Fase 8 — AVA | Julho 2026 | 8.1 · 8.2 · 8.3 | Cursos digitais, course builder, player, materiais protegidos, progresso e certificado PDF |
+| ✅ Fase 9 — API Mobile (Flutter) | Agosto 2026 | 9.1 · 9.2 · 9.3 · 9.4 | API `/api/v1` com Sanctum, catálogo, carrinho/checkout/pedidos/chat/endereços, AVA e lojista — 42 testes |
 
 ---
 
@@ -1258,6 +1264,101 @@ ava_lesson_progress  — enrollment_id, lesson_id, started_at, completed_at, wat
 
 ---
 
-*Documento atualizado em: 1º de agosto de 2026 — Versão 2.4*
-*Próxima revisão: após validação do MVP demonstrável com diretores, sócios e cliente.*
-*Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala e melhorias de escala operacional.*
+## ✅ Fase 9 — API Mobile (Flutter) (Concluída — v1)
+
+**Período:** Agosto de 2026
+**Objetivo estratégico:** preparar o backend para receber o app mobile em Flutter (cliente comprador e lojista), expondo como API REST versionada o mesmo comportamento de negócio já validado no site — sem reescrever regras, reaproveitando os Services existentes (`CartService`, `OrderService`, `MercadoPagoService`, `Shipping\MelhorEnvioService`, `AvaEnrollmentService`).
+
+**Contexto técnico:** até esta fase, a plataforma era 100% sessão/cookie via Livewire — não havia `routes/api.php`, autenticação de API, CORS nem testes/documentação de API. Foi trabalho greenfield, construído em cima da lógica de negócio já madura do site.
+
+### O que foi entregue
+
+| Componente | Status |
+|---|---|
+| `laravel/sanctum` instalado, tabela `personal_access_tokens`, trait `HasApiTokens` no `User` | ✅ Concluído |
+| `routes/api.php` registrado em `bootstrap/app.php`, prefixo versionado `/api/v1` | ✅ Concluído |
+| `config/cors.php` (`paths: api/*`, origem permissiva — autenticação é por Bearer token, não cookie) | ✅ Concluído |
+| Autenticação: registrar, entrar (cliente e lojista no mesmo endpoint), sair, eu | ✅ Concluído |
+| Catálogo público: produtos/serviços/cuidados, detalhe, lojas, categorias, agenda, rastreio, perguntas | ✅ Concluído |
+| Carrinho (exige login), cotação de frete, checkout, pedidos, chat pós-pedido, endereços | ✅ Concluído |
+| AVA — Meu Aprendizado: matrículas, conteúdo do curso, concluir aula, certificado | ✅ Concluído |
+| Lojista: painel, loja, CRUD de produtos, pedidos recebidos, perguntas, exposição, cursos (listar/publicar) | ✅ Concluído |
+| 42 testes de feature em `tests/Feature/Api/V1/` (401/403/caminho feliz/422 por grupo) | ✅ Concluído |
+| `docs/API.md` — referência completa de rotas, envelope de resposta, erros e exemplos | ✅ Concluído |
+
+---
+
+### Módulo 9.1 — Infraestrutura & Autenticação
+
+**Objetivo:** base técnica da API e login por token, sem depender de sessão/cookie do navegador.
+
+**Decisão técnica — Sanctum em modo token pessoal (Bearer), não SPA/cookie:** o Flutter é um app separado, não uma SPA no mesmo domínio, então não há necessidade do modo "stateful" do Sanctum (cookies + CSRF). Cada login gera um token nomeado por dispositivo (`$user->createToken($deviceName)`), revogável individualmente no logout.
+
+**Entregas:**
+- `POST /auth/registrar` — cria cliente comprador (`role=user`), mesmas regras de validação do cadastro web.
+- `POST /auth/entrar` — endpoint único para cliente e lojista; valida credenciais manualmente (sem `Auth::attempt`, que depende da sessão do guard `web`, indisponível em rota de API stateless).
+- `POST /auth/sair` — revoga o token atual.
+- `GET /auth/eu` — usuário autenticado, com papel, perfil de cliente e dados da loja (se lojista).
+- Lojistas continuam sendo criados apenas via aprovação de solicitação (`/seja-um-expositor`, fluxo já existente) — a API não tem cadastro de lojista, só login.
+
+---
+
+### Módulo 9.2 — Catálogo, Carrinho, Checkout, Pedidos, Chat, Endereços e AVA (Cliente)
+
+**Objetivo:** cobrir toda a jornada de compra do cliente comprador dentro do app.
+
+**Decisão de produto confirmada:** o carrinho **exige login** no app (sem carrinho anônimo por dispositivo). Isso permitiu reaproveitar o `CartService` exatamente como já existia — `Auth::check()` resolve o carrinho pelo usuário autenticado via Sanctum sem nenhuma alteração no service.
+
+**Entregas:**
+- Catálogo público (produtos/serviços/cuidados, detalhe, lojas, categorias, agenda, rastreio) sem autenticação, espelhando as rotas web equivalentes.
+- Perguntas de produto: listagem pública das respondidas, envio autenticado (mesmas regras de `ProductQandA`).
+- Carrinho: adicionar, alterar quantidade, remover — via `CartService`, sem duplicar lógica.
+- Cotação de frete: `POST /frete/cotacao` reaproveita **o mesmo** `ShippingController::quote` já usado pelo checkout web, registrado também em `routes/api.php`.
+- Checkout: `POST /checkout` espelha `Checkout::confirmar()` (Livewire) — valida dados e endereço, chama `OrderService::createFromCart()` e, se Mercado Pago estiver ativo, `MercadoPagoService::createPreference()`, retornando a URL de pagamento no JSON.
+- Pedidos: listagem, detalhe e geração/consulta do link de pagamento Mercado Pago.
+- Chat pós-pedido: `GET/POST /pedidos/splits/{split}/mensagens` reaproveita a mesma regra de autorização do componente `OrderChat` (cliente dono do pedido OU lojista dono da loja do split) — endpoint compartilhado entre o app do cliente e o do lojista.
+- Endereços: CRUD completo, mesmas regras de validação do `EnderecoForm`.
+- AVA — Meu Aprendizado: matrículas com progresso, conteúdo do curso (módulos/aulas/materiais com link assinado), marcar aula concluída (gera certificado automaticamente ao chegar a 100%, mesma lógica de `AvaEnrollment::updateCompletionPercent()`) e download do certificado.
+
+---
+
+### Módulo 9.3 — Lojista
+
+**Objetivo:** permitir que o lojista administre a loja a partir do celular, sem depender do painel web.
+
+Rotas sob `/lojista`, protegidas por `auth:sanctum` + o middleware `lojista` já existente (`LojistaMiddleware`), reaproveitado tal como estava — inclusive a resposta 403 em JSON quando o request pede `Accept: application/json`.
+
+**Entregas:**
+- Painel: resumo de produtos e próximos eventos da loja.
+- Perfil da loja: visualizar e atualizar (upload de logo/banner via multipart, com spoofing `_method=PUT` documentado — limitação conhecida do PHP com uploads em requisições PUT reais).
+- Produtos: CRUD completo (produto/serviço/cuidado), até 4 imagens comprimidas via `ImageService`, FAQ embutido, criação automática de `AvaCourse` quando marcado como digital — mesmas regras do `ProdutoForm`.
+- Pedidos recebidos: confirmar pagamento e marcar como enviado (com notificação por e-mail ao cliente), espelhando `LojistaPedidoIndex`.
+- Perguntas: responder e alternar visibilidade, com contagem de pendentes/respondidas.
+- Exposição na home: impressões da loja (total, 7 e 30 dias) e slot de destaque ativo, se houver.
+- Cursos: listagem com status e alternância publicado/rascunho — **sem** o construtor completo (módulos/aulas/materiais), ver "fora do escopo" abaixo.
+
+---
+
+### Módulo 9.4 — Testes e Documentação
+
+**Entregas:**
+- `tests/Feature/Api/V1/` com 42 testes cobrindo os seis grupos de endpoints (autenticação, catálogo, carrinho/checkout, pedidos/chat/endereços, AVA, lojista), incluindo casos de 401 sem token, 403 de papel/dono incorreto, caminho feliz e 422 de validação.
+- `docs/API.md`: convenções de envelope de resposta (recurso único → `data`, paginação → `data/links/meta`, respostas compostas → chaves próprias), formato de erros, upload de arquivos e tabela completa de rotas com exemplos.
+
+---
+
+### Fora do escopo desta fase (deliberado)
+
+Cortes conscientes para manter a v1 da API enxuta e testável — candidatos a uma fase seguinte:
+
+- **Construtor de curso AVA** (criar/editar módulos, aulas, materiais, reordenar) — CRUD aninhado grande com upload de arquivos.
+- **Feed/Comunidade** (posts, curtidas, comentários) — não essencial para a primeira versão do app.
+- **Email marketing** — funcionalidade exclusiva do painel administrativo.
+- **Painel administrativo** — permanece 100% web.
+- **Recuperação de senha via API** — login e cadastro cobrem o essencial por enquanto.
+
+---
+
+*Documento atualizado em: 1º de agosto de 2026 — Versão 2.5*
+*Próxima revisão: após validação do MVP demonstrável com diretores, sócios e cliente, e após o início da integração com o app Flutter.*
+*Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e feed/comunidade na API mobile.*
