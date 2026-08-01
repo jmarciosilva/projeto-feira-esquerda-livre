@@ -9,23 +9,33 @@
 {{-- Modal de autenticação para convidados --}}
 @if($showAuthModal)
 <div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.7);">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+    <div class="rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border"
+         style="background:#FFFDF2; border-color:#F0D060;"
          x-data="{ tab: '{{ old('_form', 'login') }}' }">
 
-        <div class="px-8 py-6 text-center" style="background:#1a472a;">
-            <h2 class="text-lg font-bold text-white">Para finalizar seu pedido</h2>
-            <p class="text-sm mt-1" style="color:#b7e4c7;">Entre na sua conta ou crie uma nova em segundos</p>
+        <div class="px-8 pt-7 pb-5 text-center" style="background:linear-gradient(180deg, #FFF4B8 0%, #FFFDF2 100%);">
+            @if($settings->logo_path)
+                <img src="{{ Storage::url($settings->logo_path) }}"
+                     alt=""
+                     class="h-14 w-auto object-contain mx-auto mb-3"
+                     loading="lazy">
+            @else
+                <div class="inline-flex h-12 w-12 items-center justify-center rounded-xl font-black mb-3"
+                     style="background:#F4E294; color:#3D3000;">F</div>
+            @endif
+            <h2 class="text-xl font-black" style="color:#3D3000;">Para finalizar seu pedido</h2>
+            <p class="text-sm mt-1" style="color:#7A5C00;">Entre na sua conta ou crie uma nova em segundos</p>
         </div>
 
-        <div class="flex" style="border-bottom:1px solid #e5e7eb;">
+        <div class="mx-6 flex rounded-xl p-1" style="background:#F8EDB8;">
             <button type="button" @click="tab = 'login'"
-                    class="flex-1 py-3 text-sm font-semibold transition-colors"
-                    :style="tab === 'login' ? 'color:#C47A00; border-bottom:2px solid #E8A000;' : 'color:#6b7280;'">
+                    class="flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors"
+                    :style="tab === 'login' ? 'color:#3D3000; background:#fff; box-shadow:0 1px 6px rgba(61,48,0,0.10);' : 'color:#7A5C00;'">
                 Já tenho conta
             </button>
             <button type="button" @click="tab = 'register'"
-                    class="flex-1 py-3 text-sm font-semibold transition-colors"
-                    :style="tab === 'register' ? 'color:#C47A00; border-bottom:2px solid #E8A000;' : 'color:#6b7280;'">
+                    class="flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors"
+                    :style="tab === 'register' ? 'color:#3D3000; background:#fff; box-shadow:0 1px 6px rgba(61,48,0,0.10);' : 'color:#7A5C00;'">
                 Criar conta
             </button>
         </div>
@@ -48,15 +58,18 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
                     <input type="email" name="email" value="{{ old('email') }}" required autofocus
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                           class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2"
+                           style="border-color:#D9C16A; --tw-ring-color:#E8A000;">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
                     <input type="password" name="password" required
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                           class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2"
+                           style="border-color:#D9C16A; --tw-ring-color:#E8A000;">
                 </div>
                 <button type="submit"
-                        class="w-full py-3 rounded-xl text-white text-sm font-bold" style="background:#1a472a;">
+                        class="w-full py-3 rounded-xl text-sm font-bold shadow-sm transition-opacity hover:opacity-90"
+                        style="background:#E8A000; color:#fff;">
                     Entrar e continuar
                 </button>
             </form>
@@ -70,33 +83,39 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Nome completo</label>
                     <input type="text" name="name" value="{{ old('name') }}" required
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                           class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2"
+                           style="border-color:#D9C16A; --tw-ring-color:#E8A000;">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
                     <input type="email" name="email" value="{{ old('email') }}" required
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                           class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2"
+                           style="border-color:#D9C16A; --tw-ring-color:#E8A000;">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
                     <input type="text" name="whatsapp" value="{{ old('whatsapp') }}" required
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                           class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2"
+                           style="border-color:#D9C16A; --tw-ring-color:#E8A000;"
                            placeholder="(11) 91234-5678">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
                         <input type="password" name="password" required placeholder="Mín. 8 caracteres"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                               class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2"
+                               style="border-color:#D9C16A; --tw-ring-color:#E8A000;">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar</label>
                         <input type="password" name="password_confirmation" required
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                               class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2"
+                               style="border-color:#D9C16A; --tw-ring-color:#E8A000;">
                     </div>
                 </div>
                 <button type="submit"
-                        class="w-full py-3 rounded-xl text-white text-sm font-bold" style="background:#1a472a;">
+                        class="w-full py-3 rounded-xl text-sm font-bold shadow-sm transition-opacity hover:opacity-90"
+                        style="background:#E8A000; color:#fff;">
                     Criar conta e continuar
                 </button>
             </form>

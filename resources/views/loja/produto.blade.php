@@ -299,6 +299,6 @@
     &copy; {{ date('Y') }}
 </footer>
 
-@livewireScripts
+@livewireScriptConfig
 </body>
 </html>

@@ -306,6 +306,6 @@
 </footer>
 
 @include('partials.back-to-top')
-@livewireScripts
+@livewireScriptConfig
 </body>
 </html>

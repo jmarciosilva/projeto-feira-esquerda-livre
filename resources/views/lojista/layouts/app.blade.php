@@ -232,7 +232,7 @@
     </div>
 </div>
 
-@livewireScripts
+@livewireScriptConfig
 
 <script>
 function toggleLojistaSidebar() {

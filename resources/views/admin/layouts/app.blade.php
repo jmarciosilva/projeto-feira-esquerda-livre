@@ -249,7 +249,7 @@
     </div>
 </div>
 
-@livewireScripts
+@livewireScriptConfig
 
 <script>
 function toggleSidebar() {

@@ -193,13 +193,16 @@ class MercadoPagoService
                 'failure' => route('mercado-pago.return', ['reference' => $order->reference, 'resultado' => 'falha']),
                 'pending' => route('mercado-pago.return', ['reference' => $order->reference, 'resultado' => 'pendente']),
             ],
-            'auto_return' => 'approved',
             'statement_descriptor' => 'FEIRA ESQ LIVRE',
             'metadata' => [
                 'order_id' => $order->id,
                 'order_reference' => $order->reference,
             ],
         ];
+
+        if ($this->canUseAutoReturn()) {
+            $payload['auto_return'] = 'approved';
+        }
 
         if ($order->customer_email) {
             $payload['payer'] = [
@@ -209,6 +212,19 @@ class MercadoPagoService
         }
 
         return $payload;
+    }
+
+    private function canUseAutoReturn(): bool
+    {
+        $host = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+        if (! $host) {
+            return false;
+        }
+
+        return ! in_array($host, ['localhost', '127.0.0.1', '::1'], true)
+            && ! str_ends_with($host, '.test')
+            && ! str_ends_with($host, '.local');
     }
 
     /**

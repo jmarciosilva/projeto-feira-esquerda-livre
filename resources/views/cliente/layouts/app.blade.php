@@ -108,7 +108,7 @@
     </div>
 </div>
 
-@livewireScripts
+@livewireScriptConfig
 
 <script>
 function toggleClienteSidebar() {
