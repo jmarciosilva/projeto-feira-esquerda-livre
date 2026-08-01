@@ -2,11 +2,11 @@
 
 @php
 $variants = [
-    'primary'   => 'bg-[#1a472a] hover:bg-[#2d6a4f] text-white border-transparent',
-    'secondary' => 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300',
+    'primary'   => 'bg-[#C47A00] hover:bg-[#A86400] text-white border-transparent',
+    'secondary' => 'bg-[#FDF8DC] hover:bg-[#F4E294] text-[#3D3000] border-[#E8DFA8]',
     'danger'    => 'bg-red-600 hover:bg-red-700 text-white border-transparent',
-    'success'   => 'bg-[#52b788] hover:bg-[#2d6a4f] text-white border-transparent',
-    'ghost'     => 'bg-transparent hover:bg-gray-100 text-gray-600 border-transparent',
+    'success'   => 'bg-[#5C8A3C] hover:bg-[#4A7030] text-white border-transparent',
+    'ghost'     => 'bg-transparent hover:bg-[#FDF8DC] text-[#5C3000] border-transparent',
 ];
 
 $sizes = [

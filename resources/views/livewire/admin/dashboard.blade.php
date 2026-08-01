@@ -1,142 +1,192 @@
-<div>
+<div class="space-y-6">
     @if(session('success'))
-    <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+    <div class="p-4 rounded-xl border text-sm font-medium" style="background:#F0F8E8; border-color:#CDE7B0; color:#3D5C1F;">
         {{ session('success') }}
     </div>
     @endif
 
-    {{-- Stats --}}
-    <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
-        @foreach([
-            ['label' => 'Páginas',   'value' => $stats['pages'],   'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', 'color' => 'blue'],
-            ['label' => 'Banners',   'value' => $stats['banners'],  'icon' => 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', 'color' => 'purple'],
-            ['label' => 'Posts',     'value' => $stats['posts'],    'icon' => 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z', 'color' => 'yellow'],
-            ['label' => 'Eventos',   'value' => $stats['events'],   'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'color' => 'green'],
-            ['label' => 'Mídias',    'value' => $stats['media'],    'icon' => 'M3 7a2 2 0 012-2h3.586a1 1 0 01.707.293L11 7h9a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V7z', 'color' => 'red'],
-            ['label' => 'Pendentes', 'value' => $stats['solicitacoes_pendentes'], 'icon' => 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', 'color' => $stats['solicitacoes_pendentes'] > 0 ? 'orange' : 'gray'],
-        ] as $stat)
-        @php
-        $colors = [
-            'blue'   => 'bg-blue-50 text-blue-600',
-            'purple' => 'bg-purple-50 text-purple-600',
-            'yellow' => 'bg-yellow-50 text-yellow-600',
-            'green'  => 'bg-green-50 text-green-600',
-            'red'    => 'bg-red-50 text-red-600',
-            'orange' => 'bg-orange-50 text-orange-600',
-            'gray'   => 'bg-gray-50 text-gray-400',
-        ];
-        @endphp
-        <div class="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 {{ $colors[$stat['color']] }}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $stat['icon'] }}"/>
-                </svg>
+    <section class="rounded-2xl overflow-hidden border shadow-sm" style="border-color:#E8DFA8; background:#3D3000;">
+        <div class="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+            <div class="p-6 lg:p-8">
+                <p class="text-sm font-bold uppercase tracking-wide" style="color:#F4E294;">Painel Administrativo</p>
+                <h2 class="mt-2 text-2xl lg:text-3xl font-black text-white">Visao geral da Feira Esquerda Livre</h2>
+                <p class="mt-3 max-w-2xl text-sm lg:text-base" style="color:#FFF4B8;">
+                    Acompanhe conteudo, marketplace, lojistas e comunidade em um unico lugar.
+                </p>
+                <div class="mt-6 flex flex-wrap gap-3">
+                    @can('cms.editar')
+                    <a href="{{ route('admin.posts.create') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold text-white transition-opacity hover:opacity-90" style="background:#C47A00;">
+                        Novo post
+                    </a>
+                    <a href="{{ route('admin.events.create') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold transition-opacity hover:opacity-85" style="background:#F4E294; color:#3D3000;">
+                        Novo evento
+                    </a>
+                    @endcan
+                    <a href="{{ url('/') }}" target="_blank" class="inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold border transition-opacity hover:opacity-85" style="border-color:#F4E294; color:#F4E294;">
+                        Ver site publico
+                    </a>
+                </div>
             </div>
-            <div>
-                <p class="text-2xl font-bold text-gray-900">{{ $stat['value'] }}</p>
-                <p class="text-sm text-gray-500">{{ $stat['label'] }}</p>
+            <div class="p-6 lg:p-8 flex lg:items-end" style="background:linear-gradient(135deg, rgba(244,226,148,0.20), rgba(196,122,0,0.28));">
+                <div class="w-full rounded-2xl p-5" style="background:rgba(255,253,240,0.94);">
+                    <p class="text-xs font-bold uppercase tracking-wide" style="color:#7A5C00;">Pendencias agora</p>
+                    <div class="mt-3 flex items-end justify-between gap-4">
+                        <div>
+                            <p class="text-4xl font-black" style="color:#3D3000;">{{ $stats['solicitacoes_pendentes'] }}</p>
+                            <p class="text-sm" style="color:#7A5C00;">solicitacoes de lojistas</p>
+                        </div>
+                        <a href="{{ route('admin.lojistas.solicitacoes') }}" class="text-sm font-bold hover:underline" style="color:#C47A00;">
+                            Revisar
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
+    </section>
+
+    {{-- Stats --}}
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        @foreach([
+            ['label' => 'Paginas', 'value' => $stats['pages'], 'href' => route('admin.pages.index'), 'tone' => 'cream', 'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],
+            ['label' => 'Posts', 'value' => $stats['posts'], 'href' => route('admin.posts.index'), 'tone' => 'gold', 'icon' => 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z'],
+            ['label' => 'Eventos', 'value' => $stats['events'], 'href' => route('admin.events.index'), 'tone' => 'green', 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'],
+            ['label' => 'Produtos', 'value' => $stats['products'], 'href' => route('admin.categorias.index'), 'tone' => 'teal', 'icon' => 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z'],
+            ['label' => 'Pedidos', 'value' => $stats['orders'], 'href' => route('admin.pedidos.index'), 'tone' => 'brown', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 104 0M9 5a2 2 0 114 0'],
+            ['label' => 'Clientes', 'value' => $stats['customers'], 'href' => route('admin.clientes.index'), 'tone' => 'blue', 'icon' => 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z'],
+        ] as $stat)
+        @php
+            $tones = [
+                'cream' => ['bg' => '#FFFDF0', 'iconBg' => '#F4E294', 'fg' => '#3D3000'],
+                'gold'  => ['bg' => '#FFF7DA', 'iconBg' => '#F6D66B', 'fg' => '#7A5C00'],
+                'green' => ['bg' => '#F0F8E8', 'iconBg' => '#DDEFC7', 'fg' => '#4A7030'],
+                'teal'  => ['bg' => '#E7F0EF', 'iconBg' => '#CFE2DF', 'fg' => '#245C5A'],
+                'brown' => ['bg' => '#F8EFE5', 'iconBg' => '#E8C7A8', 'fg' => '#5C3000'],
+                'blue'  => ['bg' => '#EEF3FA', 'iconBg' => '#D7E4F5', 'fg' => '#345272'],
+            ];
+            $tone = $tones[$stat['tone']];
+        @endphp
+        <a href="{{ $stat['href'] }}" class="group rounded-2xl border p-4 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md"
+           style="background:{{ $tone['bg'] }}; border-color:#E8DFA8;">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:{{ $tone['iconBg'] }}; color:{{ $tone['fg'] }};">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $stat['icon'] }}"/>
+                    </svg>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-2xl font-black leading-tight" style="color:#3D3000;">{{ $stat['value'] }}</p>
+                    <p class="text-sm font-medium truncate" style="color:#7A5C00;">{{ $stat['label'] }}</p>
+                </div>
+            </div>
+        </a>
         @endforeach
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {{-- Posts Recentes --}}
-        <x-admin.card title="Posts Recentes">
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <x-admin.card title="Posts Recentes" description="Conteudos mais novos publicados no CMS.">
             @if($recentPosts->isEmpty())
             <p class="text-sm text-gray-400 text-center py-4">Nenhum post criado ainda.</p>
             @else
             <div class="space-y-3">
                 @foreach($recentPosts as $post)
-                <div class="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                <div class="flex items-center justify-between gap-3 py-2 border-b last:border-0" style="border-color:#F1E6AE;">
                     <div class="min-w-0">
-                        <p class="text-sm font-medium text-gray-900 truncate">{{ $post->title }}</p>
-                        <p class="text-xs text-gray-500">{{ $post->author->name }} · {{ $post->created_at->diffForHumans() }}</p>
+                        <p class="text-sm font-bold truncate" style="color:#3D3000;">{{ $post->title }}</p>
+                        <p class="text-xs" style="color:#7A5C00;">{{ $post->author->name }} · {{ $post->created_at->diffForHumans() }}</p>
                     </div>
                     <x-admin.badge :color="$post->status->color()">{{ $post->status->label() }}</x-admin.badge>
                 </div>
                 @endforeach
             </div>
             <div class="mt-4">
-                <a href="{{ route('admin.posts.index') }}" class="text-sm text-[#1a472a] font-medium hover:underline">Ver todos →</a>
+                <a href="{{ route('admin.posts.index') }}" class="text-sm font-bold hover:underline" style="color:#C47A00;">Ver todos -></a>
             </div>
             @endif
         </x-admin.card>
 
-        {{-- Próximos Eventos --}}
-        <x-admin.card title="Próximos Eventos">
+        <x-admin.card title="Proximos Eventos" description="Agenda ativa exibida para visitantes.">
             @if($upcomingEvents->isEmpty())
-            <p class="text-sm text-gray-400 text-center py-4">Nenhum evento próximo.</p>
+            <p class="text-sm text-gray-400 text-center py-4">Nenhum evento proximo.</p>
             @else
             <div class="space-y-3">
                 @foreach($upcomingEvents as $event)
-                <div class="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
-                    <div class="w-10 text-center flex-shrink-0 bg-[#f0fdf4] rounded-lg py-1">
-                        <p class="text-xs text-[#1a472a] font-semibold">{{ $event->start_date->format('d') }}</p>
-                        <p class="text-xs text-[#52b788]">{{ $event->start_date->isoFormat('MMM') }}</p>
+                <div class="flex items-start gap-3 py-2 border-b last:border-0" style="border-color:#F1E6AE;">
+                    <div class="w-11 text-center flex-shrink-0 rounded-xl py-1.5" style="background:#F0F8E8;">
+                        <p class="text-sm font-black" style="color:#3D3000;">{{ $event->start_date->format('d') }}</p>
+                        <p class="text-xs font-semibold" style="color:#5C8A3C;">{{ $event->start_date->isoFormat('MMM') }}</p>
                     </div>
                     <div class="min-w-0">
-                        <p class="text-sm font-medium text-gray-900 truncate">{{ $event->title }}</p>
-                        <p class="text-xs text-gray-500">{{ $event->city }}@if($event->state) - {{ $event->state }}@endif</p>
+                        <p class="text-sm font-bold truncate" style="color:#3D3000;">{{ $event->title }}</p>
+                        <p class="text-xs" style="color:#7A5C00;">{{ $event->city }}@if($event->state) - {{ $event->state }}@endif</p>
                     </div>
                 </div>
                 @endforeach
             </div>
             <div class="mt-4">
-                <a href="{{ route('admin.events.index') }}" class="text-sm text-[#1a472a] font-medium hover:underline">Ver todos →</a>
+                <a href="{{ route('admin.events.index') }}" class="text-sm font-bold hover:underline" style="color:#C47A00;">Ver todos -></a>
             </div>
             @endif
         </x-admin.card>
 
-        {{-- Solicitações de Lojistas --}}
-        <x-admin.card title="Solicitações Pendentes">
+        <x-admin.card title="Solicitacoes Pendentes" description="Novos lojistas aguardando revisao.">
             @if($recentSolicitacoes->isEmpty())
-            <p class="text-sm text-gray-400 text-center py-4">Nenhuma solicitação pendente.</p>
+            <p class="text-sm text-gray-400 text-center py-4">Nenhuma solicitacao pendente.</p>
             @else
             <div class="space-y-3">
                 @foreach($recentSolicitacoes as $s)
-                <div class="py-2 border-b border-gray-50 last:border-0">
-                    <p class="text-sm font-medium text-gray-900">{{ $s->nome_loja }}</p>
-                    <p class="text-xs text-gray-500">{{ $s->responsavel }} · {{ $s->created_at->diffForHumans() }}</p>
+                <div class="py-2 border-b last:border-0" style="border-color:#F1E6AE;">
+                    <p class="text-sm font-bold" style="color:#3D3000;">{{ $s->nome_loja }}</p>
+                    <p class="text-xs" style="color:#7A5C00;">{{ $s->responsavel }} · {{ $s->created_at->diffForHumans() }}</p>
                 </div>
                 @endforeach
             </div>
             <div class="mt-4">
-                <a href="{{ route('admin.lojistas.solicitacoes') }}" class="text-sm text-orange-600 font-medium hover:underline">
-                    Revisar solicitações →
+                <a href="{{ route('admin.lojistas.solicitacoes') }}" class="text-sm font-bold hover:underline" style="color:#C47A00;">
+                    Revisar solicitacoes ->
                 </a>
             </div>
             @endif
         </x-admin.card>
     </div>
 
-    {{-- Quick Actions --}}
-    <div class="mt-6">
-        <x-admin.card title="Ações Rápidas">
-            <div class="flex flex-wrap gap-3">
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_0.8fr] gap-6">
+        <x-admin.card title="Pedidos Recentes" description="Movimento mais recente do marketplace.">
+            @if($recentOrders->isEmpty())
+            <p class="text-sm text-gray-400 text-center py-4">Nenhum pedido registrado ainda.</p>
+            @else
+            <div class="space-y-3">
+                @foreach($recentOrders as $order)
+                <div class="flex items-center justify-between gap-3 py-2 border-b last:border-0" style="border-color:#F1E6AE;">
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold truncate" style="color:#3D3000;">Pedido {{ $order->reference }}</p>
+                        <p class="text-xs" style="color:#7A5C00;">{{ $order->customer_name }} · {{ $order->created_at->diffForHumans() }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-black" style="color:#3D3000;">R$ {{ number_format((float) $order->total_amount, 2, ',', '.') }}</p>
+                        <p class="text-xs" style="color:#7A5C00;">{{ $order->status->label() }}</p>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            <div class="mt-4">
+                <a href="{{ route('admin.pedidos.index') }}" class="text-sm font-bold hover:underline" style="color:#C47A00;">Ver pedidos -></a>
+            </div>
+            @endif
+        </x-admin.card>
+
+        <x-admin.card title="Acoes Rapidas" description="Atalhos para as rotinas mais comuns.">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 @can('cms.editar')
-                <a href="{{ route('admin.pages.create') }}">
-                    <x-admin.button variant="secondary">+ Nova Página</x-admin.button>
-                </a>
-                <a href="{{ route('admin.banners.create') }}">
-                    <x-admin.button variant="secondary">+ Novo Banner</x-admin.button>
-                </a>
-                <a href="{{ route('admin.posts.create') }}">
-                    <x-admin.button variant="secondary">+ Novo Post</x-admin.button>
-                </a>
-                <a href="{{ route('admin.events.create') }}">
-                    <x-admin.button variant="secondary">+ Novo Evento</x-admin.button>
-                </a>
+                <a href="{{ route('admin.pages.create') }}"><x-admin.button variant="secondary" class="w-full justify-center">Nova pagina</x-admin.button></a>
+                <a href="{{ route('admin.banners.create') }}"><x-admin.button variant="secondary" class="w-full justify-center">Novo banner</x-admin.button></a>
+                <a href="{{ route('admin.posts.create') }}"><x-admin.button variant="secondary" class="w-full justify-center">Novo post</x-admin.button></a>
+                <a href="{{ route('admin.events.create') }}"><x-admin.button variant="secondary" class="w-full justify-center">Novo evento</x-admin.button></a>
                 @endcan
                 @can('cms.visualizar')
-                <a href="{{ route('admin.media.index') }}">
-                    <x-admin.button variant="secondary">+ Enviar Mídia</x-admin.button>
-                </a>
+                <a href="{{ route('admin.media.index') }}"><x-admin.button variant="secondary" class="w-full justify-center">Biblioteca de midia</x-admin.button></a>
                 @endcan
                 @can('lojistas.visualizar')
-                <a href="{{ route('admin.lojistas.solicitacoes') }}">
-                    <x-admin.button variant="secondary">Ver Lojistas</x-admin.button>
-                </a>
+                <a href="{{ route('admin.lojistas.solicitacoes') }}"><x-admin.button variant="primary" class="w-full justify-center">Ver lojistas</x-admin.button></a>
                 @endcan
             </div>
         </x-admin.card>

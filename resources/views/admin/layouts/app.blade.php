@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="h-full bg-gray-50">
+<html lang="pt-BR" class="h-full bg-[#FFF4CC]">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'Admin' }} — Feira Esquerda Livre</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
@@ -15,18 +15,19 @@
 <div class="flex h-full min-h-screen">
 
     {{-- Sidebar --}}
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-[#1a472a] text-white flex flex-col transform -translate-x-full lg:translate-x-0 transition-transform duration-300">
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 text-white flex flex-col transform -translate-x-full lg:translate-x-0 transition-transform duration-300"
+           style="background: linear-gradient(180deg, #3D3000 0%, #5C3000 58%, #3D3000 100%);">
 
         {{-- Logo --}}
-        <div class="flex items-center gap-3 px-6 py-5 border-b border-[#2d6a4f]">
-            <div class="w-9 h-9 bg-[#52b788] rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex items-center gap-3 px-6 py-5 border-b border-white/10">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm" style="background:#F4E294;">
+                <svg class="w-5 h-5" style="color:#3D3000;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
                 </svg>
             </div>
             <div class="overflow-hidden">
-                <p class="text-sm font-bold text-white leading-tight truncate">Feira Esquerda Livre</p>
-                <p class="text-xs text-[#b7e4c7] truncate">Painel Administrativo</p>
+                <p class="text-sm font-extrabold text-white leading-tight truncate">Feira Esquerda Livre</p>
+                <p class="text-xs truncate" style="color:#F4E294;">Painel Administrativo</p>
             </div>
         </div>
 
@@ -39,7 +40,7 @@
 
             @canany(['configuracoes.visualizar', 'cms.visualizar'])
             <div class="pt-4 pb-1 px-3">
-                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">CMS</p>
+                <p class="text-xs font-bold uppercase tracking-wider" style="color:#F4E294;">CMS</p>
             </div>
             @endcanany
 
@@ -101,7 +102,7 @@
 
             @can('lojistas.visualizar')
             <div class="pt-4 pb-1 px-3">
-                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Lojistas</p>
+                <p class="text-xs font-bold uppercase tracking-wider" style="color:#F4E294;">Lojistas</p>
             </div>
 
             @php $pendentes = \App\Models\LojistasSolicitacao::pendentes()->count(); @endphp
@@ -117,7 +118,7 @@
 
             @canany(['pedidos.visualizar', 'clientes.visualizar'])
             <div class="pt-4 pb-1 px-3">
-                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Marketplace</p>
+                <p class="text-xs font-bold uppercase tracking-wider" style="color:#F4E294;">Marketplace</p>
             </div>
 
             @can('clientes.visualizar')
@@ -136,7 +137,7 @@
 
             @can('email-marketing.gerenciar')
             <div class="pt-4 pb-1 px-3">
-                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Marketing</p>
+                <p class="text-xs font-bold uppercase tracking-wider" style="color:#F4E294;">Marketing</p>
             </div>
             <x-admin.nav-item href="{{ route('admin.email-marketing.index') }}" icon="mail" :active="request()->routeIs('admin.email-marketing.*')">
                 Email Marketing
@@ -145,7 +146,7 @@
 
             @can('feed.moderar')
             <div class="pt-4 pb-1 px-3">
-                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Comunidade</p>
+                <p class="text-xs font-bold uppercase tracking-wider" style="color:#F4E294;">Comunidade</p>
             </div>
 
             @php
@@ -166,7 +167,7 @@
 
             @canany(['usuarios.visualizar', 'permissoes.gerenciar'])
             <div class="pt-4 pb-1 px-3">
-                <p class="text-xs font-semibold text-[#52b788] uppercase tracking-wider">Governança</p>
+                <p class="text-xs font-bold uppercase tracking-wider" style="color:#F4E294;">Governança</p>
             </div>
 
             @can('usuarios.visualizar')
@@ -184,18 +185,18 @@
         </nav>
 
         {{-- User --}}
-        <div class="px-4 py-4 border-t border-[#2d6a4f]">
+        <div class="px-4 py-4 border-t border-white/10">
             <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full bg-[#52b788] flex items-center justify-center flex-shrink-0">
-                    <span class="text-white text-sm font-semibold">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
+                <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style="background:#F4E294;">
+                    <span class="text-sm font-bold" style="color:#3D3000;">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-white truncate">{{ auth()->user()->name }}</p>
-                    <p class="text-xs text-[#b7e4c7] truncate">{{ auth()->user()->role->label() }}</p>
+                    <p class="text-xs truncate" style="color:#F4E294;">{{ auth()->user()->role->label() }}</p>
                 </div>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-                    <button type="submit" class="text-[#b7e4c7] hover:text-white transition-colors" title="Sair">
+                    <button type="submit" class="transition-colors hover:text-white" style="color:#F4E294;" title="Sair">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                         </svg>
@@ -212,22 +213,23 @@
     <div class="flex-1 flex flex-col lg:ml-64 min-h-screen">
 
         {{-- Top bar --}}
-        <header class="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 lg:px-6 py-4 flex items-center gap-4">
-            <button onclick="toggleSidebar()" class="lg:hidden text-gray-500 hover:text-gray-700">
+        <header class="sticky top-0 z-30 border-b px-4 lg:px-6 py-4 flex items-center gap-4"
+                style="background:#FFFDF0; border-color:#E8DFA8;">
+            <button onclick="toggleSidebar()" class="lg:hidden transition-colors" style="color:#5C3000;">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                 </svg>
             </button>
 
             <div class="flex-1">
-                <h1 class="text-lg font-semibold text-gray-900">{{ $title ?? 'Dashboard' }}</h1>
+                <h1 class="text-lg font-bold" style="color:#3D3000;">{{ $title ?? 'Dashboard' }}</h1>
                 @isset($breadcrumbs)
-                    <nav class="text-sm text-gray-500 mt-0.5">{{ $breadcrumbs }}</nav>
+                    <nav class="text-sm mt-0.5" style="color:#7A5C00;">{{ $breadcrumbs }}</nav>
                 @endisset
             </div>
 
             <div class="flex items-center gap-3">
-                <a href="{{ url('/') }}" target="_blank" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+                <a href="{{ url('/') }}" target="_blank" class="text-sm font-semibold flex items-center gap-1 transition-opacity hover:opacity-75" style="color:#5C3000;">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
                     </svg>
@@ -237,11 +239,11 @@
         </header>
 
         {{-- Page content --}}
-        <main class="flex-1 p-4 lg:p-6">
+        <main class="flex-1 p-4 lg:p-6" style="background:#FFF4CC;">
             {{ $slot }}
         </main>
 
-        <footer class="text-center text-xs text-gray-400 py-4 border-t border-gray-100">
+        <footer class="min-h-12 flex items-center justify-center text-xs font-semibold border-t" style="color:#3D3000; border-color:#D6B85A; background:#F4E294;">
             Feira Esquerda Livre &copy; {{ date('Y') }} — CMS Administrativo
         </footer>
     </div>

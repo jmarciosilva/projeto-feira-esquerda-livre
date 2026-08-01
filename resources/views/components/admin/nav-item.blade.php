@@ -17,8 +17,10 @@ $icons = [
 ];
 
 $path = $icons[$icon] ?? $icons['document'];
-$baseClass = 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150';
-$activeClass = $active ? 'bg-[#52b788] text-white' : 'text-[#b7e4c7] hover:bg-[#2d6a4f] hover:text-white';
+$baseClass = 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors duration-150';
+$activeClass = $active
+    ? 'bg-[#F4E294] text-[#3D3000] shadow-sm'
+    : 'text-[#FDF8DC] hover:bg-[#5C3000]/70 hover:text-white';
 @endphp
 
 <a href="{{ $href }}" {{ $attributes->merge(['class' => "$baseClass $activeClass"]) }}>
@@ -27,6 +29,6 @@ $activeClass = $active ? 'bg-[#52b788] text-white' : 'text-[#b7e4c7] hover:bg-[#
     </svg>
     <span class="flex-1">{{ $slot }}</span>
     @if($badge)
-    <span class="ml-auto text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold min-w-[20px] text-center leading-tight">{{ $badge }}</span>
+    <span class="ml-auto text-xs bg-[#E8A000] text-white px-1.5 py-0.5 rounded-full font-bold min-w-[20px] text-center leading-tight">{{ $badge }}</span>
     @endif
 </a>
