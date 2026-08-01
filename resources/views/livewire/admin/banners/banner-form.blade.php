@@ -10,9 +10,25 @@
                     <div class="space-y-4">
                         <x-admin.input label="Título *" wire:model="title" :error="$errors->first('title')"/>
                         <x-admin.input label="Subtítulo" wire:model="subtitle"/>
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <x-admin.input label="Texto do Botão" wire:model="button_text" placeholder="Saiba mais"/>
-                            <x-admin.input label="Link do Botão" wire:model="button_link" type="url" placeholder="https://..." :error="$errors->first('button_link')"/>
+                            <x-admin.select label="Destino do Botão" wire:model.live="button_link_preset">
+                                <option value="">Sem link</option>
+                                @foreach($buttonLinkOptions as $option)
+                                    <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+                                @endforeach
+                                <option value="custom">Link personalizado</option>
+                            </x-admin.select>
+                            <div class="md:col-span-2">
+                                <x-admin.input
+                                    label="Link do Botão"
+                                    wire:model.live="button_link"
+                                    type="text"
+                                    placeholder="/agenda ou https://exemplo.com"
+                                    :error="$errors->first('button_link')"
+                                    hint="Use as opções acima para caminhos internos. Caminhos como /agenda funcionam no ambiente local e em produção."
+                                />
+                            </div>
                         </div>
                     </div>
                 </x-admin.card>

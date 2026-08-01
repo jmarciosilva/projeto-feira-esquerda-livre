@@ -20,6 +20,7 @@ class BannerForm extends Component
     public string  $subtitle           = '';
     public string  $button_text        = '';
     public string  $button_link        = '';
+    public string  $button_link_preset = '';
     public int     $sort_order         = 0;
     public string  $start_date         = '';
     public string  $end_date           = '';
@@ -37,6 +38,7 @@ class BannerForm extends Component
             $this->subtitle           = $banner->subtitle ?? '';
             $this->button_text        = $banner->button_text ?? '';
             $this->button_link        = $banner->button_link ?? '';
+            $this->button_link_preset = $this->detectButtonLinkPreset($this->button_link);
             $this->sort_order         = $banner->sort_order;
             $this->start_date         = $banner->start_date?->format('Y-m-d') ?? '';
             $this->end_date           = $banner->end_date?->format('Y-m-d') ?? '';
@@ -57,9 +59,11 @@ class BannerForm extends Component
             'title'               => 'required|string|max:255',
             'image_upload'        => 'nullable|image|mimes:jpg,jpeg,png,gif,webp,svg',
             'mobile_image_upload' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp,svg',
-            'button_link'         => 'nullable|url|max:500',
+            'button_link'         => ['nullable', 'string', 'max:500', 'regex:/^(https?:\/\/|\/|#)/'],
             'start_date'          => 'nullable|date',
             'end_date'            => 'nullable|date|after_or_equal:start_date',
+        ], [
+            'button_link.regex' => 'Escolha uma opção da lista ou informe uma URL começando com https://, / ou #.',
         ]);
 
         $data = [
@@ -101,9 +105,58 @@ class BannerForm extends Component
         }
     }
 
+    public function updatedButtonLinkPreset(string $value): void
+    {
+        if ($value !== 'custom') {
+            $this->button_link = $value;
+        }
+    }
+
+    public function updatedButtonLink(string $value): void
+    {
+        $this->button_link_preset = $this->detectButtonLinkPreset($value);
+    }
+
+    /**
+     * @return array<int, array{label: string, value: string}>
+     */
+    public function buttonLinkOptions(): array
+    {
+        return [
+            ['label' => 'Home', 'value' => '/'],
+            ['label' => 'Agenda de feiras', 'value' => '/agenda'],
+            ['label' => 'Produtos', 'value' => '/produtos'],
+            ['label' => 'Serviços', 'value' => '/servicos'],
+            ['label' => 'Cuidados & Bem Viver', 'value' => '/cuidados'],
+            ['label' => 'Comunidade', 'value' => '/feed'],
+            ['label' => 'Seja um Expositor', 'value' => '/seja-um-expositor'],
+            ['label' => 'Marketplace na home', 'value' => '/#marketplace'],
+            ['label' => 'Próximas feiras na home', 'value' => '/#agenda'],
+            ['label' => 'Expositores na home', 'value' => '/#expositores'],
+            ['label' => 'Quem Somos / Sobre nós', 'value' => '/#sobre'],
+            ['label' => 'Notícias na home', 'value' => '/#noticias'],
+            ['label' => 'Contato', 'value' => '/contato'],
+        ];
+    }
+
+    private function detectButtonLinkPreset(?string $link): string
+    {
+        $link = trim((string) $link);
+
+        if ($link === '') {
+            return '';
+        }
+
+        $values = array_column($this->buttonLinkOptions(), 'value');
+
+        return in_array($link, $values, true) ? $link : 'custom';
+    }
+
     public function render(): \Illuminate\View\View
     {
-        return view('livewire.admin.banners.banner-form')
+        return view('livewire.admin.banners.banner-form', [
+            'buttonLinkOptions' => $this->buttonLinkOptions(),
+        ])
             ->layout('admin.layouts.app', ['title' => $this->banner ? 'Editar Banner' : 'Novo Banner']);
     }
 }

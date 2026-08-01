@@ -19,6 +19,19 @@
     --texto-escuro:   {{ $cd }};
     --texto-principal:#1A1A1A;
 }
+[x-cloak] { display: none !important; }
+.nav-link {
+    color: var(--texto-escuro);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s, color 0.2s;
+}
+.nav-link:hover {
+    background-color: rgba(61,48,0,0.1);
+    color: #000;
+}
 .btn-primary {
     background-color: {{ $cp }};
     color: #fff;
@@ -56,4 +69,19 @@
     gap: 0.5rem;
 }
 .btn-outline:hover { background-color: {{ $cp }}; color: #fff; }
+.section-title {
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    line-height: 1.15;
+    font-weight: 900;
+    color: {{ $cd }};
+    letter-spacing: 0;
+}
+.section-subtitle {
+    max-width: 42rem;
+    margin-left: auto;
+    margin-right: auto;
+    color: #5C4000;
+    font-size: 1rem;
+    line-height: 1.7;
+}
 </style>

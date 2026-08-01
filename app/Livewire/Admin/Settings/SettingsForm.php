@@ -133,7 +133,14 @@ class SettingsForm extends Component
             $this->sobre_imagem_path   = $data['sobre_imagem_path'];
         }
 
-        $service->save($data);
+        $setting = $service->save($data);
+
+        $this->logo_path         = $setting->logo_path;
+        $this->favicon_path      = $setting->favicon_path;
+        $this->sobre_imagem_path = $setting->sobre_imagem_path;
+        $this->logo_upload = null;
+        $this->favicon_upload = null;
+        $this->sobre_imagem_upload = null;
 
         $this->saved = true;
         $this->dispatch('saved');

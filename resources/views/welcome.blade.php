@@ -106,6 +106,24 @@
             background-color: rgba(61,48,0,0.1);
             color: #000;
         }
+
+        .hero-carousel {
+            min-height: clamp(420px, calc(100svh - 4rem), 620px);
+        }
+
+        .hero-content {
+            padding-bottom: clamp(2.75rem, 8svh, 5rem);
+        }
+
+        @media (max-height: 760px) and (min-width: 768px) {
+            .hero-carousel {
+                min-height: min(520px, calc(100svh - 4rem));
+            }
+
+            .hero-content {
+                padding-bottom: 2.5rem;
+            }
+        }
     </style>
 </head>
 <body class="bg-white text-gray-900 antialiased" style="font-size: 16px;">
@@ -171,7 +189,7 @@
                     <a href="{{ route('feed.index') }}" class="nav-link">Comunidade</a>
                     <a href="#noticias" class="nav-link">Notícias</a>
                     <a href="#sobre" class="nav-link">Sobre</a>
-                    <a href="#contato" class="nav-link">Contato</a>
+                    <a href="{{ route('contato') }}" class="nav-link">Contato</a>
                 </nav>
             @endif
 
@@ -288,7 +306,7 @@
                 Comunidade
             </a>
         @else
-            @foreach(['Início' => '#', 'Agenda' => '#agenda', 'Expositores' => '#expositores', 'Marketplace' => '#marketplace', 'Comunidade' => route('feed.index'), 'Notícias' => '#noticias', 'Sobre' => '#sobre', 'Contato' => '#contato'] as $label => $href)
+            @foreach(['Início' => '#', 'Agenda' => '#agenda', 'Expositores' => '#expositores', 'Marketplace' => '#marketplace', 'Comunidade' => route('feed.index'), 'Notícias' => '#noticias', 'Sobre' => '#sobre', 'Contato' => route('contato')] as $label => $href)
                 <a href="{{ $href }}"
                    class="flex items-center min-h-14 px-5 py-3.5 text-base font-semibold border-b transition-colors"
                    style="color: #3D3000; border-color: #F4E294;"
@@ -363,8 +381,7 @@
             go(i)  { this.current = i; clearInterval(this.timer); this.start(); }
         }"
         x-init="start()"
-        class="relative overflow-hidden bg-gray-900"
-        style="min-height: clamp(300px, 55vw, 680px);">
+        class="hero-carousel relative overflow-hidden bg-gray-900">
 
         @foreach($banners as $i => $banner)
             <div x-show="current === {{ $i }}"
@@ -405,21 +422,18 @@
 
                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
                 <div class="absolute inset-0 flex items-end">
-                    <div class="max-w-7xl mx-auto px-6 lg:px-8 pb-16 sm:pb-20 w-full">
-                        <h2 class="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-black text-white leading-tight max-w-2xl drop-shadow-lg">
+                    <div class="hero-content max-w-7xl mx-auto px-6 lg:px-8 w-full">
+                        <h2 class="text-3xl sm:text-4xl lg:text-5xl xl:text-[3.5rem] font-black text-white leading-[1.04] max-w-2xl drop-shadow-lg">
                             {{ $banner->title }}
                         </h2>
                         @if($banner->subtitle)
-                            <p class="mt-3 text-lg sm:text-xl text-gray-100 max-w-xl drop-shadow">
+                            <p class="mt-3 text-base sm:text-lg lg:text-xl text-gray-100 max-w-xl drop-shadow leading-relaxed">
                                 {{ $banner->subtitle }}
                             </p>
                         @endif
                         @if($banner->button_text && $banner->button_link)
-                            <a href="{{ $banner->button_link }}" class="mt-6 btn-primary inline-flex items-center gap-2 text-lg">
+                            <a href="{{ $banner->button_link }}" class="mt-5 btn-primary inline-flex items-center justify-center whitespace-nowrap text-base lg:text-lg">
                                 {{ $banner->button_text }}
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                                </svg>
                             </a>
                         @endif
                     </div>
@@ -537,8 +551,19 @@
 
         <div class="text-center mb-10">
             <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
-            <h2 class="section-title">✊ Os Três Eixos da Feira</h2>
-            <p class="section-subtitle">Conheça as frentes da nossa economia solidária</p>
+            <h2 class="section-title inline-flex items-center justify-center gap-3">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-9 w-auto object-contain"
+                         loading="lazy">
+                @else
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black"
+                          style="background:#F4E294; color:#3D3000;">F</span>
+                @endif
+                <span>Explore a Feira por Categorias</span>
+            </h2>
+            <p class="section-subtitle">Tudo que a feira oferece, organizado para você</p>
         </div>
 
         @php
@@ -566,23 +591,34 @@
 </section>
 
 {{-- ====================== SEÇÃO 3: PRÓXIMAS FEIRAS ====================== --}}
-<section id="agenda" class="py-16 md:py-24" style="background-color: #FDF8DC;">
+<section id="agenda" class="py-12 md:py-16 xl:py-20" style="background-color: #FDF8DC;">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div class="text-center mb-10">
+        <div class="text-center mb-8">
             <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
-            <h2 class="section-title">🗓 Próximas Feiras</h2>
+            <h2 class="section-title inline-flex items-center justify-center gap-3">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-9 w-auto object-contain"
+                         loading="lazy">
+                @else
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black"
+                          style="background:#F4E294; color:#3D3000;">F</span>
+                @endif
+                <span>Próximas Feiras</span>
+            </h2>
             <p class="section-subtitle">Encontre uma edição perto de você</p>
         </div>
 
         @if($upcomingEvents->isNotEmpty())
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
                 @foreach($upcomingEvents as $event)
-                    <article class="bg-white rounded-2xl overflow-hidden shadow-md card-hover border"
+                    <article class="bg-white rounded-2xl overflow-hidden shadow-md card-hover border flex flex-col"
                              style="border-color: #F4E294;">
 
                         {{-- Imagem --}}
-                        <div class="relative h-52 sm:h-56">
+                        <div class="relative h-40 md:h-44 xl:h-48">
                             @if($event->image_path)
                                 <img src="{{ Storage::url($event->image_path) }}"
                                      alt="{{ $event->title }}"
@@ -602,18 +638,18 @@
                             </div>
                         </div>
 
-                        <div class="p-5">
+                        <div class="p-5 flex flex-1 flex-col">
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="text-sm font-semibold px-2.5 py-1 rounded-full"
                                       style="background-color: #FDF8DC; color: #7A5C00;">
                                     📍 {{ $event->city }}@if($event->state), {{ $event->state }}@endif
                                 </span>
                             </div>
-                            <h3 class="text-lg font-bold leading-snug mb-2" style="color: #1A1A1A;">
+                            <h3 class="text-base lg:text-lg font-bold leading-snug mb-2 line-clamp-2" style="color: #1A1A1A;">
                                 {{ $event->title }}
                             </h3>
                             @if($event->address)
-                                <p class="text-sm text-gray-500 mb-4 flex items-start gap-1">
+                                <p class="text-sm text-gray-500 mb-4 flex items-start gap-1 line-clamp-2">
                                     <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -622,7 +658,7 @@
                                 </p>
                             @endif
                             <a href="{{ route('agenda.show', $event->slug) }}"
-                               class="btn-primary w-full text-center text-sm py-3">
+                               class="btn-primary w-full text-center text-sm py-3 mt-auto">
                                 Saiba Mais
                             </a>
                         </div>
@@ -641,24 +677,35 @@
 </section>
 
 {{-- ====================== SEÇÃO 4: EXPOSITORES ====================== --}}
-<section id="expositores" class="py-16 md:py-24 bg-white">
+<section id="expositores" class="py-12 md:py-16 xl:py-20 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div class="text-center mb-10">
+        <div class="text-center mb-8">
             <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
-            <h2 class="section-title">🏪 Expositores em Destaque</h2>
+            <h2 class="section-title inline-flex items-center justify-center gap-3">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-9 w-auto object-contain"
+                         loading="lazy">
+                @else
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black"
+                          style="background:#F4E294; color:#3D3000;">F</span>
+                @endif
+                <span>Expositores em Destaque</span>
+            </h2>
             <p class="section-subtitle">Conheça quem faz a feira acontecer</p>
         </div>
 
         @if($featuredExpositores->isNotEmpty())
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
                 @foreach($featuredExpositores as $expositor)
                     <a href="{{ route('loja.show', $expositor->slug) }}"
                        class="bg-white rounded-2xl overflow-hidden shadow-md card-hover border flex flex-col"
                        style="border-color: #F0D060;">
 
                         {{-- Imagem de capa --}}
-                        <div class="relative h-44 overflow-hidden">
+                        <div class="relative h-36 md:h-40 xl:h-44 overflow-hidden">
                             @if($expositor->image_path)
                                 <img src="{{ Storage::url($expositor->image_path) }}"
                                      alt="{{ $expositor->name }}"
@@ -673,7 +720,7 @@
 
                             {{-- Logo sobreposto --}}
                             @if($expositor->logo_path)
-                                <div class="absolute bottom-3 left-4 w-14 h-14 rounded-full overflow-hidden border-2 shadow-md"
+                                <div class="absolute bottom-3 left-4 w-12 h-12 rounded-full overflow-hidden border-2 shadow-md"
                                      style="border-color: #F4E294; background: white;">
                                     <img src="{{ Storage::url($expositor->logo_path) }}"
                                          alt="{{ $expositor->name }}"
@@ -684,11 +731,11 @@
                         </div>
 
                         <div class="p-4 flex flex-col flex-1">
-                            <h3 class="text-base font-bold leading-snug mb-1" style="color: #1A1A1A;">
+                            <h3 class="text-base font-bold leading-snug mb-1 line-clamp-2" style="color: #1A1A1A;">
                                 {{ $expositor->name }}
                             </h3>
                             @if($expositor->city || $expositor->state)
-                                <p class="text-xs text-gray-500 mb-3 flex items-center gap-1">
+                                <p class="text-xs text-gray-500 mb-3 flex items-center gap-1 line-clamp-1">
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -704,8 +751,16 @@
                 @endforeach
             </div>
         @else
-            <div class="text-center py-16">
-                <div class="text-6xl mb-4">🏪</div>
+            <div class="text-center py-12">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-12 w-auto object-contain mx-auto mb-4 opacity-80"
+                         loading="lazy">
+                @else
+                    <div class="inline-flex h-12 w-12 items-center justify-center rounded-full text-base font-black mb-4"
+                         style="background:#F4E294; color:#3D3000;">F</div>
+                @endif
                 <p class="text-xl font-semibold" style="color: #7A5C00;">Em breve, expositores em destaque!</p>
             </div>
         @endif
@@ -714,17 +769,28 @@
 </section>
 
 {{-- ====================== SEÇÃO 5: PRODUTOS ====================== --}}
-<section id="marketplace" class="py-16 md:py-24" style="background-color: #FDF8DC;">
+<section id="marketplace" class="py-12 md:py-16 xl:py-20" style="background-color: #FDF8DC;">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div class="text-center mb-10">
+        <div class="text-center mb-8">
             <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
-            <h2 class="section-title">🛍 Produtos em Destaque</h2>
-            <p class="section-subtitle">Artesanato, alimentos e arte diretamente dos produtores</p>
+            <h2 class="section-title inline-flex items-center justify-center gap-3">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-9 w-auto object-contain"
+                         loading="lazy">
+                @else
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black"
+                          style="background:#F4E294; color:#3D3000;">F</span>
+                @endif
+                <span>Produtos em Destaque</span>
+            </h2>
+            <p class="section-subtitle">Artesanato, alimentos, livros e arte direto de quem produz com as próprias mãos</p>
         </div>
 
         @if($featuredProducts->isNotEmpty())
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 lg:gap-5">
                 @foreach($featuredProducts as $product)
                     @if($product->expositor)
                     <a href="{{ route('loja.produto', [$product->expositor->slug, $product->slug]) }}"
@@ -751,7 +817,7 @@
                         </div>
 
                         <div class="p-3 sm:p-4 flex flex-col flex-1">
-                            <h3 class="text-sm sm:text-base font-bold leading-snug mb-1 flex-1" style="color: #1A1A1A;">
+                            <h3 class="text-sm sm:text-base font-bold leading-snug mb-1 flex-1 line-clamp-2" style="color: #1A1A1A;">
                                 {{ $product->name }}
                             </h3>
                             @if($product->price)
@@ -760,7 +826,7 @@
                                 </p>
                             @endif
                             @if($product->expositor)
-                                <p class="text-xs text-gray-500 mb-3 flex items-center gap-1">
+                                <p class="text-xs text-gray-500 mb-3 flex items-center gap-1 line-clamp-1">
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
                                     </svg>
@@ -781,12 +847,20 @@
             </div>
             <div class="text-center mt-8">
                 <a href="{{ route('catalogo.produto') }}" class="btn-outline px-8 py-3">
-                    Ver todos os Produtos →
+                    Ver todos os Produtos
                 </a>
             </div>
         @else
-            <div class="text-center py-16">
-                <div class="text-6xl mb-4">🛍</div>
+            <div class="text-center py-12">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-12 w-auto object-contain mx-auto mb-4 opacity-80"
+                         loading="lazy">
+                @else
+                    <div class="inline-flex h-12 w-12 items-center justify-center rounded-full text-base font-black mb-4"
+                         style="background:#F4E294; color:#3D3000;">F</div>
+                @endif
                 <p class="text-xl font-semibold" style="color: #7A5C00;">Produtos chegando em breve!</p>
             </div>
         @endif
@@ -795,13 +869,24 @@
 </section>
 
 {{-- ====================== SEÇÃO 5b: SERVIÇOS ====================== --}}
-<section id="servicos" class="py-16 md:py-24 bg-white">
+<section id="servicos" class="py-12 md:py-16 xl:py-20 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div class="text-center mb-10">
+        <div class="text-center mb-8">
             <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
-            <h2 class="section-title">🎯 Serviços em Destaque</h2>
-            <p class="section-subtitle">Design, aulas e consultorias de quem trabalha com propósito</p>
+            <h2 class="section-title inline-flex items-center justify-center gap-3">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-9 w-auto object-contain"
+                         loading="lazy">
+                @else
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black"
+                          style="background:#F4E294; color:#3D3000;">F</span>
+                @endif
+                <span>Serviços em Destaque</span>
+            </h2>
+            <p class="section-subtitle">Design, comunicação, aulas e consultorias para fortalecer coletivos e negócios</p>
         </div>
 
         @if($featuredServicos->isNotEmpty())
@@ -849,7 +934,7 @@
                             </div>
                             @endif
 
-                            <h3 class="text-sm sm:text-base font-bold leading-snug mb-1 flex-1" style="color: #1A1A1A;">
+                            <h3 class="text-sm sm:text-base font-bold leading-snug mb-1 flex-1 line-clamp-2" style="color: #1A1A1A;">
                                 {{ $item->name }}
                             </h3>
 
@@ -870,7 +955,7 @@
                             </div>
 
                             @if($item->expositor)
-                                <p class="text-xs text-gray-500 mb-3 flex items-center gap-1">
+                                <p class="text-xs text-gray-500 mb-3 flex items-center gap-1 line-clamp-1">
                                     <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                                     </svg>
@@ -892,12 +977,20 @@
 
             <div class="text-center mt-8">
                 <a href="{{ route('catalogo.servico') }}" class="btn-outline px-8 py-3">
-                    Ver todos os Serviços →
+                    Ver todos os Serviços
                 </a>
             </div>
         @else
-            <div class="text-center py-16">
-                <div class="text-6xl mb-4">🎯</div>
+            <div class="text-center py-12">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-12 w-auto object-contain mx-auto mb-4 opacity-80"
+                         loading="lazy">
+                @else
+                    <div class="inline-flex h-12 w-12 items-center justify-center rounded-full text-base font-black mb-4"
+                         style="background:#F4E294; color:#3D3000;">F</div>
+                @endif
                 <p class="text-xl font-semibold" style="color: #7A5C00;">Serviços chegando em breve!</p>
             </div>
         @endif
@@ -906,13 +999,24 @@
 </section>
 
 {{-- ====================== SEÇÃO 5c: CUIDADO & BEM VIVER ====================== --}}
-<section id="cuidado" class="py-16 md:py-24" style="background-color: #FDF8DC;">
+<section id="cuidado" class="py-12 md:py-16 xl:py-20" style="background-color: #FDF8DC;">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div class="text-center mb-10">
+        <div class="text-center mb-8">
             <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
-            <h2 class="section-title">🌿 Cuidado & Bem Viver</h2>
-            <p class="section-subtitle">Massagens, terapias e práticas integrativas para corpo e mente</p>
+            <h2 class="section-title inline-flex items-center justify-center gap-3">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-9 w-auto object-contain"
+                         loading="lazy">
+                @else
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black"
+                          style="background:#F4E294; color:#3D3000;">F</span>
+                @endif
+                <span>Cuidado & Bem Viver</span>
+            </h2>
+            <p class="section-subtitle">Massagens, terapias e práticas integrativas para o bem viver de corpo e mente</p>
         </div>
 
         @if($featuredCuidados->isNotEmpty())
@@ -958,7 +1062,7 @@
                             </div>
                             @endif
 
-                            <h3 class="text-sm sm:text-base font-bold leading-snug mb-1 flex-1" style="color: #1A1A1A;">
+                            <h3 class="text-sm sm:text-base font-bold leading-snug mb-1 flex-1 line-clamp-2" style="color: #1A1A1A;">
                                 {{ $item->name }}
                             </h3>
 
@@ -978,7 +1082,7 @@
                             </div>
 
                             @if($item->expositor)
-                                <p class="text-xs text-gray-500 mb-3 flex items-center gap-1">
+                                <p class="text-xs text-gray-500 mb-3 flex items-center gap-1 line-clamp-1">
                                     <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                                     </svg>
@@ -1000,12 +1104,20 @@
 
             <div class="text-center mt-8">
                 <a href="{{ route('catalogo.cuidado') }}" class="btn-outline px-8 py-3">
-                    Ver todo Cuidado & Bem Viver →
+                    Ver todo Cuidado & Bem Viver
                 </a>
             </div>
         @else
-            <div class="text-center py-16">
-                <div class="text-6xl mb-4">🌿</div>
+            <div class="text-center py-12">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-12 w-auto object-contain mx-auto mb-4 opacity-80"
+                         loading="lazy">
+                @else
+                    <div class="inline-flex h-12 w-12 items-center justify-center rounded-full text-base font-black mb-4"
+                         style="background:#F4E294; color:#3D3000;">F</div>
+                @endif
                 <p class="text-xl font-semibold" style="color: #7A5C00;">Práticas de cuidado chegando em breve!</p>
             </div>
         @endif
@@ -1014,23 +1126,34 @@
 </section>
 
 {{-- ====================== SEÇÃO 6: NOTÍCIAS ====================== --}}
-<section id="noticias" class="py-16 md:py-24 bg-white">
+<section id="noticias" class="py-12 md:py-16 xl:py-20 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div class="text-center mb-10">
+        <div class="text-center mb-8">
             <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
-            <h2 class="section-title">📰 Notícias e Blog</h2>
-            <p class="section-subtitle">Fique por dentro do movimento</p>
+            <h2 class="section-title inline-flex items-center justify-center gap-3">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-9 w-auto object-contain"
+                         loading="lazy">
+                @else
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black"
+                          style="background:#F4E294; color:#3D3000;">F</span>
+                @endif
+                <span>Notícias e Blog</span>
+            </h2>
+            <p class="section-subtitle">Atualizações, histórias e conteúdos para acompanhar o movimento da feira</p>
         </div>
 
         @if($latestPosts->isNotEmpty())
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
 
                 {{-- Post destaque --}}
                 @php $featured = $latestPosts->first(); @endphp
                 <article class="md:col-span-2 lg:col-span-1 lg:row-span-2 bg-white rounded-2xl overflow-hidden shadow-md card-hover border flex flex-col"
                          style="border-color: #F0D060;">
-                    <div class="h-56 sm:h-64 md:h-72 overflow-hidden">
+                    <div class="h-44 md:h-48 xl:h-56 overflow-hidden">
                         @if($featured->image_path)
                             <img src="{{ Storage::url($featured->image_path) }}"
                                  alt="{{ $featured->title }}"
@@ -1038,28 +1161,36 @@
                                  loading="lazy">
                         @else
                             <div class="w-full h-full img-placeholder flex-col gap-2">
-                                <span class="text-5xl">📰</span>
+                                @if($settings->logo_path)
+                                    <img src="{{ Storage::url($settings->logo_path) }}"
+                                         alt=""
+                                         class="h-12 w-auto object-contain opacity-80"
+                                         loading="lazy">
+                                @else
+                                    <span class="inline-flex h-12 w-12 items-center justify-center rounded-full text-base font-black"
+                                          style="background:#F4E294; color:#3D3000;">F</span>
+                                @endif
                                 <span>Notícia em destaque</span>
                             </div>
                         @endif
                     </div>
-                    <div class="p-5 sm:p-6 flex flex-col flex-1">
+                    <div class="p-5 flex flex-col flex-1">
                         <span class="text-xs font-bold uppercase tracking-widest mb-3 px-2.5 py-1 rounded-full w-fit"
                               style="background-color: #F4E294; color: #3D3000;">
                             {{ $featured->type?->value === 'news' ? 'Notícia' : 'Blog' }}
                         </span>
-                        <h3 class="text-xl font-black leading-snug mb-3 flex-1" style="color: #1A1A1A;">
+                        <h3 class="text-lg lg:text-xl font-black leading-snug mb-3 flex-1 line-clamp-3" style="color: #1A1A1A;">
                             {{ $featured->title }}
                         </h3>
                         @if($featured->excerpt)
-                            <p class="text-gray-600 text-sm leading-relaxed mb-4">
-                                {{ Str::limit($featured->excerpt, 160) }}
+                            <p class="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-3">
+                                {{ Str::limit($featured->excerpt, 140) }}
                             </p>
                         @endif
                         <div class="flex items-center justify-between mt-auto pt-3 border-t" style="border-color: #F4E294;">
                             <span class="text-xs text-gray-400">{{ $featured->published_at?->format('d/m/Y') }}</span>
-                            <a href="{{ route('blog.show', $featured->slug) }}" class="btn-primary text-sm py-2 px-4" style="min-height: 36px;">
-                                Ler mais →
+                            <a href="{{ route('blog.show', $featured->slug) }}" class="btn-primary text-sm py-2 px-4 whitespace-nowrap" style="min-height: 36px;">
+                                Ler mais
                             </a>
                         </div>
                     </div>
@@ -1069,7 +1200,7 @@
                 @foreach($latestPosts->skip(1) as $post)
                     <article class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col sm:flex-row md:flex-col"
                              style="border-color: #F0D060;">
-                        <div class="h-40 sm:w-36 sm:h-auto sm:shrink-0 md:w-auto md:h-36 overflow-hidden">
+                        <div class="h-36 sm:w-32 sm:h-auto sm:shrink-0 md:w-auto md:h-32 overflow-hidden">
                             @if($post->image_path)
                                 <img src="{{ Storage::url($post->image_path) }}"
                                      alt="{{ $post->title }}"
@@ -1077,7 +1208,15 @@
                                      loading="lazy">
                             @else
                                 <div class="w-full h-full img-placeholder flex-col gap-1">
-                                    <span class="text-3xl">📰</span>
+                                    @if($settings->logo_path)
+                                        <img src="{{ Storage::url($settings->logo_path) }}"
+                                             alt=""
+                                             class="h-8 w-auto object-contain opacity-80"
+                                             loading="lazy">
+                                    @else
+                                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-black"
+                                              style="background:#F4E294; color:#3D3000;">F</span>
+                                    @endif
                                 </div>
                             @endif
                         </div>
@@ -1086,14 +1225,14 @@
                                   style="background-color: #FDF8DC; color: #7A5C00;">
                                 {{ $post->type?->value === 'news' ? 'Notícia' : 'Blog' }}
                             </span>
-                            <h3 class="text-sm sm:text-base font-bold leading-snug mb-2 flex-1" style="color: #1A1A1A;">
+                            <h3 class="text-sm sm:text-base font-bold leading-snug mb-2 flex-1 line-clamp-2" style="color: #1A1A1A;">
                                 {{ Str::limit($post->title, 70) }}
                             </h3>
                             <div class="flex items-center justify-between mt-auto">
                                 <span class="text-xs text-gray-400">{{ $post->published_at?->format('d/m/Y') }}</span>
                                 <a href="{{ route('blog.show', $post->slug) }}" class="text-sm font-semibold transition-colors" style="color: #C47A00;"
                                    onmouseover="this.style.color='#7A5C00'" onmouseout="this.style.color='#C47A00'">
-                                    Ler mais →
+                                    Ler mais
                                 </a>
                             </div>
                         </div>
@@ -1102,8 +1241,16 @@
 
             </div>
         @else
-            <div class="text-center py-16">
-                <div class="text-6xl mb-4">📰</div>
+            <div class="text-center py-12">
+                @if($settings->logo_path)
+                    <img src="{{ Storage::url($settings->logo_path) }}"
+                         alt=""
+                         class="h-12 w-auto object-contain mx-auto mb-4 opacity-80"
+                         loading="lazy">
+                @else
+                    <div class="inline-flex h-12 w-12 items-center justify-center rounded-full text-base font-black mb-4"
+                         style="background:#F4E294; color:#3D3000;">F</div>
+                @endif
                 <p class="text-xl font-semibold" style="color: #7A5C00;">Publicações em breve!</p>
             </div>
         @endif
@@ -1111,15 +1258,68 @@
     </div>
 </section>
 
-{{-- ====================== SEÇÃO 7: NEWSLETTER ====================== --}}
-<section id="newsletter" class="py-16 md:py-20" style="background-color: #F4E294;">
+{{-- ====================== SEÇÃO 7: CTA EXPOSITORES ====================== --}}
+<section id="expositores-cta" class="py-12 md:py-16 xl:py-20" style="background-color: #FDF8DC;">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
 
-        <div class="text-5xl mb-4">✉️</div>
-        <h2 class="text-3xl sm:text-4xl font-black mb-2" style="color: #3D3000;">
-            Fique por Dentro das Novidades
+        <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
+        <h2 class="section-title inline-flex items-center justify-center gap-3">
+            @if($settings->logo_path)
+                <img src="{{ Storage::url($settings->logo_path) }}"
+                     alt=""
+                     class="h-9 w-auto object-contain"
+                     loading="lazy">
+            @else
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black"
+                      style="background:#F4E294; color:#3D3000;">F</span>
+            @endif
+            <span>Quer vender seus produtos em nossa feira?</span>
         </h2>
-        <p class="text-lg mb-8" style="color: #5C4000;">
+        <p class="section-subtitle mb-8">
+            Faça parte de um movimento de economia solidária e conecte-se com pessoas que valorizam produção local, artesanato e cultura popular.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href="{{ route('seja-um-expositor') }}"
+               class="btn-primary px-8 py-3 text-base whitespace-nowrap"
+               style="min-height: 48px;">
+                Quero ser Expositor
+            </a>
+            <a href="{{ route('contato') }}"
+               class="btn-outline px-8 py-3 text-base whitespace-nowrap"
+               style="min-height: 48px; background-color: #fff;">
+                Enviar mensagem por e-mail
+            </a>
+            @if($settings->whatsapp)
+                <a href="https://wa.me/55{{ preg_replace('/\D/', '', $settings->whatsapp) }}"
+                   target="_blank"
+                   class="btn-secondary px-8 py-3 text-base whitespace-nowrap"
+                   style="min-height: 48px;">
+                    Falar no WhatsApp
+                </a>
+            @endif
+        </div>
+    </div>
+</section>
+
+{{-- ====================== SEÇÃO 8: NEWSLETTER ====================== --}}
+<section id="newsletter" class="py-12 md:py-16 xl:py-20" style="background-color: #F4E294;">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+
+        <div class="w-12 h-1.5 rounded-full mx-auto mb-4" style="background-color: #E8A000;"></div>
+        <h2 class="section-title inline-flex items-center justify-center gap-3">
+            @if($settings->logo_path)
+                <img src="{{ Storage::url($settings->logo_path) }}"
+                     alt=""
+                     class="h-9 w-auto object-contain"
+                     loading="lazy">
+            @else
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black"
+                      style="background:#FDF8DC; color:#3D3000;">F</span>
+            @endif
+            <span>Fique por Dentro das Novidades</span>
+        </h2>
+        <p class="section-subtitle mb-8" style="color: #5C4000;">
             Receba em primeira mão informações sobre as próximas feiras, novos expositores e conteúdos exclusivos.
         </p>
 
@@ -1132,14 +1332,14 @@
 
         <form action="{{ route('newsletter.subscribe') }}" method="POST">
             @csrf
-            <div class="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto">
+            <div class="flex flex-col sm:flex-row gap-3 max-w-3xl mx-auto">
                 <input type="text"
                        name="name"
                        placeholder="Seu nome"
                        required
                        value="{{ old('name') }}"
-                       class="flex-1 px-5 py-4 rounded-xl text-base font-medium border-2 focus:outline-none focus:ring-0 transition-colors"
-                       style="border-color: #E8A000; background: white; color: #1A1A1A; min-height: 56px;"
+                       class="flex-1 px-4 py-3 rounded-xl text-base font-medium border-2 focus:outline-none focus:ring-0 transition-colors"
+                       style="border-color: #E8A000; background: white; color: #1A1A1A; min-height: 48px;"
                        onfocus="this.style.borderColor='#C47A00'"
                        onblur="this.style.borderColor='#E8A000'">
                 <input type="email"
@@ -1147,13 +1347,13 @@
                        placeholder="Seu melhor e-mail"
                        required
                        value="{{ old('email') }}"
-                       class="flex-1 px-5 py-4 rounded-xl text-base font-medium border-2 focus:outline-none focus:ring-0 transition-colors"
-                       style="border-color: #E8A000; background: white; color: #1A1A1A; min-height: 56px;"
+                       class="flex-1 px-4 py-3 rounded-xl text-base font-medium border-2 focus:outline-none focus:ring-0 transition-colors"
+                       style="border-color: #E8A000; background: white; color: #1A1A1A; min-height: 48px;"
                        onfocus="this.style.borderColor='#C47A00'"
                        onblur="this.style.borderColor='#E8A000'">
                 <button type="submit"
-                        class="btn-secondary px-8 py-4 text-base whitespace-nowrap"
-                        style="min-height: 56px;">
+                        class="btn-secondary px-6 py-3 text-base whitespace-nowrap"
+                        style="min-height: 48px;">
                     Receber Novidades
                 </button>
             </div>
@@ -1165,36 +1365,6 @@
             @enderror
         </form>
 
-    </div>
-</section>
-
-{{-- ====================== SEÇÃO 8: CTA EXPOSITORES ====================== --}}
-<section id="expositores-cta" class="relative py-20 md:py-28 overflow-hidden">
-    <div class="absolute inset-0"
-         style="background: linear-gradient(135deg, #3D3000 0%, #7A5C00 40%, #C47A00 100%);"></div>
-    <div class="absolute inset-0 opacity-10"
-         style="background-image: url('data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"60\" height=\"60\"><circle cx=\"30\" cy=\"30\" r=\"20\" fill=\"%23F4E294\" opacity=\"0.3\"/></svg>');"></div>
-
-    <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <div class="text-6xl mb-6">🤝</div>
-        <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight mb-4">
-            Quer vender seus produtos em nossa feira?
-        </h2>
-        <p class="text-lg sm:text-xl mb-8 max-w-2xl mx-auto" style="color: #F4E294;">
-            Faça parte de um movimento de economia solidária e conecte-se com milhares de pessoas que valorizam a produção local, o artesanato e a cultura popular.
-        </p>
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="{{ route('seja-um-expositor') }}" class="btn-primary text-lg px-10 py-4" style="min-height: 60px; background-color: #F4E294; color: #3D3000;">
-                🤝 Quero ser Expositor
-            </a>
-            @if($settings->whatsapp)
-                <a href="https://wa.me/55{{ preg_replace('/\D/', '', $settings->whatsapp) }}"
-                   target="_blank"
-                   class="btn-secondary text-lg px-10 py-4" style="min-height: 60px;">
-                    💬 Falar no WhatsApp
-                </a>
-            @endif
-        </div>
     </div>
 </section>
 
@@ -1233,7 +1403,7 @@
                     Links Rápidos
                 </h3>
                 <ul class="space-y-2.5">
-                    @foreach(['Início' => '#', 'Agenda' => '#agenda', 'Marketplace' => '#marketplace', 'Notícias' => '#noticias', 'Sobre' => '#sobre'] as $label => $href)
+                    @foreach(['Início' => '#', 'Agenda' => '#agenda', 'Marketplace' => '#marketplace', 'Notícias' => '#noticias', 'Sobre' => '#sobre', 'Contato' => route('contato')] as $label => $href)
                         <li>
                             <a href="{{ $href }}"
                                class="text-sm font-medium transition-colors"
@@ -1362,6 +1532,7 @@
     </div>
 </footer>
 
+@include('partials.back-to-top')
 @livewireScripts
 </body>
 </html>

@@ -55,6 +55,7 @@ use App\Livewire\Lojista\Pedidos\PedidoIndex as LojistaPedidoIndex;
 use App\Livewire\Lojista\Produtos\ProdutoForm;
 use App\Livewire\Lojista\Produtos\ProdutoIndex;
 use App\Mail\LojistaSolicitacaoRecebida;
+use App\Mail\ContatoMensagemRecebida;
 use App\Models\Banner;
 use App\Models\ContentCategory;
 use App\Models\Event;
@@ -115,6 +116,50 @@ Route::post('/newsletter', function (Request $request) {
 
     return back()->with('newsletter_success', 'Obrigado! Você foi inscrito com sucesso.');
 })->name('newsletter.subscribe');
+
+// ─── Contato público ─────────────────────────────────────────────────────────
+Route::get('/contato', function () {
+    $settings = SiteSetting::instance();
+
+    return view('contato', compact('settings'));
+})->name('contato');
+
+Route::post('/contato', function (Request $request) {
+    $validated = $request->validate([
+        'name' => 'required|string|max:120',
+        'email' => 'required|email|max:255',
+        'phone' => 'nullable|string|max:30',
+        'subject' => 'required|string|max:150',
+        'message' => 'required|string|min:10|max:3000',
+        'website' => 'nullable|size:0',
+    ], [
+        'name.required' => 'Informe seu nome.',
+        'email.required' => 'Informe seu e-mail.',
+        'email.email' => 'Informe um e-mail válido.',
+        'subject.required' => 'Informe o assunto.',
+        'message.required' => 'Escreva sua mensagem.',
+        'message.min' => 'A mensagem deve ter pelo menos 10 caracteres.',
+        'website.size' => 'Não foi possível enviar sua mensagem. Tente novamente.',
+    ]);
+
+    $settings = SiteSetting::instance();
+    $recipient = $settings->email
+        ?: $settings->mail_from_address
+        ?: config('mail.from.address')
+        ?: 'contato@feiraesquerdalivre.com.br';
+
+    try {
+        Mail::to($recipient)->send(new ContatoMensagemRecebida($validated));
+    } catch (Throwable $exception) {
+        report($exception);
+
+        return back()
+            ->withInput()
+            ->with('contato_error', 'Não foi possível enviar sua mensagem agora. Tente novamente em alguns instantes.');
+    }
+
+    return back()->with('contato_success', 'Mensagem enviada com sucesso! Nossa equipe retornará em breve.');
+})->name('contato.enviar');
 
 // ─── Catálogo público por eixo ────────────────────────────────────────────────
 foreach (['produtos' => 'produto', 'servicos' => 'servico', 'cuidados' => 'cuidado'] as $slug => $tipo) {
