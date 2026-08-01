@@ -40,7 +40,7 @@ class ExpositorVisibilityService
 
     private function buildSelection(): Collection
     {
-        $totalSlots   = (int) config('app.home_expositores_count', 8);
+        $totalSlots   = (int) config('app.home_expositores_count', 9);
         $featuredMax  = (int) config('app.home_featured_max', 2);
 
         // 1. Destaques pagos ativos

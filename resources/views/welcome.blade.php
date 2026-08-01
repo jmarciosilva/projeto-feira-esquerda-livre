@@ -618,11 +618,12 @@
                              style="border-color: #F4E294;">
 
                         {{-- Imagem --}}
-                        <div class="relative h-40 md:h-44 xl:h-48">
+                        <div class="relative h-40 md:h-44 xl:h-48 overflow-hidden"
+                             style="background: linear-gradient(135deg, #FFF8DC 0%, #F4E294 100%);">
                             @if($event->image_path)
                                 <img src="{{ Storage::url($event->image_path) }}"
                                      alt="{{ $event->title }}"
-                                     class="w-full h-full object-cover"
+                                     class="w-full h-full object-contain p-2"
                                      loading="lazy">
                             @else
                                 <div class="w-full h-full img-placeholder flex-col gap-2">

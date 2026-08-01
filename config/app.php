@@ -54,6 +54,12 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'home_expositores_count' => env('HOME_EXPOSITORES_COUNT', 9),
+
+    'home_featured_max' => env('HOME_FEATURED_MAX', 2),
+
+    'home_cache_ttl_minutes' => env('HOME_CACHE_TTL_MINUTES', 5),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

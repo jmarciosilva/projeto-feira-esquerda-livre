@@ -93,8 +93,8 @@ Route::get('/', function () {
     $sessionHash = hash('sha256', session()->getId());
     $featuredExpositores = app(ExpositorVisibilityService::class)->selectForHome($sessionHash);
     $featuredProducts = Product::featured()->where('item_type', 'produto')->with('expositor')->limit(10)->get();
-    $featuredServicos = Product::featured()->where('item_type', 'servico')->with('expositor')->limit(10)->get();
-    $featuredCuidados = Product::featured()->where('item_type', 'cuidado')->with('expositor')->limit(10)->get();
+    $featuredServicos = Product::featured()->where('item_type', 'servico')->with('expositor')->limit(12)->get();
+    $featuredCuidados = Product::featured()->where('item_type', 'cuidado')->with('expositor')->limit(12)->get();
     $latestPosts = Post::published()->orderByDesc('published_at')->limit(5)->get();
 
     return view('welcome', compact(

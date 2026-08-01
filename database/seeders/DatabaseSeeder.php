@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             BannerSeeder::class,
             EventSeeder::class,
             ExpositorSeeder::class,
+            DemoExpositorImageSeeder::class,
             ContentCategorySeeder::class,
             ProductSeeder::class,
             PostSeeder::class,
@@ -23,6 +24,9 @@ class DatabaseSeeder extends Seeder
             ExpositorUserSeeder::class,
             ServicoSeeder::class,
             CuidadoSeeder::class,
+            DemoProductSeeder::class,
+            DemoProductImageSeeder::class,
+            DemoFeedPostSeeder::class,
         ]);
     }
 }

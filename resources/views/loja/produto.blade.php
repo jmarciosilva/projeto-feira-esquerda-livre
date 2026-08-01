@@ -15,6 +15,13 @@
             : route('loja.produto.share-preview', [$expositor->slug, $product->slug]);
         $sharePrice = $product->price ? 'R$ ' . number_format((float) $product->price, 2, ',', '.') : 'valor sob consulta';
         $shareText = "Conheça {$product->name} por {$sharePrice} na loja {$expositor->name}: {$productUrl}";
+        $returnTo = request()->query('return_to');
+        $returnTo = $returnTo && parse_url($returnTo, PHP_URL_HOST) === request()->getHost()
+            ? $returnTo
+            : null;
+        $storeUrl = route('loja.show', $returnTo
+            ? [$expositor->slug, 'return_to' => $returnTo]
+            : [$expositor->slug]);
     @endphp
     <title>{{ $product->name }} — {{ $expositor->name }} — Feira Esquerda Livre</title>
     <meta name="description" content="{{ $productDescription }}">
@@ -42,7 +49,7 @@
 {{-- Navbar --}}
 <nav class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100 shadow-sm">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-        <a href="{{ route('loja.show', $expositor->slug) }}"
+        <a href="{{ $storeUrl }}"
            class="flex items-center gap-2 font-bold text-base" style="color: var(--texto-escuro, #3D3000);">
             @include('partials.site-logo')
             ← {{ $expositor->name }}
@@ -58,7 +65,7 @@
     <p class="text-sm text-gray-400">
         <a href="{{ url('/') }}" class="hover:underline">Início</a>
         <span class="mx-1.5">›</span>
-        <a href="{{ route('loja.show', $expositor->slug) }}" class="hover:underline">{{ $expositor->name }}</a>
+        <a href="{{ $storeUrl }}" class="hover:underline">{{ $expositor->name }}</a>
         <span class="mx-1.5">›</span>
         <span class="text-gray-600">{{ $product->name }}</span>
     </p>
@@ -195,7 +202,7 @@
                 {{-- Vendedor --}}
                 <div class="mt-6 pt-5 border-t border-gray-100">
                     <p class="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-3">Vendido por</p>
-                    <a href="{{ route('loja.show', $expositor->slug) }}" class="flex items-center gap-3 group">
+                    <a href="{{ $storeUrl }}" class="flex items-center gap-3 group">
                         <div class="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0" style="background: #F4E294;">
                             @if($expositor->logo_path)
                             <img src="{{ Storage::url($expositor->logo_path) }}" alt="{{ $expositor->name }}" class="w-full h-full object-cover">
@@ -261,7 +268,7 @@
         <h2 class="text-lg font-bold text-gray-900 mb-4">Outros produtos de {{ $expositor->name }}</h2>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
             @foreach($otherProducts as $other)
-            <a href="{{ route('loja.produto', [$expositor->slug, $other->slug]) }}"
+            <a href="{{ route('loja.produto', [$expositor->slug, $other->slug, 'return_to' => $returnTo]) }}"
                class="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                 <div class="aspect-square overflow-hidden bg-gray-50">
                     @php

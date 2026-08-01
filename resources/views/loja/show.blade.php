@@ -12,11 +12,24 @@
     @include('partials.site-css')
 </head>
 <body class="bg-gray-50 font-sans antialiased">
+@php
+    $requestedReturnTo = request()->query('return_to');
+    $requestedReturnTo = $requestedReturnTo && parse_url($requestedReturnTo, PHP_URL_HOST) === request()->getHost()
+        ? $requestedReturnTo
+        : null;
+    $previousUrl = url()->previous();
+    $currentUrl = url()->current();
+    $previousPath = parse_url($previousUrl, PHP_URL_PATH) ?: '';
+    $isSameHostPrevious = parse_url($previousUrl, PHP_URL_HOST) === request()->getHost();
+    $isLojaPrevious = str_starts_with($previousPath, '/loja/');
+    $storeBackUrl = $requestedReturnTo
+        ?: ($isSameHostPrevious && $previousUrl !== $currentUrl && ! $isLojaPrevious ? $previousUrl : url('/'));
+@endphp
 
 {{-- Navbar --}}
 <nav class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100 shadow-sm">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-        <a href="{{ url('/') }}" class="flex items-center gap-2 font-bold text-lg" style="color: var(--texto-escuro, #3D3000);">
+        <a href="{{ $storeBackUrl }}" class="flex items-center gap-2 font-bold text-lg" style="color: var(--texto-escuro, #3D3000);">
             @include('partials.site-logo')
             <span class="hidden sm:inline">← Feira Esquerda Livre</span>
             <span class="sm:hidden">←</span>
@@ -29,8 +42,8 @@
 
 {{-- Header da loja --}}
 <div class="relative overflow-hidden" style="background: linear-gradient(135deg, #3D3000 0%, #5C4500 100%); min-height: 200px;">
-    @if($expositor->cover_image_path)
-    <img src="{{ Storage::url($expositor->cover_image_path) }}" alt="{{ $expositor->name }}"
+    @if($expositor->image_path)
+    <img src="{{ Storage::url($expositor->image_path) }}" alt="{{ $expositor->name }}"
          class="absolute inset-0 w-full h-full object-cover opacity-30">
     @endif
     <div class="relative max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row items-start sm:items-end gap-5">
@@ -113,7 +126,7 @@
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     @foreach($itensDoEixo as $product)
-                    <a href="{{ route('loja.produto', [$expositor->slug, $product->slug]) }}"
+                    <a href="{{ route('loja.produto', [$expositor->slug, $product->slug, 'return_to' => $storeBackUrl]) }}"
                        class="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                         <div class="aspect-square overflow-hidden bg-gray-50">
                             @php

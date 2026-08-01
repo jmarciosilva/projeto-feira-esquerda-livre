@@ -54,7 +54,7 @@
     <article class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden" wire:key="feed-post-{{ $post->id }}">
         <div class="p-5">
             <div class="flex items-start gap-3">
-                <a href="{{ route('loja.show', $post->expositor->slug) }}" class="flex-shrink-0">
+                <a href="{{ route('loja.show', [$post->expositor->slug, 'return_to' => route('feed.index')]) }}" class="flex-shrink-0">
                     @if($post->expositor->logo_path)
                     <img src="{{ Storage::url($post->expositor->logo_path) }}" alt="{{ $post->expositor->name }}"
                          class="w-12 h-12 rounded-xl object-cover border border-gray-100">
@@ -68,7 +68,7 @@
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div>
-                            <a href="{{ route('loja.show', $post->expositor->slug) }}"
+                            <a href="{{ route('loja.show', [$post->expositor->slug, 'return_to' => route('feed.index')]) }}"
                                class="font-bold text-gray-900 hover:underline">{{ $post->expositor->name }}</a>
                             <p class="text-sm text-gray-400">{{ $post->created_at->diffForHumans() }}</p>
                         </div>
