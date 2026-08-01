@@ -161,6 +161,19 @@ Route::post('/contato', function (Request $request) {
     return back()->with('contato_success', 'Mensagem enviada com sucesso! Nossa equipe retornará em breve.');
 })->name('contato.enviar');
 
+// ─── Páginas institucionais ──────────────────────────────────────────────────
+Route::get('/politica-de-privacidade', function () {
+    $settings = SiteSetting::instance();
+
+    return view('politica-de-privacidade', compact('settings'));
+})->name('politica-privacidade');
+
+Route::get('/termos-de-uso', function () {
+    $settings = SiteSetting::instance();
+
+    return view('termos-de-uso', compact('settings'));
+})->name('termos-uso');
+
 // ─── Catálogo público por eixo ────────────────────────────────────────────────
 foreach (['produtos' => 'produto', 'servicos' => 'servico', 'cuidados' => 'cuidado'] as $slug => $tipo) {
     Route::get("/{$slug}", function (Request $request) use ($tipo) {

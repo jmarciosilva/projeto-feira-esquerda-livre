@@ -1403,7 +1403,7 @@
                     Links Rápidos
                 </h3>
                 <ul class="space-y-2.5">
-                    @foreach(['Início' => '#', 'Agenda' => '#agenda', 'Marketplace' => '#marketplace', 'Notícias' => '#noticias', 'Sobre' => '#sobre', 'Contato' => route('contato')] as $label => $href)
+                    @foreach(['Início' => '#', 'Agenda' => '#agenda', 'Marketplace' => '#marketplace', 'Notícias' => '#noticias', 'Sobre' => '#sobre', 'Contato' => route('contato'), 'Política de Privacidade' => route('politica-privacidade'), 'Termos de Uso' => route('termos-uso')] as $label => $href)
                         <li>
                             <a href="{{ $href }}"
                                class="text-sm font-medium transition-colors"
