@@ -210,6 +210,10 @@
     <div class="flex-1 flex flex-col lg:ml-64 min-h-screen">
 
         {{-- Top bar --}}
+        @php
+            $helpRouteName = request()->route()?->getName();
+            $help = $helpRouteName ? config("help.$helpRouteName") : null;
+        @endphp
         <header class="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 lg:px-6 py-4 flex items-center gap-4">
             <button onclick="toggleLojistaSidebar()" class="lg:hidden text-gray-500 hover:text-gray-700">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,7 +221,20 @@
                 </svg>
             </button>
             <div class="flex-1">
-                <h1 class="text-lg font-semibold text-gray-900">{{ $title ?? 'Painel do Lojista' }}</h1>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-lg font-semibold text-gray-900">{{ $title ?? 'Painel do Lojista' }}</h1>
+                    @if($help)
+                        <button type="button"
+                            onclick="window.dispatchEvent(new CustomEvent('open-help', { detail: @js($help) }))"
+                            class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-opacity hover:opacity-80"
+                            style="background:#F4E294; color:#3D3000;"
+                            title="Ajuda desta tela" aria-label="Ajuda desta tela">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.5M12 17.5h.007v.008H12v-.008z"/>
+                            </svg>
+                        </button>
+                    @endif
+                </div>
             </div>
         </header>
 
@@ -231,6 +248,8 @@
         </footer>
     </div>
 </div>
+
+<x-help-modal />
 
 @livewireScriptConfig
 
