@@ -45,6 +45,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/produtos/{product}', [CatalogoController::class, 'show'])->name('produtos.show');
     Route::get('/produtos/{product}/perguntas', [ProductQuestionController::class, 'index'])->name('produtos.perguntas.index');
 
+    Route::get('/lojas', [LojaController::class, 'index'])->name('lojas.index');
     Route::get('/lojas/{slug}', [LojaController::class, 'show'])->name('lojas.show');
     Route::get('/categorias', [CategoriaController::class, 'index'])->name('categorias.index');
     Route::get('/agenda', [AgendaController::class, 'index'])->name('agenda.index');

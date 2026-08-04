@@ -105,6 +105,17 @@ class CatalogoApiTest extends TestCase
             ->assertJsonCount(1, 'products');
     }
 
+    public function test_lists_active_stores(): void
+    {
+        Expositor::create(['name' => 'Ateliê das Mãos', 'slug' => 'atelie-das-maos', 'is_active' => true]);
+        Expositor::create(['name' => 'Loja Inativa', 'slug' => 'loja-inativa', 'is_active' => false]);
+
+        $this->getJson('/api/v1/lojas')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Ateliê das Mãos');
+    }
+
     public function test_lists_categories_filtered_by_eixo(): void
     {
         ContentCategory::create(['name' => 'Artesanato', 'slug' => 'artesanato', 'eixo' => 'produto', 'is_active' => true]);

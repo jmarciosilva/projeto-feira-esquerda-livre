@@ -68,6 +68,7 @@ Lojistas **não se cadastram** por aqui — a conta é criada quando a administr
 |---|---|---|
 | GET | `/produtos` \| `/servicos` \| `/cuidados` | Catálogo paginado por eixo. Filtros: `?busca=&categoria=` |
 | GET | `/produtos/{id}` | Detalhe do item (imagens, FAQ, loja) |
+| GET | `/lojas` | Lojas ativas, paginado (destaques primeiro) |
 | GET | `/lojas/{slug}` | Perfil público da loja + produtos ativos |
 | GET | `/categorias?eixo=produto\|servico\|cuidado` | Categorias do eixo |
 | GET | `/agenda` | Próximas feiras. Filtros: `?estado=&mes=&ano=` |

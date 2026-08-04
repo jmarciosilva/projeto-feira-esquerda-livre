@@ -8,9 +8,21 @@ use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Expositor;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class LojaController extends Controller
 {
+    /** GET /api/v1/lojas — usado pelo carrossel de expositores do app mobile. */
+    public function index(): AnonymousResourceCollection
+    {
+        $expositores = Expositor::where('is_active', true)
+            ->orderByDesc('is_featured')
+            ->orderBy('name')
+            ->paginate(24);
+
+        return ExpositorResource::collection($expositores);
+    }
+
     /** GET /api/v1/lojas/{slug} */
     public function show(string $slug): JsonResponse
     {
