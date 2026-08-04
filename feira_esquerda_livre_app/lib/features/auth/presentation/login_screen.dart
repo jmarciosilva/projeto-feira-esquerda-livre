@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/http/api_exception.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/theme/app_colors.dart';
 import '../application/auth_controller.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -60,6 +61,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: AppColors.brown,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

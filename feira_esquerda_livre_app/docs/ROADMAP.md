@@ -185,6 +185,25 @@ Se alguma tela precisar de um dado que a API não retorna, é sinal para **volta
 
 ---
 
+## ✅ Módulo extra — Comunidade (Feed)
+
+**Construído fora de ordem**, antes da Fase 3 (Carrinho & Checkout), por decisão do usuário: a Comunidade é considerada a principal diferenciação do app (rede social da própria feira) e por isso foi priorizada.
+
+### Entregas
+
+| Componente | Descrição |
+|---|---|
+| Aba "Comunidade" no bottom nav | 6ª aba, entre Agenda e Conta |
+| `FeedScreen` | Lista de posts (`GET /feed`), paginada com "Carregar mais", estados de loading/erro-com-retry/vazio |
+| `FeedPostCard` | Avatar/nome do expositor, imagem, curtir (otimista) e contador de comentários |
+| Curtir | `POST /feed/{post}/curtir` — exige login; visitante é direcionado ao login ao tocar |
+| `FeedPostDetailScreen` | Lista de comentários (`GET /feed/{post}/comentarios`) + campo de novo comentário (`POST`, exige login) |
+| Denunciar post | Endpoint (`POST /feed/{post}/denunciar`) disponível na API — **UI de denúncia ainda não construída no app** |
+
+**Fora do escopo do app:** publicar no feed continua exclusivo do lojista, pelo site — o app só consome (ver, curtir, comentar, denunciar), conforme `docs/API.md` do backend.
+
+---
+
 ## 📊 Resumo do Roadmap
 
 | Fase | Entregável Principal | Depende de endpoint novo no backend? |
@@ -206,7 +225,6 @@ Todas as fases usam endpoints já existentes — nenhuma delas está bloqueada p
 Mesmo corte já documentado na Fase 9 do roadmap do backend, refletido aqui para o app:
 
 - **Construtor de curso AVA** (criar/editar módulos, aulas, materiais) — o lojista cria cursos pelo site; o app só lista e publica/despublica.
-- **Feed/Comunidade** (posts, curtidas, comentários).
 - **Recuperação de senha** dentro do app — orientar o usuário a usar o site enquanto o endpoint não existir no backend.
 - **Notificações push** — não avaliado ainda; entraria como uma fase própria (exigiria FCM/APNs e endpoints novos no backend para registrar device tokens).
 - **Modo offline** — todas as telas assumem conexão ativa nesta primeira versão.

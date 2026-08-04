@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
@@ -21,23 +22,48 @@ abstract final class AppTheme {
 
     final base = ThemeData(colorScheme: colorScheme, useMaterial3: true);
 
+    // Nunito tem traços arredondados e mais leves que a Roboto padrão do
+    // Material — usada em todo o app para uma leitura mais suave, menos
+    // "dura", especialmente nos títulos em negrito.
+    final textTheme = GoogleFonts.nunitoTextTheme(base.textTheme).apply(
+      bodyColor: AppColors.textPrimary,
+      displayColor: AppColors.textPrimary,
+      fontSizeFactor: 1.0,
+    );
+
     return base.copyWith(
       scaffoldBackgroundColor: AppColors.background,
-      textTheme: base.textTheme.apply(
-        bodyColor: AppColors.textPrimary,
-        displayColor: AppColors.textPrimary,
-        fontSizeFactor: 1.0,
-      ).copyWith(
-        bodyMedium: const TextStyle(fontSize: 16, height: 1.4, color: AppColors.textPrimary),
-        bodyLarge: const TextStyle(fontSize: 18, height: 1.4, color: AppColors.textPrimary),
-        titleLarge: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.brown),
-        titleMedium: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.brown),
+      textTheme: textTheme.copyWith(
+        bodyMedium: GoogleFonts.nunito(fontSize: 16, height: 1.4, color: AppColors.textPrimary),
+        bodyLarge: GoogleFonts.nunito(fontSize: 18, height: 1.4, color: AppColors.textPrimary),
+        titleLarge: GoogleFonts.nunito(
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          color: AppColors.brown,
+        ),
+        titleMedium: GoogleFonts.nunito(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: AppColors.brown,
+        ),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.brown,
         foregroundColor: Colors.white,
         centerTitle: false,
         elevation: 0,
+      ),
+      // Labels da barra inferior ficaram mais longos ("Agenda da Feira",
+      // "Nossa Comunidade", "Entrar na Conta") — fonte um pouco menor e mais
+      // leve evita estourar a largura do item em telas menores.
+      navigationBarTheme: NavigationBarThemeData(
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => GoogleFonts.nunito(
+            fontSize: 11,
+            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
+            color: states.contains(WidgetState.selected) ? AppColors.brown : AppColors.textSecondary,
+          ),
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
