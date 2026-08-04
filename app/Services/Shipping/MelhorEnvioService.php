@@ -3,10 +3,10 @@
 namespace App\Services\Shipping;
 
 use App\DTO\ShippingQuoteData;
-use App\Enums\ItemType;
 use App\Models\Expositor;
 use App\Models\Product;
 use App\Models\SiteSetting;
+use App\Services\Shipping\Concerns\ValidatesShippableItems;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
@@ -14,6 +14,8 @@ use Throwable;
 
 class MelhorEnvioService
 {
+    use ValidatesShippableItems;
+
     /**
      * @param  array<int, array{product: Product, quantity: int}>  $products
      * @return array<int, ShippingQuoteData>
@@ -71,46 +73,7 @@ class MelhorEnvioService
      */
     public function quoteForStore(Expositor $store, string $destinationZipcode, Collection $items): array
     {
-        $originError = $this->originAddressError($store);
-
-        if ($originError) {
-            return [ShippingQuoteData::error($originError)];
-        }
-
-        $products = [];
-
-        foreach ($items as $item) {
-            $product = $item->product;
-
-            if (! $product instanceof Product || ! $this->isShippable($product)) {
-                continue;
-            }
-
-            $logisticError = $this->logisticDataError($product);
-
-            if ($logisticError) {
-                return [ShippingQuoteData::error($logisticError)];
-            }
-
-            $products[] = [
-                'product' => $product,
-                'quantity' => (int) $item->quantity,
-            ];
-        }
-
-        if ($products === []) {
-            return [
-                new ShippingQuoteData(
-                    service_id: 'sem-frete',
-                    company: 'Feira Esquerda Livre',
-                    service_name: 'Sem frete para esta loja',
-                    price: 0.0,
-                    delivery_time: null,
-                ),
-            ];
-        }
-
-        return $this->calculate((string) $store->zipcode, $destinationZipcode, $products);
+        return $this->quoteForStoreUsing($store, $destinationZipcode, $items, 'Melhor Envio', $this->calculate(...));
     }
 
     /**
@@ -267,45 +230,6 @@ class MelhorEnvioService
             })
             ->values()
             ->all();
-    }
-
-    private function originAddressError(Expositor $store): ?string
-    {
-        if (! $this->isConfigured()) {
-            return 'O Melhor Envio ainda não está configurado para calcular frete.';
-        }
-
-        if (blank($store->zipcode)) {
-            return "A loja {$store->name} ainda não possui CEP de origem cadastrado.";
-        }
-
-        return null;
-    }
-
-    private function logisticDataError(Product $product): ?string
-    {
-        $missing = collect([
-            'peso' => $product->weight,
-            'altura' => $product->height,
-            'largura' => $product->width,
-            'comprimento' => $product->length,
-        ])->filter(fn ($value) => blank($value) || (float) $value <= 0)->keys()->implode(', ');
-
-        if ($missing === '') {
-            return null;
-        }
-
-        return "O produto {$product->name} não possui dados logísticos cadastrados: {$missing}.";
-    }
-
-    private function isShippable(Product $product): bool
-    {
-        return $product->item_type === ItemType::Produto;
-    }
-
-    private function onlyDigits(string $value): string
-    {
-        return preg_replace('/\D+/', '', $value) ?? '';
     }
 
     private function apiErrorMessage(RequestException $exception): string

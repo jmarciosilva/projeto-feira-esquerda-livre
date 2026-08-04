@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Expositor;
 use App\Models\Product;
+use App\Models\SiteSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -97,6 +98,84 @@ class ShippingQuoteTest extends TestCase
         );
 
         Http::assertNothingSent();
+    }
+
+    public function test_quotes_shipping_with_frenet_when_selected_as_provider(): void
+    {
+        SiteSetting::instance()->update([
+            'frenet_ativo' => true,
+            'frenet_token' => 'FRENET_TEST_TOKEN',
+            'frete_provedor' => 'frenet',
+        ]);
+
+        Http::fake([
+            'api.frenet.com.br/shipping/quote' => Http::response([
+                'ShippingSevicesArray' => [
+                    [
+                        'Carrier' => 'Correios',
+                        'ServiceCode' => '04510',
+                        'ServiceDescription' => 'PAC',
+                        'ShippingPrice' => '24.90',
+                        'DeliveryTime' => '7',
+                        'Error' => false,
+                        'Msg' => 'Cotação realizada com sucesso',
+                    ],
+                ],
+            ]),
+        ]);
+
+        [$store, $product] = $this->makeStoreAndProduct();
+
+        $response = $this->postJson(route('shipping.quote'), [
+            'store_id' => $store->id,
+            'destination_zipcode' => '01001000',
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 2],
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('quotes.0.service_id', '04510')
+            ->assertJsonPath('quotes.0.company', 'Correios')
+            ->assertJsonPath('quotes.0.service_name', 'PAC')
+            ->assertJsonPath('quotes.0.price', 24.9)
+            ->assertJsonPath('quotes.0.delivery_time', 7);
+
+        Http::assertSent(function ($request) {
+            $payload = $request->data();
+
+            return $request->hasHeader('token', 'FRENET_TEST_TOKEN')
+                && $payload['SellerCEP'] === '01310000'
+                && $payload['RecipientCEP'] === '01001000'
+                && $payload['ShippingItemArray'][0]['Weight'] === 0.3
+                && $payload['ShippingItemArray'][0]['Quantity'] === 2;
+        });
+    }
+
+    public function test_melhor_envio_is_not_called_when_frenet_is_the_selected_provider(): void
+    {
+        SiteSetting::instance()->update([
+            'frenet_ativo' => true,
+            'frenet_token' => 'FRENET_TEST_TOKEN',
+            'frete_provedor' => 'frenet',
+        ]);
+
+        Http::fake([
+            'api.frenet.com.br/*' => Http::response(['ShippingSevicesArray' => []]),
+        ]);
+
+        [$store, $product] = $this->makeStoreAndProduct();
+
+        $this->postJson(route('shipping.quote'), [
+            'store_id' => $store->id,
+            'destination_zipcode' => '01001000',
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 1],
+            ],
+        ])->assertOk();
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'melhorenvio.com.br'));
     }
 
     /**

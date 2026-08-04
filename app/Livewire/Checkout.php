@@ -6,6 +6,7 @@ use App\Models\SiteSetting;
 use App\Services\CartService;
 use App\Services\MercadoPagoService;
 use App\Services\OrderService;
+use App\Services\Shipping\FrenetService;
 use App\Services\Shipping\MelhorEnvioService;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -193,7 +194,7 @@ class Checkout extends Component
 
     // ─── Frete e endereço ─────────────────────────────────────────────────
 
-    public function calculateShipping(MelhorEnvioService $shipping, CartService $cart): void
+    public function calculateShipping(MelhorEnvioService $melhorEnvio, FrenetService $frenet, CartService $cart): void
     {
         if ($this->delivery_type !== 'entrega') {
             $this->addError('shipping_destination_zipcode', 'Selecione entrega em casa para consultar frete.');
@@ -206,6 +207,9 @@ class Checkout extends Component
         ], [], [
             'shipping_destination_zipcode' => 'CEP de entrega',
         ]);
+
+        // Provedor de frete escolhido manualmente no admin (padrão: Melhor Envio).
+        $shipping = SiteSetting::instance()->frete_provedor === 'frenet' ? $frenet : $melhorEnvio;
 
         $this->shipping_quotes = [];
         $this->selected_shipping_options = [];

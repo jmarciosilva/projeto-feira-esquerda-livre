@@ -22,6 +22,9 @@ class CheckoutSettingsForm extends Component
     public bool    $melhor_envio_sandbox       = true;
     public bool    $melhor_envio_connected     = false;
     public ?string $melhor_envio_expires_at    = null;
+    public bool    $frenet_ativo               = false;
+    public string  $frenet_token               = '';
+    public string  $frete_provedor             = 'melhor_envio';
 
     // Pagamento
     public string  $pagamento_modo          = 'manual';
@@ -47,6 +50,9 @@ class CheckoutSettingsForm extends Component
         $this->melhor_envio_sandbox       = (bool) ($s->melhor_envio_sandbox ?? true);
         $this->melhor_envio_connected     = filled($s->melhor_envio_token);
         $this->melhor_envio_expires_at    = $s->melhor_envio_token_expires_at?->format('d/m/Y H:i');
+        $this->frenet_ativo               = (bool) $s->frenet_ativo;
+        $this->frenet_token               = $s->frenet_token ?? '';
+        $this->frete_provedor             = $s->frete_provedor ?? 'melhor_envio';
 
         $this->pagamento_modo        = $s->pagamento_modo ?? 'manual';
         $this->comissao_percentual   = (string) ($s->comissao_percentual ?? '0');
@@ -66,6 +72,8 @@ class CheckoutSettingsForm extends Component
             'melhor_envio_client_id'     => 'nullable|string|max:255',
             'melhor_envio_client_secret' => 'nullable|string|max:2000',
             'melhor_envio_token'         => 'nullable|string|max:2000',
+            'frenet_token'               => 'nullable|string|max:2000',
+            'frete_provedor'             => 'required|in:melhor_envio,frenet',
             'comissao_percentual'        => 'required|numeric|min:0|max:100',
             'mercado_pago_public_key'    => 'nullable|string|max:255',
             'mercado_pago_access_token'  => 'nullable|string|max:2000',
@@ -78,6 +86,21 @@ class CheckoutSettingsForm extends Component
 
         if ($this->melhor_envio_ativo && blank($this->melhor_envio_token)) {
             $this->addError('melhor_envio_token', 'Conecte com o Melhor Envio ou informe um Access Token para ativar a integração.');
+            return;
+        }
+
+        if ($this->frenet_ativo && blank($this->frenet_token)) {
+            $this->addError('frenet_token', 'Informe o Token para ativar a Frenet.');
+            return;
+        }
+
+        if ($this->frete_provedor === 'frenet' && ! $this->frenet_ativo) {
+            $this->addError('frete_provedor', 'Ative a Frenet antes de selecioná-la como provedor de frete.');
+            return;
+        }
+
+        if ($this->frete_provedor === 'melhor_envio' && ! $this->melhor_envio_ativo) {
+            $this->addError('frete_provedor', 'Ative o Melhor Envio antes de selecioná-lo como provedor de frete.');
             return;
         }
 
@@ -99,6 +122,9 @@ class CheckoutSettingsForm extends Component
                 'melhor_envio_refresh_token' => null,
                 'melhor_envio_token_expires_at' => null,
             ] : []),
+            'frenet_ativo'               => $this->frenet_ativo,
+            'frenet_token'               => $this->frenet_token ?: null,
+            'frete_provedor'             => $this->frete_provedor,
 
             'pagamento_modo'             => $this->mercado_pago_ativo ? 'mercado_pago' : 'manual',
             'comissao_percentual'        => $this->comissao_percentual,

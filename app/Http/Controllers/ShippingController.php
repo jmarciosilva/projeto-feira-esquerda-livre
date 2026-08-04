@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Expositor;
 use App\Models\Product;
+use App\Models\SiteSetting;
+use App\Services\Shipping\FrenetService;
 use App\Services\Shipping\MelhorEnvioService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,8 +13,11 @@ use Illuminate\Validation\ValidationException;
 
 class ShippingController extends Controller
 {
-    public function quote(Request $request, MelhorEnvioService $shipping): JsonResponse
+    public function quote(Request $request, MelhorEnvioService $melhorEnvio, FrenetService $frenet): JsonResponse
     {
+        // Provedor de frete escolhido manualmente no admin (padrão: Melhor Envio).
+        $shipping = SiteSetting::instance()->frete_provedor === 'frenet' ? $frenet : $melhorEnvio;
+
         $validated = $request->validate([
             'store_id' => 'required|integer|exists:expositores,id',
             'destination_zipcode' => 'required|string|max:9',

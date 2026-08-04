@@ -26,25 +26,12 @@ class ShippingQuoteData
             : ($data['company'] ?? null);
         $serviceName = isset($data['name']) ? (string) $data['name'] : null;
 
-        $resolvedPrice = is_numeric($price) ? round((float) $price, 2) : null;
-        $errorMessage = self::extractErrorMessage($data);
-        $hasValidPrice = $resolvedPrice !== null && $resolvedPrice > 0;
-
-        // A API pode devolver uma transportadora sem preço valido (ex: sem contrato
-        // ativo para essa rota) sem preencher "error" num formato que reconhecemos.
-        // Nunca deixamos essa opcao virar um botao selecionavel em branco ou R$ 0,00.
-        if ($errorMessage === null && ! $hasValidPrice) {
-            $label = trim(($company ?: '').' '.($serviceName ?: ''));
-            $errorMessage = $label !== ''
-                ? "{$label}: frete indisponível para este pedido."
-                : 'Opção de frete indisponível para este pedido.';
-        }
-
-        // Se virou erro, o preco nunca deve ser exibido/usado - mesmo que a API
-        // tenha mandado um numero junto com o erro.
-        if ($errorMessage !== null) {
-            $resolvedPrice = null;
-        }
+        [$resolvedPrice, $errorMessage] = self::resolvePriceAndError(
+            $price,
+            self::extractErrorMessage($data),
+            $company,
+            $serviceName,
+        );
 
         return new self(
             service_id: isset($data['id']) ? (string) $data['id'] : null,
@@ -52,6 +39,34 @@ class ShippingQuoteData
             service_name: $serviceName,
             price: $resolvedPrice,
             delivery_time: is_numeric($deliveryTime) ? (int) $deliveryTime : null,
+            error_message: $errorMessage,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function fromFrenet(array $data): self
+    {
+        $company = $data['Carrier'] ?? null;
+        $serviceName = $data['ServiceDescription'] ?? null;
+        $apiError = ((bool) ($data['Error'] ?? false))
+            ? (is_string($data['Msg'] ?? null) && $data['Msg'] !== '' ? $data['Msg'] : 'Frete indisponível para esta transportadora.')
+            : null;
+
+        [$resolvedPrice, $errorMessage] = self::resolvePriceAndError(
+            $data['ShippingPrice'] ?? null,
+            $apiError,
+            $company,
+            $serviceName,
+        );
+
+        return new self(
+            service_id: isset($data['ServiceCode']) ? (string) $data['ServiceCode'] : null,
+            company: $company ? (string) $company : null,
+            service_name: $serviceName ? (string) $serviceName : null,
+            price: $resolvedPrice,
+            delivery_time: is_numeric($data['DeliveryTime'] ?? null) ? (int) $data['DeliveryTime'] : null,
             error_message: $errorMessage,
         );
     }
@@ -82,6 +97,39 @@ class ShippingQuoteData
             'currency' => $this->currency,
             'error_message' => $this->error_message,
         ];
+    }
+
+    /**
+     * Resolve o preço e a mensagem de erro de forma consistente entre provedores:
+     * uma cotação sem preço válido (ausente, zero ou negativo) e sem erro explícito
+     * da API vira uma mensagem de indisponibilidade — nunca um botão em branco ou
+     * "R$ 0,00" selecionável. Quando há erro, o preço nunca é exibido.
+     *
+     * @return array{0: ?float, 1: ?string}
+     */
+    private static function resolvePriceAndError(
+        mixed $rawPrice,
+        ?string $apiErrorMessage,
+        mixed $company,
+        mixed $serviceName,
+    ): array {
+        $resolvedPrice = is_numeric($rawPrice) ? round((float) $rawPrice, 2) : null;
+        $hasValidPrice = $resolvedPrice !== null && $resolvedPrice > 0;
+
+        $errorMessage = $apiErrorMessage;
+
+        if ($errorMessage === null && ! $hasValidPrice) {
+            $label = trim(($company ?: '').' '.($serviceName ?: ''));
+            $errorMessage = $label !== ''
+                ? "{$label}: frete indisponível para este pedido."
+                : 'Opção de frete indisponível para este pedido.';
+        }
+
+        if ($errorMessage !== null) {
+            $resolvedPrice = null;
+        }
+
+        return [$resolvedPrice, $errorMessage];
     }
 
     /**
