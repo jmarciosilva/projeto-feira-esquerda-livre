@@ -175,13 +175,17 @@ class MelhorEnvioService
         return filled($this->token()) && filled($this->baseUrl());
     }
 
-    /** URL base da API/OAuth do Melhor Envio (sandbox ou produção) conforme configuração ativa. */
+    /** URL base da API/OAuth do Melhor Envio (sandbox ou produção) conforme configuração do admin. */
     public function baseUrl(): string
     {
         $settings = SiteSetting::instance();
 
-        if ($settings->melhor_envio_ativo && $settings->melhor_envio_sandbox === false) {
-            return 'https://www.melhorenvio.com.br';
+        // Assim que houver Client ID cadastrado, o checkbox de sandbox manda — mesmo
+        // antes da integração estar "ativa" (necessário durante o próprio handshake OAuth).
+        if ($settings->melhor_envio_ativo || filled($settings->melhor_envio_client_id)) {
+            return $settings->melhor_envio_sandbox === false
+                ? 'https://www.melhorenvio.com.br'
+                : 'https://sandbox.melhorenvio.com.br';
         }
 
         return rtrim((string) config('melhorenvio.base_url'), '/');
