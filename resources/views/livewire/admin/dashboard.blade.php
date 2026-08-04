@@ -44,6 +44,86 @@
         </div>
     </section>
 
+    {{-- Faturamento --}}
+    @php
+        $growth = $revenueGrowthPercent;
+        $growthLabel = $growth === null
+            ? 'sem comparação com mês anterior'
+            : (($growth >= 0 ? '+' : '') . number_format($growth, 1, ',', '.') . '% vs mês passado');
+        $growthColor = $growth === null ? '#7A5C00' : ($growth >= 0 ? '#3D5C1F' : '#A13D2E');
+        $netToStores = $revenueTotal - $commissionTotal;
+        $maxDaily = max(1, collect($dailyRevenue)->max('total'));
+    @endphp
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="rounded-2xl border p-5 shadow-sm" style="background:#FFFDF0; border-color:#E8DFA8;">
+            <p class="text-xs font-bold uppercase tracking-wide" style="color:#7A5C00;">Faturamento confirmado</p>
+            <p class="mt-2 text-2xl font-black" style="color:#3D3000;">R$ {{ number_format($revenueTotal, 2, ',', '.') }}</p>
+            <p class="mt-1 text-xs" style="color:#7A5C00;">{{ $confirmedOrdersCount }} {{ $confirmedOrdersCount === 1 ? 'pedido pago' : 'pedidos pagos' }} · total</p>
+        </div>
+        <div class="rounded-2xl border p-5 shadow-sm" style="background:#F8EFE5; border-color:#E8DFA8;">
+            <p class="text-xs font-bold uppercase tracking-wide" style="color:#7A5C00;">Comissão da plataforma</p>
+            <p class="mt-2 text-2xl font-black" style="color:#5C3000;">R$ {{ number_format($commissionTotal, 2, ',', '.') }}</p>
+            <p class="mt-1 text-xs" style="color:#7A5C00;">Repasse aos lojistas: R$ {{ number_format($netToStores, 2, ',', '.') }}</p>
+        </div>
+        <div class="rounded-2xl border p-5 shadow-sm" style="background:#F0F8E8; border-color:#E8DFA8;">
+            <p class="text-xs font-bold uppercase tracking-wide" style="color:#7A5C00;">Este mês</p>
+            <p class="mt-2 text-2xl font-black" style="color:#3D3000;">R$ {{ number_format($revenueThisMonth, 2, ',', '.') }}</p>
+            <p class="mt-1 text-xs font-semibold" style="color:{{ $growthColor }};">{{ $growthLabel }}</p>
+        </div>
+        <div class="rounded-2xl border p-5 shadow-sm" style="background:#FFF7DA; border-color:#E8DFA8;">
+            <p class="text-xs font-bold uppercase tracking-wide" style="color:#7A5C00;">Aguardando pagamento</p>
+            <p class="mt-2 text-2xl font-black" style="color:#7A5C00;">R$ {{ number_format($pendingAmount, 2, ',', '.') }}</p>
+            <p class="mt-1 text-xs" style="color:#7A5C00;">{{ $pendingOrdersCount }} {{ $pendingOrdersCount === 1 ? 'pedido' : 'pedidos' }} ainda não confirmados</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6">
+        <x-admin.card title="Faturamento — últimos 30 dias" description="Soma diária do valor confirmado por loja (pago via Mercado Pago ou confirmado manualmente).">
+            @if($revenueTotal <= 0)
+            <p class="text-sm text-gray-400 text-center py-10">Nenhum pagamento confirmado ainda. Assim que um pedido for pago, ele aparece aqui.</p>
+            @else
+            <div class="flex items-stretch gap-[3px]" style="height:160px;">
+                @foreach($dailyRevenue as $i => $day)
+                @php $pct = max(2, round(($day['total'] / $maxDaily) * 100)); @endphp
+                <div class="flex-1 flex flex-col justify-end relative group" x-data="{ show: false }" @mouseenter="show = true" @mouseleave="show = false">
+                    <div x-show="show" x-cloak
+                         class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap z-10 shadow-lg pointer-events-none"
+                         style="background:#3D3000; color:#F4E294;">
+                        {{ $day['label'] }}: R$ {{ number_format($day['total'], 2, ',', '.') }}
+                    </div>
+                    <div class="w-full rounded-t transition-opacity group-hover:opacity-80"
+                         style="height:{{ $pct }}%; min-height:2px; background:{{ $day['total'] > 0 ? '#E8A000' : '#F1E6AE' }};"></div>
+                </div>
+                @endforeach
+            </div>
+            <div class="mt-2 flex justify-between text-xs" style="color:#7A5C00;">
+                <span>{{ $dailyRevenue[0]['label'] }}</span>
+                <span>Hoje</span>
+            </div>
+            @endif
+        </x-admin.card>
+
+        <x-admin.card title="Top Lojas" description="Maior faturamento confirmado.">
+            @if($topStores->isEmpty())
+            <p class="text-sm text-gray-400 text-center py-10">Nenhuma venda confirmada ainda.</p>
+            @else
+            <div class="space-y-3">
+                @foreach($topStores as $i => $store)
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0" style="background:#F4E294; color:#3D3000;">{{ $i + 1 }}</span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold truncate" style="color:#3D3000;">{{ $store->name }}</p>
+                        <p class="text-xs" style="color:#7A5C00;">{{ $store->confirmed_orders_count }} {{ $store->confirmed_orders_count === 1 ? 'pedido' : 'pedidos' }}</p>
+                    </div>
+                    <p class="text-sm font-black flex-shrink-0" style="color:#3D3000;">R$ {{ number_format($store->confirmed_revenue, 2, ',', '.') }}</p>
+                </div>
+                @endforeach
+            </div>
+            @endif
+        </x-admin.card>
+    </div>
+
     {{-- Stats --}}
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         @foreach([
