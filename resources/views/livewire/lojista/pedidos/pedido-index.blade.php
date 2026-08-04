@@ -58,12 +58,27 @@
                             </div>
                         </td>
                         <td class="py-4 px-4">
-                            <div class="space-y-0.5 mb-2">
-                                @foreach($order->items as $item)
+                            @php $itemsOverflow = $order->items->count() - 5; @endphp
+                            <div class="space-y-0.5 mb-2" @if($itemsOverflow > 0) x-data="{ expanded: false }" @endif>
+                                @foreach($order->items->take(5) as $item)
                                 <p class="text-sm text-gray-700 leading-snug">
                                     <span class="font-semibold">{{ $item->quantity }}×</span> {{ $item->product_name }}
                                 </p>
                                 @endforeach
+
+                                @if($itemsOverflow > 0)
+                                <div x-show="expanded" x-cloak class="space-y-0.5">
+                                    @foreach($order->items->slice(5) as $item)
+                                    <p class="text-sm text-gray-700 leading-snug">
+                                        <span class="font-semibold">{{ $item->quantity }}×</span> {{ $item->product_name }}
+                                    </p>
+                                    @endforeach
+                                </div>
+                                <button type="button" @click="expanded = !expanded"
+                                        class="text-xs font-semibold" style="color:#C47A00;"
+                                        x-text="expanded ? 'Ver menos' : '+ {{ $itemsOverflow }} ' + '{{ $itemsOverflow === 1 ? 'item' : 'itens' }}'">
+                                </button>
+                                @endif
                             </div>
                             <div class="text-xs rounded-lg px-2 py-1 inline-block" style="background:#FDF8DC; color:#5C4500;">
                                 @if($order->delivery_type->value === 'retirada')
