@@ -41,9 +41,40 @@
                         <td class="py-4 px-4">
                             <p class="font-semibold text-gray-900">#{{ $order->reference }}</p>
                             <p class="text-xs text-gray-400">{{ $order->customer_name }} · {{ $order->created_at->format('d/m/Y H:i') }}</p>
+                            <div class="mt-1.5 space-y-0.5">
+                                @if($order->customer_whatsapp)
+                                <a href="https://wa.me/55{{ preg_replace('/\D/', '', $order->customer_whatsapp) }}"
+                                   target="_blank"
+                                   class="flex items-center gap-1 text-xs font-semibold" style="color:#16a34a;">
+                                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12 21.785h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26C2.117 6.443 6.552 2.009 12.004 2.009c2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884"/>
+                                    </svg>
+                                    {{ $order->customer_whatsapp }}
+                                </a>
+                                @endif
+                                @if($order->customer_email)
+                                <p class="text-xs text-gray-400 truncate max-w-[180px]">✉ {{ $order->customer_email }}</p>
+                                @endif
+                            </div>
                         </td>
                         <td class="py-4 px-4">
-                            <p class="text-sm text-gray-600">{{ $order->items->count() }} {{ $order->items->count() === 1 ? 'item' : 'itens' }}</p>
+                            <div class="space-y-0.5 mb-2">
+                                @foreach($order->items as $item)
+                                <p class="text-sm text-gray-700 leading-snug">
+                                    <span class="font-semibold">{{ $item->quantity }}×</span> {{ $item->product_name }}
+                                </p>
+                                @endforeach
+                            </div>
+                            <div class="text-xs rounded-lg px-2 py-1 inline-block" style="background:#FDF8DC; color:#5C4500;">
+                                @if($order->delivery_type->value === 'retirada')
+                                    {{ $order->delivery_type->emoji() }} Retirada no local
+                                @else
+                                    {{ $order->delivery_type->emoji() }}
+                                    {{ $order->address_rua }}, {{ $order->address_numero }}
+                                    @if($order->address_complemento) - {{ $order->address_complemento }} @endif
+                                    — {{ $order->address_bairro }}, {{ $order->address_cidade }}/{{ $order->address_estado }}
+                                @endif
+                            </div>
                         </td>
                         <td class="py-4 px-4 hidden sm:table-cell">
                             <span class="font-bold text-lg" style="color: #C47A00;">R$ {{ number_format((float) $split->gross_amount, 2, ',', '.') }}</span>
