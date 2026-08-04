@@ -24,14 +24,35 @@ class ShippingQuoteData
         $company = is_array($data['company'] ?? null)
             ? ($data['company']['name'] ?? null)
             : ($data['company'] ?? null);
+        $serviceName = isset($data['name']) ? (string) $data['name'] : null;
+
+        $resolvedPrice = is_numeric($price) ? round((float) $price, 2) : null;
+        $errorMessage = self::extractErrorMessage($data);
+        $hasValidPrice = $resolvedPrice !== null && $resolvedPrice > 0;
+
+        // A API pode devolver uma transportadora sem preço valido (ex: sem contrato
+        // ativo para essa rota) sem preencher "error" num formato que reconhecemos.
+        // Nunca deixamos essa opcao virar um botao selecionavel em branco ou R$ 0,00.
+        if ($errorMessage === null && ! $hasValidPrice) {
+            $label = trim(($company ?: '').' '.($serviceName ?: ''));
+            $errorMessage = $label !== ''
+                ? "{$label}: frete indisponível para este pedido."
+                : 'Opção de frete indisponível para este pedido.';
+        }
+
+        // Se virou erro, o preco nunca deve ser exibido/usado - mesmo que a API
+        // tenha mandado um numero junto com o erro.
+        if ($errorMessage !== null) {
+            $resolvedPrice = null;
+        }
 
         return new self(
             service_id: isset($data['id']) ? (string) $data['id'] : null,
             company: $company ? (string) $company : null,
-            service_name: isset($data['name']) ? (string) $data['name'] : null,
-            price: is_numeric($price) ? round((float) $price, 2) : null,
+            service_name: $serviceName,
+            price: $resolvedPrice,
             delivery_time: is_numeric($deliveryTime) ? (int) $deliveryTime : null,
-            error_message: self::extractErrorMessage($data),
+            error_message: $errorMessage,
         );
     }
 
