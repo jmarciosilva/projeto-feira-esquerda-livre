@@ -20,6 +20,8 @@ class CheckoutSettingsForm extends Component
     public string  $melhor_envio_client_secret = '';
     public string  $melhor_envio_token         = '';
     public bool    $melhor_envio_sandbox       = true;
+    public bool    $melhor_envio_connected     = false;
+    public ?string $melhor_envio_expires_at    = null;
 
     // Pagamento
     public string  $pagamento_modo          = 'manual';
@@ -43,6 +45,8 @@ class CheckoutSettingsForm extends Component
         $this->melhor_envio_client_secret = $s->melhor_envio_client_secret ?? '';
         $this->melhor_envio_token         = $s->melhor_envio_token ?? '';
         $this->melhor_envio_sandbox       = (bool) ($s->melhor_envio_sandbox ?? true);
+        $this->melhor_envio_connected     = filled($s->melhor_envio_token);
+        $this->melhor_envio_expires_at    = $s->melhor_envio_token_expires_at?->format('d/m/Y H:i');
 
         $this->pagamento_modo        = $s->pagamento_modo ?? 'manual';
         $this->comissao_percentual   = (string) ($s->comissao_percentual ?? '0');
@@ -67,8 +71,16 @@ class CheckoutSettingsForm extends Component
             'mercado_pago_access_token'  => 'nullable|string|max:2000',
         ]);
 
-        // MVP: integrações reais permanecem desativadas — os campos abaixo
-        // só ficam disponíveis para ativação manual em uma fase futura.
+        if ($this->melhor_envio_ativo && (blank($this->melhor_envio_client_id) || blank($this->melhor_envio_client_secret))) {
+            $this->addError('melhor_envio_client_id', 'Informe o Client ID e o Client Secret para ativar o Melhor Envio.');
+            return;
+        }
+
+        if ($this->melhor_envio_ativo && blank($this->melhor_envio_token)) {
+            $this->addError('melhor_envio_token', 'Conecte com o Melhor Envio ou informe um Access Token para ativar a integração.');
+            return;
+        }
+
         if ($this->mercado_pago_ativo && blank($this->mercado_pago_access_token)) {
             $this->addError('mercado_pago_access_token', 'Informe o Access Token para ativar o Mercado Pago.');
             return;
@@ -78,11 +90,15 @@ class CheckoutSettingsForm extends Component
             'frete_modo'                 => 'manual',
             'frete_mensagem_manual'      => $this->frete_mensagem_manual ?: null,
             'frete_valor_padrao'         => $this->frete_valor_padrao !== '' ? $this->frete_valor_padrao : null,
-            'melhor_envio_ativo'         => false,
+            'melhor_envio_ativo'         => $this->melhor_envio_ativo,
             'melhor_envio_client_id'     => $this->melhor_envio_client_id ?: null,
             'melhor_envio_client_secret' => $this->melhor_envio_client_secret ?: null,
             'melhor_envio_token'         => $this->melhor_envio_token ?: null,
             'melhor_envio_sandbox'       => $this->melhor_envio_sandbox,
+            ...(blank($this->melhor_envio_token) ? [
+                'melhor_envio_refresh_token' => null,
+                'melhor_envio_token_expires_at' => null,
+            ] : []),
 
             'pagamento_modo'             => $this->mercado_pago_ativo ? 'mercado_pago' : 'manual',
             'comissao_percentual'        => $this->comissao_percentual,
@@ -92,6 +108,29 @@ class CheckoutSettingsForm extends Component
             'mercado_pago_sandbox'       => $this->mercado_pago_sandbox,
         ]);
 
+        $this->melhor_envio_connected  = filled($this->melhor_envio_token);
+        $this->melhor_envio_expires_at = $this->melhor_envio_connected
+            ? SiteSetting::instance()->melhor_envio_token_expires_at?->format('d/m/Y H:i')
+            : null;
+
+        $this->saved = true;
+    }
+
+    public function disconnectMelhorEnvio(SiteSettingService $service): void
+    {
+        $this->authorizeAdminAction('configuracoes.editar');
+
+        $service->save([
+            'melhor_envio_token'            => null,
+            'melhor_envio_refresh_token'    => null,
+            'melhor_envio_token_expires_at' => null,
+            'melhor_envio_ativo'            => false,
+        ]);
+
+        $this->melhor_envio_token       = '';
+        $this->melhor_envio_ativo       = false;
+        $this->melhor_envio_connected   = false;
+        $this->melhor_envio_expires_at  = null;
         $this->saved = true;
     }
 

@@ -2,6 +2,7 @@
 
 use App\Enums\ItemType;
 use App\Enums\MenuLocation;
+use App\Http\Controllers\Admin\MelhorEnvioOAuthController;
 use App\Http\Controllers\MercadoPagoPaymentController;
 use App\Http\Controllers\ProductShareImageController;
 use App\Http\Controllers\ProductSharePreviewController;
@@ -459,6 +460,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/settings', SettingsForm::class)->name('settings.edit');
         Route::get('/settings/mail', MailSettingsForm::class)->name('settings.mail');
         Route::get('/settings/checkout', CheckoutSettingsForm::class)->name('settings.checkout');
+    });
+
+    Route::middleware('can:configuracoes.editar')->prefix('melhor-envio')->name('melhor-envio.')->group(function () {
+        Route::get('/conectar', [MelhorEnvioOAuthController::class, 'connect'])->name('connect');
+        Route::get('/callback', [MelhorEnvioOAuthController::class, 'callback'])->name('callback');
     });
 
     Route::middleware('can:usuarios.visualizar')->group(function () {

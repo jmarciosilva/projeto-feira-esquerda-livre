@@ -12,6 +12,19 @@
     </div>
     @endif
 
+    @if(session('melhor_envio_success'))
+    <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        {{ session('melhor_envio_success') }}
+    </div>
+    @endif
+
+    @if(session('melhor_envio_error'))
+    <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+        {{ session('melhor_envio_error') }}
+    </div>
+    @endif
+
     <form wire:submit="save">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -37,12 +50,41 @@
                     </div>
                 </x-admin.card>
 
-                <x-admin.card title="Melhor Envio" description="Integracao futura - credenciais salvas para ativacao posterior">
-                    <div class="space-y-4 opacity-80">
+                <x-admin.card title="Melhor Envio" description="Conecte via OAuth2 para calcular e comprar fretes automaticamente">
+                    <div class="space-y-4">
+                        <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border"
+                               style="{{ $melhor_envio_ativo ? 'background:#f0fdf4; border-color:#86efac;' : 'background:#fff; border-color:#e5e7eb;' }}">
+                            <input type="checkbox" wire:model="melhor_envio_ativo" class="mt-1 w-4 h-4 text-[#52b788] rounded border-gray-300">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">Ativar Melhor Envio no checkout</span>
+                                <span class="block text-xs text-gray-500">Quando ativo, o frete e calculado automaticamente com o token conectado abaixo.</span>
+                            </span>
+                        </label>
+
+                        @if($melhor_envio_connected)
+                        <div class="p-3 rounded-lg border border-green-200 bg-green-50 text-sm text-green-800 flex items-center justify-between gap-3">
+                            <span>
+                                <strong>Conectado.</strong>
+                                @if($melhor_envio_expires_at)
+                                    Token valido ate {{ $melhor_envio_expires_at }} (renovacao automatica).
+                                @endif
+                            </span>
+                            <button type="button" wire:click="disconnectMelhorEnvio"
+                                    wire:confirm="Desconectar o Melhor Envio? O frete automatico sera desativado."
+                                    class="text-xs font-semibold text-red-700 hover:text-red-900 whitespace-nowrap">
+                                Desconectar
+                            </button>
+                        </div>
+                        @else
+                        <div class="p-3 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-600">
+                            Nao conectado. Salve o Client ID e o Client Secret abaixo e clique em "Conectar com Melhor Envio".
+                        </div>
+                        @endif
+
                         <x-admin.input
                             label="Client ID"
                             wire:model="melhor_envio_client_id"
-                            placeholder="Disponivel apos cadastro na Melhor Envio"
+                            placeholder="Disponivel apos cadastro do app na Melhor Envio"
                             :error="$errors->first('melhor_envio_client_id')"
                         />
                         <x-admin.input
@@ -52,17 +94,33 @@
                             placeholder="{{ $melhor_envio_client_secret ? '************' : '' }}"
                             :error="$errors->first('melhor_envio_client_secret')"
                         />
-                        <x-admin.input
-                            label="Access Token"
-                            type="password"
-                            wire:model="melhor_envio_token"
-                            placeholder="{{ $melhor_envio_token ? '************' : '' }}"
-                            :error="$errors->first('melhor_envio_token')"
-                        />
+
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" wire:model="melhor_envio_sandbox" class="w-4 h-4 text-[#52b788] rounded border-gray-300">
-                            <span class="text-sm text-gray-700">Usar ambiente de testes (sandbox) quando a integracao for ativada</span>
+                            <span class="text-sm text-gray-700">Usar ambiente de testes (sandbox)</span>
                         </label>
+
+                        <a href="{{ route('admin.melhor-envio.connect') }}"
+                           class="inline-flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[#52b788] hover:bg-[#3f9d70] transition-colors">
+                            {{ $melhor_envio_connected ? 'Reconectar com Melhor Envio' : 'Conectar com Melhor Envio' }}
+                        </a>
+                        <p class="text-xs text-gray-400">
+                            URL de redirecionamento a cadastrar no app da Melhor Envio:
+                            <code class="break-all">{{ route('admin.melhor-envio.callback') }}</code>
+                        </p>
+
+                        <details class="text-xs text-gray-500">
+                            <summary class="cursor-pointer select-none">Avancado: informar Access Token manualmente</summary>
+                            <div class="mt-3">
+                                <x-admin.input
+                                    label="Access Token"
+                                    type="password"
+                                    wire:model="melhor_envio_token"
+                                    placeholder="{{ $melhor_envio_token ? '************' : '' }}"
+                                    :error="$errors->first('melhor_envio_token')"
+                                />
+                            </div>
+                        </details>
                     </div>
                 </x-admin.card>
 

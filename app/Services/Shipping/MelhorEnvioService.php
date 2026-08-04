@@ -175,7 +175,8 @@ class MelhorEnvioService
         return filled($this->token()) && filled($this->baseUrl());
     }
 
-    private function baseUrl(): string
+    /** URL base da API/OAuth do Melhor Envio (sandbox ou produção) conforme configuração ativa. */
+    public function baseUrl(): string
     {
         $settings = SiteSetting::instance();
 
@@ -190,9 +191,49 @@ class MelhorEnvioService
     {
         $settings = SiteSetting::instance();
 
-        return $settings->melhor_envio_ativo && filled($settings->melhor_envio_token)
-            ? $settings->melhor_envio_token
-            : config('melhorenvio.token');
+        if (! $settings->melhor_envio_ativo || blank($settings->melhor_envio_token)) {
+            return config('melhorenvio.token');
+        }
+
+        $this->refreshTokenIfExpiring($settings);
+
+        return $settings->melhor_envio_token;
+    }
+
+    /** Renova o access_token via refresh_token quando estiver perto de expirar. */
+    private function refreshTokenIfExpiring(SiteSetting $settings): void
+    {
+        if (blank($settings->melhor_envio_refresh_token) || blank($settings->melhor_envio_token_expires_at)) {
+            return;
+        }
+
+        if (now()->lt($settings->melhor_envio_token_expires_at->subMinutes(5))) {
+            return;
+        }
+
+        try {
+            $response = Http::baseUrl($this->baseUrl())
+                ->asJson()
+                ->acceptJson()
+                ->timeout($this->timeout())
+                ->post('/oauth/token', [
+                    'grant_type' => 'refresh_token',
+                    'refresh_token' => $settings->melhor_envio_refresh_token,
+                    'client_id' => $settings->melhor_envio_client_id,
+                    'client_secret' => $settings->melhor_envio_client_secret,
+                ])
+                ->throw();
+
+            $data = $response->json();
+
+            $settings->update([
+                'melhor_envio_token' => $data['access_token'] ?? $settings->melhor_envio_token,
+                'melhor_envio_refresh_token' => $data['refresh_token'] ?? $settings->melhor_envio_refresh_token,
+                'melhor_envio_token_expires_at' => now()->addSeconds((int) ($data['expires_in'] ?? 2592000)),
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function timeout(): int
