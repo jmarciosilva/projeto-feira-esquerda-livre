@@ -88,6 +88,7 @@
                             },
                         },
                         callbacks: {
+                            onReady: () => {},
                             onError: (error) => {
                                 console.error(error);
                                 showError('Não foi possível carregar o pagamento agora. Recarregue a página e tente novamente.');
