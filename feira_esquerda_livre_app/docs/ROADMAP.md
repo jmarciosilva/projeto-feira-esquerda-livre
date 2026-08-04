@@ -1,28 +1,30 @@
 # 🗺️ Roadmap de Desenvolvimento — App Mobile (Flutter)
 
 **Documento de Planejamento Estratégico**
-**Versão:** 0.1 — Agosto de 2026
-**Status geral do app:** planejamento. Nenhuma linha de código Flutter foi escrita ainda — este documento existe para alinhar o escopo e a ordem de construção antes de rodar `flutter create`. O backend que o app vai consumir **já está pronto** (API `/api/v1`, ver [`../../docs/API.md`](../../docs/API.md) e a Fase 9 do [`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) do backend).
+**Versão:** 0.2 — Agosto de 2026
+**Status geral do app:** em desenvolvimento. Fases 1 e 2 (setup/autenticação e catálogo/loja pública) e o módulo extra de Comunidade (Feed) já têm código Flutter funcionando contra o backend real; Home & Navegação Principal (ver módulo extra abaixo) também concluído. Fases 3–7 (carrinho/checkout, pedidos/rastreio/chat, AVA, painel do lojista, qualidade/publicação) ainda não foram construídas. O backend que o app consome **já está pronto** (API `/api/v1`, ver [`../../docs/API.md`](../../docs/API.md) e a Fase 9 do [`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) do backend).
 
 ---
 
 ## Visão Geral das Fases
 
 ```
-[FASE 1] Setup do Projeto & Autenticação
+[FASE 1] Setup do Projeto & Autenticação           ✅ Concluída
            ↓
-[FASE 2] Catálogo & Loja Pública (sem login)
+[FASE 2] Catálogo & Loja Pública (sem login)        ✅ Concluída
            ↓
-[FASE 3] Carrinho & Checkout
+[FASE 3] Carrinho & Checkout                        ❌ Não iniciada
            ↓
-[FASE 4] Pedidos, Rastreio & Chat
+[FASE 4] Pedidos, Rastreio & Chat                   🔶 Parcial (só rastreio público)
            ↓
-[FASE 5] AVA — Meu Aprendizado
+[FASE 5] AVA — Meu Aprendizado                      ❌ Não iniciada
            ↓
-[FASE 6] Painel do Lojista
+[FASE 6] Painel do Lojista                          🔶 Placeholder (tela "em breve")
            ↓
-[FASE 7] Qualidade, Testes & Publicação nas Lojas
+[FASE 7] Qualidade, Testes & Publicação nas Lojas    ❌ Não iniciada
 ```
+
+Módulos extras construídos fora de ordem, já concluídos: **Comunidade (Feed)** e **Home & Navegação Principal** (ver seções dedicadas abaixo).
 
 Fases 1–5 cobrem a jornada do **cliente comprador**. Fase 6 cobre o **lojista**, reaproveitando toda a base técnica (autenticação, cliente HTTP, tema, componentes) construída nas fases anteriores — por isso vem depois, e não em paralelo.
 
@@ -35,7 +37,7 @@ Não há trabalho de API pendente para as fases 1–6 abaixo. Todo endpoint nece
 | Área do app | Endpoints já prontos no backend |
 |---|---|
 | Autenticação | `POST /auth/registrar`, `POST /auth/entrar`, `POST /auth/sair`, `GET /auth/eu` |
-| Catálogo público | `GET /produtos\|servicos\|cuidados`, `GET /produtos/{id}`, `GET /lojas/{slug}`, `GET /categorias`, `GET /agenda`, `GET /rastreio/{code}` |
+| Catálogo público | `GET /produtos\|servicos\|cuidados`, `GET /produtos/{id}`, `GET /lojas`, `GET /lojas/{slug}`, `GET /categorias`, `GET /agenda`, `GET /rastreio/{code}` |
 | Perguntas | `GET/POST /produtos/{id}/perguntas` |
 | Carrinho | `GET /carrinho`, `POST/PATCH/DELETE /carrinho/itens` |
 | Frete e checkout | `POST /frete/cotacao`, `POST /checkout` |
@@ -77,14 +79,17 @@ Se alguma tela precisar de um dado que a API não retorna, é sinal para **volta
 
 **Objetivo estratégico:** permitir que qualquer visitante explore produtos, serviços e cuidados sem precisar se cadastrar — o cadastro só é pedido no momento de comprar ou perguntar.
 
+**Nota (Agosto/2026):** o modelo de navegação original desta fase (abas de Produtos/Serviços/Cuidados no bottom nav) foi substituído pela Home com carrosséis — ver "✅ Módulo extra — Home & Navegação Principal" abaixo. As telas de catálogo completo (`CatalogoListScreen`, com busca e filtro por categoria) continuam existindo e fazendo paginação/scroll normalmente, só deixaram de ser abas fixas e passaram a ser alcançadas pelo "Ver tudo" de cada carrossel ou pelos chips de categoria.
+
 ### Entregas
 
 | Componente | Descrição |
 |---|---|
-| Home / catálogo por eixo | Abas ou navegação para Produtos / Serviços / Cuidados, consumindo `GET /{eixo}` com paginação (scroll infinito) |
+| Catálogo por eixo | Telas de listagem para Produtos / Serviços / Cuidados, consumindo `GET /{eixo}` com paginação ("Carregar mais") — hoje acessadas via Home, não por aba própria |
 | Filtros | Busca por nome (`?busca=`) e categoria (`?categoria=`), com `GET /categorias?eixo=` para popular o filtro |
 | Detalhe do produto | Galeria de imagens, descrição, preço formatado em R$, FAQ, perguntas já respondidas (`GET /produtos/{id}/perguntas`) |
 | Pergunta ao lojista | Campo de pergunta exige login — se o visitante não estiver autenticado, direciona ao login/cadastro antes de enviar |
+| Lista de lojas | `GET /lojas` — todas as lojas ativas, paginado (destaques primeiro); destino do "Ver tudo" do carrossel de lojas da Home |
 | Página da loja | `GET /lojas/{slug}` — banner, descrição, grade de produtos da loja |
 | Agenda de feiras | Listagem (`GET /agenda`) com filtro por estado/mês/ano e detalhe (`GET /agenda/{slug}`) |
 | Rastreio público | Campo para digitar o código de rastreio, consultando `GET /rastreio/{code}` sem exigir login |
@@ -93,7 +98,7 @@ Se alguma tela precisar de um dado que a API não retorna, é sinal para **volta
 
 ---
 
-## ✅ Fase 3 — Carrinho & Checkout
+## ❌ Fase 3 — Carrinho & Checkout (não iniciada)
 
 **Objetivo estratégico:** fechar o primeiro ciclo de compra completo dentro do app.
 
@@ -112,9 +117,11 @@ Se alguma tela precisar de um dado que a API não retorna, é sinal para **volta
 
 ---
 
-## ✅ Fase 4 — Pedidos, Rastreio & Chat
+## 🔶 Fase 4 — Pedidos, Rastreio & Chat (parcial — só rastreio público)
 
 **Objetivo estratégico:** dar visibilidade e canal de comunicação pós-compra, reduzindo mensagens de suporte fora da plataforma.
+
+**O que já existe:** `RastreioScreen` (consulta pública por código, `GET /rastreio/{code}`), acessível pela aba Conta. **O que falta:** Meus Pedidos, detalhe do pedido, retomar pagamento, chat por loja e endereços — nenhum desses tem tela no app ainda.
 
 ### Entregas
 
@@ -129,7 +136,7 @@ Se alguma tela precisar de um dado que a API não retorna, é sinal para **volta
 
 ---
 
-## ✅ Fase 5 — AVA — Meu Aprendizado
+## ❌ Fase 5 — AVA — Meu Aprendizado (não iniciada)
 
 **Objetivo estratégico:** permitir que quem comprou um produto digital (curso) consuma o conteúdo direto do celular.
 
@@ -147,11 +154,13 @@ Se alguma tela precisar de um dado que a API não retorna, é sinal para **volta
 
 ---
 
-## ✅ Fase 6 — Painel do Lojista
+## 🔶 Fase 6 — Painel do Lojista (placeholder — só tela "em breve")
 
 **Objetivo estratégico:** permitir que o lojista administre a loja no dia a dia sem precisar abrir o site em um desktop — especialmente útil durante uma feira física.
 
 **Pré-requisito:** toda a base técnica das Fases 1–5 (auth, cliente HTTP, tema, componentes de formulário) é reaproveitada — esta fase é essencialmente "mais uma área do mesmo app", não um app separado.
+
+**O que já existe:** `LojistaHomeScreen` — o roteamento pós-login já leva o lojista para cá (`user.role == "lojista"`), mas a tela só mostra "Olá, {nome}!" e um aviso de que produtos/pedidos/perguntas chegam nesta fase. Nenhuma das entregas abaixo tem tela ainda.
 
 ### Entregas
 
@@ -168,7 +177,7 @@ Se alguma tela precisar de um dado que a API não retorna, é sinal para **volta
 
 ---
 
-## ✅ Fase 7 — Qualidade, Testes & Publicação nas Lojas
+## ❌ Fase 7 — Qualidade, Testes & Publicação nas Lojas (não iniciada)
 
 **Objetivo estratégico:** sair de "funciona na minha máquina" para um app publicável e mantível.
 
@@ -193,7 +202,7 @@ Se alguma tela precisar de um dado que a API não retorna, é sinal para **volta
 
 | Componente | Descrição |
 |---|---|
-| Aba "Comunidade" no bottom nav | 6ª aba, entre Agenda e Conta |
+| Aba "Nossa Comunidade" no bottom nav | Atualmente a 3ª das 4 abas fixas (Início · Agenda da Feira · Nossa Comunidade · Entrar na Conta) — ver módulo Home & Navegação Principal sobre a reorganização do bottom nav |
 | `FeedScreen` | Lista de posts (`GET /feed`), paginada com "Carregar mais", estados de loading/erro-com-retry/vazio |
 | `FeedPostCard` | Avatar/nome do expositor, imagem, curtir (otimista) e contador de comentários |
 | Curtir | `POST /feed/{post}/curtir` — exige login; visitante é direcionado ao login ao tocar |
@@ -204,19 +213,41 @@ Se alguma tela precisar de um dado que a API não retorna, é sinal para **volta
 
 ---
 
+## ✅ Módulo extra — Home & Navegação Principal
+
+**Construído fora de ordem**, revisando o modelo de navegação da Fase 2: em vez de Produtos/Serviços/Cuidados serem abas próprias do bottom nav, viraram carrosséis de uma única tela inicial — decisão do usuário após testar a primeira versão (abas por eixo) e achar a navegação pouco atraente.
+
+### Entregas
+
+| Componente | Descrição |
+|---|---|
+| `HomeScreen` (`/inicio`) | Primeira tela do app — quatro carrosséis nesta ordem: Nossos Produtos, Nossas Principais Lojas, Profissionais e Serviços, Cuidados & Bem Viver. Cada seção mostra o logotipo da marca antes do título e um "Ver tudo" que abre a listagem completa |
+| Chips de categoria | Fileira de categorias de produto acima do carrossel "Nossos Produtos" (`GET /categorias?eixo=produto`); tocar numa categoria abre o catálogo completo já filtrado (`/produtos?categoria=id`) |
+| Lista de lojas (`/lojas`) | `LojasListScreen` — grade paginada de todas as lojas ativas, destino do "Ver tudo" do carrossel de lojas |
+| `FelAppBar` | AppBar de marca (logotipo + título) reaproveitada em Home, Agenda, Comunidade, Conta e nas telas de catálogo |
+| Bottom nav reduzido | De 6 para 4 abas: **Início** · **Agenda da Feira** · **Nossa Comunidade** · **Entrar na Conta** — Produtos/Serviços/Cuidados/Lojas deixaram de ser abas |
+| Rodapé sempre visível | Produtos, serviços, cuidados, lojas (lista e detalhe) e rastreio viraram páginas dentro da pilha da aba Início (ou Conta, no caso do rastreio) via `StatefulShellRoute` — nenhuma tela do app cliente perde a barra inferior ao navegar |
+| Tipografia | Fonte trocada de Roboto (padrão Material) para Nunito (`google_fonts`) — traços mais arredondados e pesos mais leves em todo o app |
+
+**Ponto de atenção:** como o catálogo por eixo não é mais aba, o `CatalogoController`/`CatalogoState` (family por `Eixo`) continua igual — só a forma de chegar até ele mudou (Home ou "Ver tudo", em vez de bottom nav).
+
+---
+
 ## 📊 Resumo do Roadmap
 
-| Fase | Entregável Principal | Depende de endpoint novo no backend? |
-|---|---|---|
-| Fase 1 — Setup & Autenticação | Login/cadastro funcionando, sessão persistida | Não |
-| Fase 2 — Catálogo & Loja Pública | Navegação completa sem login | Não |
-| Fase 3 — Carrinho & Checkout | Primeira compra ponta a ponta | Não |
-| Fase 4 — Pedidos, Rastreio & Chat | Acompanhamento pós-compra | Não |
-| Fase 5 — AVA | Consumo de curso digital no app | Não |
-| Fase 6 — Painel do Lojista | Gestão da loja pelo celular | Não |
-| Fase 7 — Qualidade & Publicação | App nas lojas | Não |
+| Fase | Entregável Principal | Status | Depende de endpoint novo no backend? |
+|---|---|---|---|
+| Fase 1 — Setup & Autenticação | Login/cadastro funcionando, sessão persistida | ✅ Concluída | Não |
+| Fase 2 — Catálogo & Loja Pública | Navegação completa sem login | ✅ Concluída | Não |
+| Fase 3 — Carrinho & Checkout | Primeira compra ponta a ponta | ❌ Não iniciada | Não |
+| Fase 4 — Pedidos, Rastreio & Chat | Acompanhamento pós-compra | 🔶 Só rastreio público | Não |
+| Fase 5 — AVA | Consumo de curso digital no app | ❌ Não iniciada | Não |
+| Fase 6 — Painel do Lojista | Gestão da loja pelo celular | 🔶 Placeholder | Não |
+| Fase 7 — Qualidade & Publicação | App nas lojas | ❌ Não iniciada | Não |
+| Módulo extra — Comunidade (Feed) | Feed social do app | ✅ Concluído | Não |
+| Módulo extra — Home & Navegação Principal | Home com carrosséis, appbar de marca, rodapé sempre visível | ✅ Concluído | Não |
 
-Todas as fases usam endpoints já existentes — nenhuma delas está bloqueada por trabalho pendente no backend.
+Todas as fases usam endpoints já existentes — nenhuma delas está bloqueada por trabalho pendente no backend. **Próximo passo recomendado:** Fase 3 (Carrinho & Checkout) — é a única que falta para fechar o primeiro ciclo de compra ponta a ponta no app.
 
 ---
 
@@ -232,4 +263,5 @@ Mesmo corte já documentado na Fase 9 do roadmap do backend, refletido aqui para
 ---
 
 *Documento criado em: 1º de agosto de 2026 — Versão 0.1*
-*Próxima revisão: ao concluir a Fase 1 (setup + autenticação funcionando contra o backend real).*
+*Atualizado em: 4 de agosto de 2026 — Versão 0.2 (status real de cada fase revisado; módulo Home & Navegação Principal adicionado).*
+*Próxima revisão: ao concluir a Fase 3 (Carrinho & Checkout).*

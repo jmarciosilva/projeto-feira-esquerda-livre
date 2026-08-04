@@ -6,11 +6,16 @@ import '../../auth/domain/expositor_summary.dart';
 import '../../catalogo/data/catalogo_api.dart';
 import '../../catalogo/domain/categoria.dart';
 import '../../catalogo/domain/product.dart';
+import '../../contato/data/contato_api.dart';
+import '../../contato/domain/contato_info.dart';
 import '../../loja/data/loja_api.dart';
+import '../../noticias/data/noticia_api.dart';
+import '../../noticias/domain/noticia.dart';
 import 'home_state.dart';
 
-/// Carrega os dados dos 4 carrosséis da Home (produtos, lojas, serviços e
-/// cuidados) em paralelo — cada carrossel mostra só a primeira página.
+/// Carrega os dados dos carrosséis da Home (produtos, lojas, serviços,
+/// cuidados e notícias) e os contatos da seção "vender na feira" em
+/// paralelo — cada carrossel mostra só a primeira página.
 class HomeController extends Notifier<HomeState> {
   @override
   HomeState build() {
@@ -23,6 +28,8 @@ class HomeController extends Notifier<HomeState> {
     try {
       final catalogoApi = ref.read(catalogoApiProvider);
       final lojaApi = ref.read(lojaApiProvider);
+      final noticiaApi = ref.read(noticiaApiProvider);
+      final contatoApi = ref.read(contatoApiProvider);
 
       // Future.wait garante que todas as chamadas sejam aguardadas mesmo se
       // uma delas lançar antes das outras terminarem.
@@ -32,6 +39,8 @@ class HomeController extends Notifier<HomeState> {
         lojaApi.listar(),
         catalogoApi.listar(Eixo.servico),
         catalogoApi.listar(Eixo.cuidado),
+        noticiaApi.listar(),
+        contatoApi.buscar(),
       ]);
 
       state = state.copyWith(
@@ -40,6 +49,8 @@ class HomeController extends Notifier<HomeState> {
         lojas: (results[2] as Paginated<ExpositorSummary>).data,
         servicos: (results[3] as Paginated<Product>).data,
         cuidados: (results[4] as Paginated<Product>).data,
+        noticias: (results[5] as Paginated<Noticia>).data,
+        contato: results[6] as ContatoInfo,
         isLoading: false,
       );
     } on ApiException catch (error) {

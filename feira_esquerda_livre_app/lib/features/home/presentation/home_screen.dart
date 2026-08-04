@@ -2,17 +2,22 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/fel_app_bar.dart';
 import '../../../shared/widgets/product_card.dart';
+import '../../../shared/widgets/whatsapp_button.dart';
 import '../../auth/domain/expositor_summary.dart';
 import '../../catalogo/data/catalogo_api.dart';
 import '../../catalogo/domain/categoria.dart';
+import '../../contato/domain/contato_info.dart';
+import '../../noticias/domain/noticia.dart';
 import '../application/home_controller.dart';
 
-/// Primeira tela do app: quatro carrosséis, nesta ordem — Produtos,
-/// Expositores (lojas), Serviços e Cuidados & Bem Viver.
+/// Primeira tela do app: carrosséis de Produtos, Expositores (lojas),
+/// Serviços, Cuidados & Bem Viver e Notícias e Blog, seguidos da seção
+/// "Quer vender seus produtos na Feira?".
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -31,7 +36,8 @@ class HomeScreen extends ConsumerWidget {
                     state.produtos.isEmpty &&
                     state.lojas.isEmpty &&
                     state.servicos.isEmpty &&
-                    state.cuidados.isEmpty
+                    state.cuidados.isEmpty &&
+                    state.noticias.isEmpty
                 ? _ErrorState(message: state.error!, onRetry: controller.tentarNovamente)
                 : ListView(
                     padding: const EdgeInsets.only(bottom: 24),
@@ -101,6 +107,22 @@ class HomeScreen extends ConsumerWidget {
                           );
                         },
                       ),
+                      _CarouselSection(
+                        title: 'Nossas Notícias e Blog',
+                        onVerTudo: () => context.push('/noticias'),
+                        itemCount: state.noticias.length,
+                        itemBuilder: (context, index) {
+                          final noticia = state.noticias[index];
+                          return SizedBox(
+                            width: 200,
+                            child: _NoticiaCarouselCard(
+                              noticia: noticia,
+                              onTap: () => context.push('/noticias/${noticia.slug}'),
+                            ),
+                          );
+                        },
+                      ),
+                      _VenderNaFeiraSection(contato: state.contato),
                     ],
                   ),
       ),
@@ -247,6 +269,143 @@ class _ExpositorCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _NoticiaCarouselCard extends StatelessWidget {
+  const _NoticiaCarouselCard({required this.noticia, required this.onTap});
+
+  final Noticia noticia;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5E5E5)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: noticia.imageUrl != null
+                  ? CachedNetworkImage(
+                      imageUrl: noticia.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(color: const Color(0xFFF0F0F0)),
+                      errorWidget: (context, url, error) => const _PlaceholderNoticia(),
+                    )
+                  : const _PlaceholderNoticia(),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    noticia.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  if (noticia.publishedAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      DateFormat('dd/MM/yyyy').format(noticia.publishedAt!),
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaceholderNoticia extends StatelessWidget {
+  const _PlaceholderNoticia();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFF0F0F0),
+      child: const Icon(Icons.article_outlined, color: Color(0xFFBDBDBD), size: 32),
+    );
+  }
+}
+
+/// Seção final da Home — convida quem visita a virar expositor, com três
+/// canais de contato: página do site, e-mail e WhatsApp (sempre verde).
+class _VenderNaFeiraSection extends StatelessWidget {
+  const _VenderNaFeiraSection({required this.contato});
+
+  final ContatoInfo? contato;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 28, 16, 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.accentYellow,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Image.asset('assets/images/logo_bird_transparent.png', height: 26),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Quer vender seus produtos na nossa Feira?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.brown,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Junte-se aos nossos expositores e alcance quem valoriza produtos e '
+            'serviços da economia solidária.',
+            style: TextStyle(color: AppColors.brown),
+          ),
+          const SizedBox(height: 18),
+          ElevatedButton(
+            onPressed: () => context.push('/seja-um-expositor'),
+            child: const Text('Quero ser um Expositor'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => context.push('/contato'),
+            icon: const Icon(Icons.email_outlined),
+            label: const Text('Enviar Mensagem'),
+          ),
+          if (contato?.whatsapp != null && contato!.whatsapp!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            WhatsAppButton(
+              telefone: contato!.whatsapp!,
+              mensagem: 'Olá! Tenho interesse em vender meus produtos na Feira Esquerda Livre.',
+              label: 'Falar no WhatsApp',
+            ),
+          ],
+        ],
       ),
     );
   }

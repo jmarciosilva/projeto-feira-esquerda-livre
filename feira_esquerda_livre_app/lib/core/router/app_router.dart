@@ -13,12 +13,16 @@ import '../../features/catalogo/data/catalogo_api.dart';
 import '../../features/catalogo/presentation/catalogo_list_screen.dart';
 import '../../features/catalogo/presentation/product_detail_screen.dart';
 import '../../features/conta/presentation/conta_screen.dart';
+import '../../features/contato/presentation/contato_form_screen.dart';
+import '../../features/expositor_solicitacao/presentation/seja_expositor_screen.dart';
 import '../../features/feed/presentation/feed_post_detail_screen.dart';
 import '../../features/feed/presentation/feed_screen.dart';
 import '../../features/home/lojista_home_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/loja/presentation/loja_screen.dart';
 import '../../features/loja/presentation/lojas_list_screen.dart';
+import '../../features/noticias/presentation/noticia_detail_screen.dart';
+import '../../features/noticias/presentation/noticias_list_screen.dart';
 import '../../features/rastreio/presentation/rastreio_screen.dart';
 import 'app_shell.dart';
 
@@ -92,6 +96,17 @@ final routerProvider = Provider<GoRouter>((ref) {
               _catalogoRoute(Eixo.produto, 'Produtos'),
               _catalogoRoute(Eixo.servico, 'Serviços'),
               _catalogoRoute(Eixo.cuidado, 'Cuidados & Bem Viver'),
+              GoRoute(path: '/noticias', builder: (context, state) => const NoticiasListScreen()),
+              GoRoute(
+                path: '/noticias/:slug',
+                builder: (context, state) =>
+                    NoticiaDetailScreen(slug: state.pathParameters['slug']!),
+              ),
+              GoRoute(
+                path: '/seja-um-expositor',
+                builder: (context, state) => const SejaExpositorScreen(),
+              ),
+              GoRoute(path: '/contato', builder: (context, state) => const ContatoFormScreen()),
             ],
           ),
           StatefulShellBranch(

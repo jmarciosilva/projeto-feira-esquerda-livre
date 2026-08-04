@@ -22,4 +22,8 @@ abstract final class AppColors {
   static const Color surface = Colors.white;
   static const Color textPrimary = Color(0xFF1F1F1F);
   static const Color textSecondary = Color(0xFF6B6B6B);
+
+  /// Verde oficial da marca WhatsApp — todo botão "Falar no WhatsApp" do
+  /// app usa essa cor, nunca a cor de destaque do app (ver `WhatsAppButton`).
+  static const Color whatsappGreen = Color(0xFF25D366);
 }

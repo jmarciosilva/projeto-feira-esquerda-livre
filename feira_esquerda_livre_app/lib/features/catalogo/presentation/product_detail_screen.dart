@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/http/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../shared/utils/whatsapp.dart';
+import '../../../shared/widgets/whatsapp_button.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/application/auth_state.dart';
 import '../data/catalogo_api.dart';
@@ -131,13 +131,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 if (product.expositor?.whatsapp != null &&
                     product.expositor!.whatsapp!.isNotEmpty) ...[
                   const SizedBox(height: 20),
-                  OutlinedButton.icon(
-                    onPressed: () => abrirWhatsApp(
-                      product.expositor!.whatsapp!,
-                      mensagem: 'Olá! Tenho interesse no produto "${product.name}" da Feira Esquerda Livre.',
-                    ),
-                    icon: const Icon(Icons.chat_bubble_outline),
-                    label: const Text('Falar com o lojista no WhatsApp'),
+                  WhatsAppButton(
+                    telefone: product.expositor!.whatsapp!,
+                    mensagem: 'Olá! Tenho interesse no produto "${product.name}" da Feira Esquerda Livre.',
+                    label: 'Falar com o lojista no WhatsApp',
                   ),
                 ],
                 if (product.faqs != null && product.faqs!.isNotEmpty) ...[

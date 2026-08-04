@@ -6,8 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/http/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../shared/utils/whatsapp.dart';
 import '../../../shared/widgets/product_card.dart';
+import '../../../shared/widgets/whatsapp_button.dart';
 import '../data/loja_api.dart';
 import '../data/loja_detalhe.dart';
 
@@ -119,11 +119,7 @@ class _LojaScreenState extends ConsumerState<LojaScreen> {
                     spacing: 8,
                     children: [
                       if (expositor.whatsapp != null && expositor.whatsapp!.isNotEmpty)
-                        OutlinedButton.icon(
-                          onPressed: () => abrirWhatsApp(expositor.whatsapp!),
-                          icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                          label: const Text('WhatsApp'),
-                        ),
+                        WhatsAppButton(telefone: expositor.whatsapp!),
                       if (expositor.instagramUrl != null && expositor.instagramUrl!.isNotEmpty)
                         OutlinedButton.icon(
                           onPressed: () => launchUrl(
