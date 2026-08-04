@@ -794,7 +794,7 @@
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 lg:gap-5">
                 @foreach($featuredProducts as $product)
                     @if($product->expositor)
-                    <a href="{{ route('loja.produto', [$product->expositor->slug, $product->slug]) }}"
+                    <a href="{{ route('loja.produto', [$product->expositor->slug, $product->slug, 'return_to' => url()->full()]) }}"
                        class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col"
                        style="border-color: #F0D060;">
                     @else
@@ -894,7 +894,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 @foreach($featuredServicos as $item)
                     @if($item->expositor)
-                    <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug]) }}"
+                    <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug, 'return_to' => url()->full()]) }}"
                        class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col"
                        style="border-color: #F0D060;">
                     @else
@@ -1024,7 +1024,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 @foreach($featuredCuidados as $item)
                     @if($item->expositor)
-                    <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug]) }}"
+                    <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug, 'return_to' => url()->full()]) }}"
                        class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col"
                        style="border-color: #F0D060;">
                     @else

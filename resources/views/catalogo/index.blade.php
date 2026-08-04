@@ -96,7 +96,7 @@
         @else
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             @foreach($items as $item)
-            <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug]) }}"
+            <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug, 'return_to' => url()->full()]) }}"
                class="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                 <div class="aspect-square overflow-hidden bg-gray-50">
                     @php
