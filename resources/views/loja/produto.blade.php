@@ -225,7 +225,7 @@
     </div>
 
     {{-- Q&A --}}
-    <livewire:product-q-and-a :product="$product" />
+    <livewire:product-qand-a :product="$product" />
 
     {{-- FAQ --}}
     @php $faqs = $product->faqs; @endphp
