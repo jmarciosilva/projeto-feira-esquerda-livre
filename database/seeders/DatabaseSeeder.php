@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             DemoAvaCourseSeeder::class,
             DemoFeedPostSeeder::class,
             ExpositorZipcodeSeeder::class,
+            ProductLogisticDataSeeder::class,
         ]);
     }
 }
