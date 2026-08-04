@@ -140,16 +140,20 @@
                     </div>
                 </x-admin.card>
 
-                <x-admin.card title="Mercado Pago" description="Checkout Pro com retorno e webhook de confirmacao">
+                <x-admin.card title="Mercado Pago" description="Pagamento embutido (Payment Brick) - cartao, Pix e boleto sem sair do site">
                     <div class="space-y-4">
                         <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border"
                                style="{{ $mercado_pago_ativo ? 'background:#f0fdf4; border-color:#86efac;' : 'background:#fff; border-color:#e5e7eb;' }}">
                             <input type="checkbox" wire:model="mercado_pago_ativo" class="mt-1 w-4 h-4 text-[#52b788] rounded border-gray-300">
                             <span>
                                 <span class="block text-sm font-semibold text-gray-800">Ativar Mercado Pago no checkout</span>
-                                <span class="block text-xs text-gray-500">Quando ativo, o botao de finalizar compra leva o cliente para pagar na conta Mercado Pago da Feira Esquerda Livre.</span>
+                                <span class="block text-xs text-gray-500">Quando ativo, o pagamento acontece direto na pagina do pedido, na conta Mercado Pago da Feira Esquerda Livre.</span>
                             </span>
                         </label>
+
+                        <p class="text-xs text-gray-400">
+                            Nao usa Client ID/Secret - pegue apenas Public Key e Access Token na aba "Credenciais" da sua aplicacao no painel do Mercado Pago.
+                        </p>
 
                         <x-admin.input
                             label="Public Key"
