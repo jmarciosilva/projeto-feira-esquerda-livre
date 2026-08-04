@@ -24,6 +24,11 @@ class AuthenticatedSessionController extends Controller
             'password' => ['required'],
         ]);
 
+        // Precisa ser capturado antes do Auth::attempt(): um login bem-sucedido
+        // ja regenera e destroi a sessao internamente (SessionGuard::login()),
+        // entao capturar depois pegaria o ID novo e nunca acharia o carrinho guest.
+        $oldSessionId = $request->session()->getId();
+
         if (!Auth::attempt($credentials, $request->boolean('remember'))) {
             return back()->withErrors([
                 'email' => 'Credenciais inválidas.',
@@ -37,8 +42,6 @@ class AuthenticatedSessionController extends Controller
             ])->onlyInput('email');
         }
 
-        $oldSessionId = $request->session()->getId();
-        $request->session()->regenerate();
         $cart->reassignSession($oldSessionId, Auth::id());
         $redirectTo = $this->safeRedirectPath($request);
 
