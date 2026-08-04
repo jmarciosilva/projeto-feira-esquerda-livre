@@ -12,6 +12,15 @@ use Livewire\Component;
 
 class Checkout extends Component
 {
+    /**
+     * Fases do checkout, na ordem em que aparecem para o cliente.
+     * 'endereco' só é usada quando needsAddressStep() é verdadeiro,
+     * e 'pagamento' só quando o Mercado Pago está ativo.
+     */
+    private const STEPS = ['carrinho', 'dados', 'entrega', 'endereco', 'resumo', 'pagamento', 'sucesso'];
+
+    public string $step = 'carrinho';
+
     public bool $showAuthModal = false;
 
     public string $customer_name = '';
@@ -48,6 +57,15 @@ class Checkout extends Component
 
     public array $selected_shipping_options = [];
 
+    // Preenchidos assim que o pedido é criado (fase "resumo" -> "pagamento"/"sucesso").
+    // A partir daí o carrinho já foi esvaziado, então a UI passa a usar esses valores
+    // em vez de reconsultar o CartService.
+    public ?string $orderReference = null;
+
+    public ?float $orderTotalAmount = null;
+
+    public ?string $orderCustomerEmail = null;
+
     public function mount(): void
     {
         if (auth()->guest()) {
@@ -81,11 +99,6 @@ class Checkout extends Component
         $this->dispatch('cart-updated');
     }
 
-    public function updatedDeliveryType(): void
-    {
-        $this->resetShippingQuotes();
-    }
-
     public function updatedCustomerAddressId(): void
     {
         if (! auth()->check()) {
@@ -96,6 +109,89 @@ class Checkout extends Component
         $this->shipping_destination_zipcode = $address?->cep ?? '';
         $this->resetShippingQuotes();
     }
+
+    // ─── Navegação entre fases ────────────────────────────────────────────
+
+    public function goToStep(string $step): void
+    {
+        if (in_array($step, self::STEPS, true)) {
+            $this->step = $step;
+        }
+    }
+
+    public function goToDados(CartService $cart): void
+    {
+        if ($cart->items()->isEmpty()) {
+            return;
+        }
+
+        $this->step = 'dados';
+    }
+
+    public function goToEntrega(): void
+    {
+        $this->validate([
+            'customer_name' => 'required|string|max:255',
+            'customer_whatsapp' => ['required', 'string', 'regex:/^\(\d{2}\)\d{5}-\d{4}$/'],
+            'customer_email' => 'nullable|email|max:255',
+        ], [
+            'customer_whatsapp.regex' => 'Informe um WhatsApp válido no formato (00)00000-0000.',
+        ], [
+            'customer_name' => 'nome',
+        ]);
+
+        $this->step = 'entrega';
+    }
+
+    public function selectDeliveryType(string $type, CartService $cart): void
+    {
+        if (! in_array($type, ['retirada', 'entrega'], true)) {
+            return;
+        }
+
+        $this->delivery_type = $type;
+        $this->resetShippingQuotes();
+        $this->step = $this->needsAddressStep($cart) ? 'endereco' : 'resumo';
+    }
+
+    public function goToResumoFromEndereco(CartService $cart): void
+    {
+        if (! $this->needsAddressStep($cart)) {
+            $this->step = 'resumo';
+
+            return;
+        }
+
+        if (! $this->customer_address_id) {
+            $this->addError('customer_address_id', 'Selecione ou cadastre um endereço de entrega.');
+
+            return;
+        }
+
+        $this->step = 'resumo';
+    }
+
+    public function backStep(CartService $cart): void
+    {
+        $this->step = match ($this->step) {
+            'dados' => 'carrinho',
+            'entrega' => 'dados',
+            'endereco' => 'entrega',
+            'resumo' => $this->needsAddressStep($cart) ? 'endereco' : 'entrega',
+            default => $this->step,
+        };
+    }
+
+    public function needsAddressStep(CartService $cart): bool
+    {
+        if ($this->delivery_type !== 'entrega') {
+            return false;
+        }
+
+        return ! $cart->items()->every(fn ($item) => $item->product?->is_digital);
+    }
+
+    // ─── Frete e endereço ─────────────────────────────────────────────────
 
     public function calculateShipping(MelhorEnvioService $shipping, CartService $cart): void
     {
@@ -200,7 +296,9 @@ class Checkout extends Component
         ]);
     }
 
-    public function confirmar(OrderService $orderService, CartService $cart, MercadoPagoService $mercadoPago)
+    // ─── Confirmação do pedido ────────────────────────────────────────────
+
+    public function confirmar(OrderService $orderService, CartService $cart, MercadoPagoService $mercadoPago): void
     {
         if (auth()->guest()) {
             $this->showAuthModal = true;
@@ -222,23 +320,24 @@ class Checkout extends Component
 
         $this->validate([
             'customer_name' => 'required|string|max:255',
-            'customer_whatsapp' => 'required|string|max:20',
+            'customer_whatsapp' => ['required', 'string', 'regex:/^\(\d{2}\)\d{5}-\d{4}$/'],
             'customer_email' => 'nullable|email|max:255',
             'delivery_type' => 'required|in:retirada,entrega',
-        ], [], [
+        ], [
+            'customer_whatsapp.regex' => 'Informe um WhatsApp válido no formato (00)00000-0000.',
+        ], [
             'customer_name' => 'nome',
-            'customer_whatsapp' => 'WhatsApp',
         ]);
 
         $address = null;
+        $needsAddress = $this->needsAddressStep($cart);
 
-        $allDigital = $cart->items()->every(fn ($item) => $item->product?->is_digital);
-
-        if ($this->delivery_type === 'entrega' && ! $allDigital) {
+        if ($needsAddress) {
             $address = auth()->user()->addresses()->find($this->customer_address_id);
 
             if (! $address) {
                 $this->addError('customer_address_id', 'Selecione ou cadastre um endereço de entrega.');
+                $this->step = 'endereco';
 
                 return;
             }
@@ -261,20 +360,34 @@ class Checkout extends Component
             'shipping_note' => $this->shippingNote(),
         ], $cart);
 
+        $this->orderReference = $order->reference;
+        $this->orderTotalAmount = (float) $order->total_amount;
+        $this->orderCustomerEmail = $order->customer_email;
+
         if ($mercadoPago->isEnabled()) {
-            // O pagamento em si acontece na página do pedido, com o Payment Brick
+            // O pagamento em si acontece nesta mesma fase, com o Payment Brick
             // embutido — sem sair do site. Aqui só marcamos o metodo escolhido.
             $order->forceFill([
                 'payment_method' => 'mercado_pago',
                 'payment_provider' => 'mercado_pago',
                 'payment_status' => 'pending',
             ])->save();
+
+            $this->step = 'pagamento';
+            $this->dispatch(
+                'order-created',
+                reference: $order->reference,
+                amount: (float) $order->total_amount,
+                email: $order->customer_email,
+            );
+
+            return;
         }
 
-        return $this->redirect(route('pedido.show', $order->reference), navigate: false);
+        $this->step = 'sucesso';
     }
 
-    public function render(CartService $cart): View
+    public function render(CartService $cart, MercadoPagoService $mercadoPago): View
     {
         $shippingTotal = $this->delivery_type === 'entrega' ? $this->shippingTotal() : 0.0;
 
@@ -287,7 +400,45 @@ class Checkout extends Component
             'addresses' => auth()->check()
                 ? auth()->user()->addresses()->orderByDesc('is_default')->get()
                 : collect(),
+            'needsAddressStep' => $this->needsAddressStep($cart),
+            'mercadoPagoAtivo' => $mercadoPago->isEnabled(),
+            'stepMeta' => $this->stepMeta($cart, $mercadoPago),
         ]);
+    }
+
+    /**
+     * @return array{index: int, total: int, label: string}
+     */
+    private function stepMeta(CartService $cart, MercadoPagoService $mercadoPago): array
+    {
+        $steps = ['carrinho', 'dados', 'entrega'];
+
+        if ($this->needsAddressStep($cart)) {
+            $steps[] = 'endereco';
+        }
+
+        $steps[] = 'resumo';
+
+        if ($mercadoPago->isEnabled()) {
+            $steps[] = 'pagamento';
+        }
+
+        $labels = [
+            'carrinho' => 'Carrinho',
+            'dados' => 'Seus dados',
+            'entrega' => 'Entrega',
+            'endereco' => 'Endereço',
+            'resumo' => 'Resumo',
+            'pagamento' => 'Pagamento',
+        ];
+
+        $index = array_search($this->step, $steps, true);
+
+        return [
+            'index' => $index === false ? count($steps) : $index + 1,
+            'total' => count($steps),
+            'label' => $labels[$this->step] ?? '',
+        ];
     }
 
     private function shippingTotal(): float
