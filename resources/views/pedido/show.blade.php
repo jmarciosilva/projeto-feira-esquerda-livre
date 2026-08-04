@@ -7,6 +7,7 @@
     $isMercadoPago = $order->payment_method === 'mercado_pago';
     $isPaid = $order->status === \App\Enums\OrderStatus::PagamentoConfirmado;
     $shippings = $order->shippings ?? collect();
+    $mpSettings = \App\Models\SiteSetting::instance();
 @endphp
 
 <main class="max-w-3xl mx-auto px-4 sm:px-6 py-10">
@@ -33,12 +34,116 @@
             @if($isPaid)
                 <p>Recebemos a confirmacao do Mercado Pago da Feira Esquerda Livre. As lojas ja podem preparar seu pedido.</p>
             @else
-                <p>Finalize o pagamento no ambiente seguro do Mercado Pago da Feira Esquerda Livre. O pedido sera atualizado automaticamente quando o pagamento for confirmado.</p>
-                <a href="{{ route('mercado-pago.pay', $order->reference) }}"
-                   class="mt-4 inline-flex items-center justify-center px-6 py-3 rounded-xl text-white font-bold"
-                   style="background:#E8A000; min-height:48px;">
-                    Pagar agora com Mercado Pago
-                </a>
+                <p class="mb-4">Finalize o pagamento abaixo, sem sair desta página.</p>
+
+                <div id="mp-payment-error" class="hidden mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm"></div>
+                <div id="mp-pix-result" class="hidden mb-4 p-4 rounded-lg bg-white border border-gray-200 text-center"></div>
+
+                <div id="paymentBrick_container"></div>
+
+                @push('scripts')
+                <script src="https://sdk.mercadopago.com/js/v2"></script>
+                <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const mp = new MercadoPago(@json($mpSettings->mercado_pago_public_key), { locale: 'pt-BR' });
+
+                    const errorBox = document.getElementById('mp-payment-error');
+                    const pixBox = document.getElementById('mp-pix-result');
+                    const payUrl = @json(route('mercado-pago.pay.process', $order->reference));
+                    const statusUrl = @json(route('pedido.status', $order->reference));
+
+                    function showError(message) {
+                        errorBox.textContent = message;
+                        errorBox.classList.remove('hidden');
+                    }
+
+                    function pollPaymentStatus() {
+                        let attempts = 0;
+                        const interval = setInterval(function () {
+                            attempts++;
+                            fetch(statusUrl)
+                                .then((response) => response.json())
+                                .then((data) => {
+                                    if (data.status === 'approved') {
+                                        clearInterval(interval);
+                                        window.location.reload();
+                                    }
+                                })
+                                .catch(() => {});
+                            if (attempts >= 60) clearInterval(interval);
+                        }, 5000);
+                    }
+
+                    mp.bricks().create('payment', 'paymentBrick_container', {
+                        initialization: {
+                            amount: {{ (float) $order->total_amount }},
+                            payer: { email: @json($order->customer_email) },
+                        },
+                        customization: {
+                            paymentMethods: {
+                                creditCard: 'all',
+                                debitCard: 'all',
+                                bankTransfer: 'all',
+                                ticket: 'all',
+                            },
+                        },
+                        callbacks: {
+                            onError: (error) => {
+                                console.error(error);
+                                showError('Não foi possível carregar o pagamento agora. Recarregue a página e tente novamente.');
+                            },
+                            onSubmit: ({ formData }) => {
+                                errorBox.classList.add('hidden');
+
+                                return new Promise((resolve, reject) => {
+                                    fetch(payUrl, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Accept': 'application/json',
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                        },
+                                        body: JSON.stringify(formData),
+                                    })
+                                        .then((response) => response.json())
+                                        .then((result) => {
+                                            if (result.status === 'approved') {
+                                                window.location.reload();
+                                            } else if (result.status === 'pending' && result.pix && result.pix.qr_code_base64) {
+                                                pixBox.innerHTML =
+                                                    '<p class="font-semibold text-gray-800 mb-3">Escaneie o QR Code do Pix para pagar</p>' +
+                                                    '<img src="data:image/png;base64,' + result.pix.qr_code_base64 + '" alt="QR Code Pix" class="mx-auto mb-3" style="max-width:220px;">' +
+                                                    '<p class="text-xs text-gray-500 mb-2">Ou copie o código:</p>' +
+                                                    '<textarea readonly class="w-full text-xs p-2 border rounded-lg" rows="3" onclick="this.select()">' + result.pix.qr_code + '</textarea>' +
+                                                    '<p class="text-xs text-gray-500 mt-3">Esta página será atualizada automaticamente assim que o pagamento for confirmado.</p>';
+                                                pixBox.classList.remove('hidden');
+                                                pollPaymentStatus();
+                                            } else if (result.status === 'pending' && result.ticket_url) {
+                                                window.open(result.ticket_url, '_blank');
+                                                showError('Boleto gerado em uma nova aba. Após o pagamento, pode levar até 3 dias úteis para compensar.');
+                                                pollPaymentStatus();
+                                            } else if (result.status === 'rejected') {
+                                                showError('Pagamento recusado: ' + (result.status_detail || 'tente outro cartão ou forma de pagamento.'));
+                                            } else if (result.status === 'error') {
+                                                showError(result.message || 'Não foi possível processar o pagamento agora.');
+                                            } else {
+                                                showError('Pagamento em análise. Assim que confirmado, atualizaremos seu pedido.');
+                                                pollPaymentStatus();
+                                            }
+                                            resolve();
+                                        })
+                                        .catch((error) => {
+                                            console.error(error);
+                                            showError('Não foi possível processar o pagamento agora. Tente novamente.');
+                                            reject();
+                                        });
+                                });
+                            },
+                        },
+                    });
+                });
+                </script>
+                @endpush
             @endif
             <p class="mt-3">{{ $order->delivery_type->emoji() }} <strong>{{ $order->delivery_type->label() }}:</strong> {{ $order->shipping_note }}</p>
         </div>

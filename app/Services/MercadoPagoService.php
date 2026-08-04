@@ -78,6 +78,46 @@ class MercadoPagoService
     }
 
     /**
+     * Cria e processa um pagamento direto via Checkout API (Payment Brick embutido),
+     * sem redirecionar o cliente para fora do site.
+     *
+     * @param  array<string, mixed>  $formData  Payload gerado pelo Payment Brick (onSubmit).
+     * @return array<string, mixed>
+     */
+    public function createPayment(Order $order, array $formData): array
+    {
+        $settings = SiteSetting::instance();
+        $this->ensureConfigured($settings);
+
+        // O valor cobrado nunca vem do navegador — sempre recalculado a partir do pedido.
+        $payload = array_merge($formData, [
+            'transaction_amount' => round((float) $order->total_amount, 2),
+            'external_reference' => $order->reference,
+            'description' => "Pedido #{$order->reference} - Feira Esquerda Livre",
+            'notification_url' => route('mercado-pago.webhook'),
+        ]);
+
+        try {
+            $response = Http::withToken($settings->mercado_pago_access_token)
+                ->acceptJson()
+                ->asJson()
+                ->withHeaders([
+                    'X-Idempotency-Key' => 'fel-payment-'.$order->reference.'-'.substr(sha1(json_encode($formData)), 0, 16),
+                ])
+                ->post(self::API_BASE_URL.'/v1/payments', $payload)
+                ->throw();
+        } catch (RequestException $exception) {
+            throw new RuntimeException($this->paymentErrorMessage($exception), previous: $exception);
+        }
+
+        $payment = $response->json();
+
+        $this->applyPayment($payment);
+
+        return $payment;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function getPayment(string $paymentId): array
@@ -157,6 +197,16 @@ class MercadoPagoService
         if (! $this->isEnabled($settings)) {
             throw new RuntimeException('Mercado Pago não está ativo ou está sem Access Token.');
         }
+    }
+
+    private function paymentErrorMessage(RequestException $exception): string
+    {
+        $response = $exception->response;
+        $message = $response?->json('message') ?: $response?->json('cause.0.description');
+
+        return is_string($message) && $message !== ''
+            ? "Mercado Pago: {$message}"
+            : 'Não foi possível processar o pagamento pelo Mercado Pago agora.';
     }
 
     /**

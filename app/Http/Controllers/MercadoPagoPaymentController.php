@@ -35,6 +35,79 @@ class MercadoPagoPaymentController extends Controller
         }
     }
 
+    /** Recebe o formData do Payment Brick embutido e processa o pagamento direto via Checkout API. */
+    public function pay(Request $request, string $reference, MercadoPagoService $mercadoPago): JsonResponse
+    {
+        $order = Order::where('reference', $reference)->firstOrFail();
+
+        if ($order->status === OrderStatus::PagamentoConfirmado) {
+            return response()->json(['status' => 'approved']);
+        }
+
+        $formData = $request->validate([
+            'token' => 'nullable|string',
+            'issuer_id' => 'nullable|string',
+            'payment_method_id' => 'required|string|max:60',
+            'installments' => 'nullable|integer|min:1|max:60',
+            'payer' => 'required|array',
+            'payer.email' => 'required|email|max:255',
+            'payer.first_name' => 'nullable|string|max:255',
+            'payer.last_name' => 'nullable|string|max:255',
+            'payer.identification' => 'nullable|array',
+            'payer.identification.type' => 'nullable|string|max:10',
+            'payer.identification.number' => 'nullable|string|max:30',
+            'payer.address' => 'nullable|array',
+            'payer.phone' => 'nullable|array',
+        ]);
+
+        try {
+            $payment = $mercadoPago->createPayment($order, $formData);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'status' => $payment['status'] ?? 'unknown',
+            'status_detail' => $payment['status_detail'] ?? null,
+            'payment_id' => $payment['id'] ?? null,
+            'pix' => $this->extractPix($payment),
+            'ticket_url' => $payment['transaction_details']['external_resource_url'] ?? null,
+        ]);
+    }
+
+    /** Status resumido do pedido, usado pelo polling do Pix embutido para atualizar a página sozinha. */
+    public function status(string $reference): JsonResponse
+    {
+        $order = Order::where('reference', $reference)->firstOrFail();
+
+        return response()->json([
+            'status' => $order->status === OrderStatus::PagamentoConfirmado ? 'approved' : ($order->payment_status ?? 'pending'),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payment
+     * @return array{qr_code: ?string, qr_code_base64: ?string}|null
+     */
+    private function extractPix(array $payment): ?array
+    {
+        $data = $payment['point_of_interaction']['transaction_data'] ?? null;
+
+        if (! is_array($data)) {
+            return null;
+        }
+
+        return [
+            'qr_code' => $data['qr_code'] ?? null,
+            'qr_code_base64' => $data['qr_code_base64'] ?? null,
+        ];
+    }
+
     public function retorno(string $reference, Request $request, MercadoPagoService $mercadoPago): RedirectResponse
     {
         $order = Order::where('reference', $reference)->firstOrFail();

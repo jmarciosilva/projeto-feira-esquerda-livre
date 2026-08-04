@@ -9,7 +9,6 @@ use App\Services\OrderService;
 use App\Services\Shipping\MelhorEnvioService;
 use Illuminate\View\View;
 use Livewire\Component;
-use Throwable;
 
 class Checkout extends Component
 {
@@ -263,17 +262,13 @@ class Checkout extends Component
         ], $cart);
 
         if ($mercadoPago->isEnabled()) {
-            try {
-                $order = $mercadoPago->createPreference($order);
-
-                return redirect()->away($mercadoPago->checkoutUrl($order));
-            } catch (Throwable $exception) {
-                report($exception);
-
-                session()->flash('error', 'O pedido foi criado, mas não foi possível abrir o Mercado Pago agora. Tente pagar novamente pela página do pedido.');
-
-                return $this->redirect(route('pedido.show', $order->reference), navigate: false);
-            }
+            // O pagamento em si acontece na página do pedido, com o Payment Brick
+            // embutido — sem sair do site. Aqui só marcamos o metodo escolhido.
+            $order->forceFill([
+                'payment_method' => 'mercado_pago',
+                'payment_provider' => 'mercado_pago',
+                'payment_status' => 'pending',
+            ])->save();
         }
 
         return $this->redirect(route('pedido.show', $order->reference), navigate: false);

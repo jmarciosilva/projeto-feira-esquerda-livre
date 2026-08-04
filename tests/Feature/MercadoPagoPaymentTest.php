@@ -84,6 +84,104 @@ class MercadoPagoPaymentTest extends TestCase
         $this->assertSame(OrderSplitStatus::Confirmado, $order->splits()->first()->status);
     }
 
+    public function test_pay_endpoint_charges_real_order_total_ignoring_client_amount(): void
+    {
+        $order = $this->makeOrder([
+            'payment_method' => 'mercado_pago',
+            'payment_provider' => 'mercado_pago',
+            'payment_status' => 'pending',
+        ]);
+        $this->enableMercadoPago();
+
+        Http::fake([
+            'api.mercadopago.com/v1/payments' => function ($request) {
+                return Http::response([
+                    'id' => 555,
+                    'status' => 'approved',
+                    'status_detail' => 'accredited',
+                    'external_reference' => $request['external_reference'],
+                    'date_approved' => '2026-06-29T12:00:00.000-03:00',
+                ]);
+            },
+        ]);
+
+        $response = $this->postJson(route('mercado-pago.pay.process', $order->reference), [
+            'payment_method_id' => 'pix',
+            'transaction_amount' => 0.01, // tentativa de manipular o valor — deve ser ignorado
+            'payer' => ['email' => 'cliente@example.com'],
+        ]);
+
+        $response->assertOk()->assertJsonPath('status', 'approved');
+
+        Http::assertSent(function ($request) use ($order) {
+            $payload = $request->data();
+
+            return (float) $payload['transaction_amount'] === 89.90
+                && $payload['external_reference'] === $order->reference;
+        });
+
+        $order->refresh();
+        $this->assertSame(OrderStatus::PagamentoConfirmado, $order->status);
+    }
+
+    public function test_pay_endpoint_returns_pix_qr_code_when_pending(): void
+    {
+        $order = $this->makeOrder([
+            'payment_method' => 'mercado_pago',
+            'payment_provider' => 'mercado_pago',
+            'payment_status' => 'pending',
+        ]);
+        $this->enableMercadoPago();
+
+        Http::fake([
+            'api.mercadopago.com/v1/payments' => function ($request) {
+                return Http::response([
+                    'id' => 777,
+                    'status' => 'pending',
+                    'status_detail' => 'pending_waiting_transfer',
+                    'external_reference' => $request['external_reference'],
+                    'point_of_interaction' => [
+                        'transaction_data' => [
+                            'qr_code' => '00020126...copia-e-cola',
+                            'qr_code_base64' => 'iVBORw0KGgoAAAANSUhEUg==',
+                        ],
+                    ],
+                ]);
+            },
+        ]);
+
+        $response = $this->postJson(route('mercado-pago.pay.process', $order->reference), [
+            'payment_method_id' => 'pix',
+            'payer' => ['email' => 'cliente@example.com'],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('status', 'pending')
+            ->assertJsonPath('pix.qr_code_base64', 'iVBORw0KGgoAAAANSUhEUg==');
+
+        $order->refresh();
+        $this->assertSame('pending', $order->payment_status);
+    }
+
+    public function test_pedido_show_renders_embedded_payment_brick_when_pending(): void
+    {
+        $order = $this->makeOrder([
+            'payment_method' => 'mercado_pago',
+            'payment_provider' => 'mercado_pago',
+            'payment_status' => 'pending',
+        ]);
+        $this->enableMercadoPago();
+        SiteSetting::instance()->update(['mercado_pago_public_key' => 'TEST-public-key']);
+
+        $response = $this->get(route('pedido.show', $order->reference));
+
+        $response->assertOk()
+            ->assertSee('paymentBrick_container', false)
+            ->assertSee('sdk.mercadopago.com/js/v2', false)
+            ->assertSee('TEST-public-key', false)
+            ->assertDontSee('Pagar agora com Mercado Pago');
+    }
+
     /**
      * @param array<string, mixed> $attributes
      */

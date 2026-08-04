@@ -325,6 +325,12 @@ Route::get('/pagamentos/mercado-pago/retorno/{reference}', [MercadoPagoPaymentCo
 Route::get('/pedido/{reference}/pagar', [MercadoPagoPaymentController::class, 'start'])
     ->name('mercado-pago.pay');
 
+Route::post('/pedido/{reference}/pagar/mercado-pago', [MercadoPagoPaymentController::class, 'pay'])
+    ->name('mercado-pago.pay.process');
+
+Route::get('/pedido/{reference}/status', [MercadoPagoPaymentController::class, 'status'])
+    ->name('pedido.status');
+
 Route::get('/pedido/{reference}', function (string $reference) {
     $order = Order::where('reference', $reference)
         ->with(['items', 'splits.expositor', 'shippings.expositor'])
