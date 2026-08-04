@@ -5,8 +5,10 @@ namespace Tests\Feature\Api\V1;
 use App\Models\ContentCategory;
 use App\Models\Event;
 use App\Models\Expositor;
+use App\Models\Post;
 use App\Models\Product;
 use App\Models\ProductQuestion;
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -114,6 +116,120 @@ class CatalogoApiTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.name', 'Ateliê das Mãos');
+    }
+
+    public function test_lists_only_published_news_posts_ordered_by_recent(): void
+    {
+        $author = User::factory()->create();
+
+        $older = Post::create([
+            'user_id' => $author->id,
+            'title' => 'Notícia mais antiga',
+            'slug' => 'noticia-mais-antiga',
+            'type' => 'news',
+            'status' => 'published',
+            'published_at' => now()->subDays(5),
+            'is_active' => true,
+        ]);
+
+        $newer = Post::create([
+            'user_id' => $author->id,
+            'title' => 'Notícia mais recente',
+            'slug' => 'noticia-mais-recente',
+            'type' => 'news',
+            'status' => 'published',
+            'published_at' => now()->subDay(),
+            'is_active' => true,
+        ]);
+
+        Post::create([
+            'user_id' => $author->id,
+            'title' => 'Rascunho não publicado',
+            'slug' => 'rascunho-nao-publicado',
+            'type' => 'post',
+            'status' => 'draft',
+            'published_at' => null,
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson('/api/v1/noticias')->assertOk();
+        $response->assertJsonCount(2, 'data');
+        $response->assertJsonPath('data.0.slug', $newer->slug);
+        $response->assertJsonPath('data.1.slug', $older->slug);
+    }
+
+    public function test_shows_single_news_post_with_content_and_related_posts(): void
+    {
+        $author = User::factory()->create(['name' => 'Redação FEL']);
+
+        $post = Post::create([
+            'user_id' => $author->id,
+            'title' => 'Notícia principal',
+            'slug' => 'noticia-principal',
+            'content' => '<p>Corpo completo da <strong>notícia</strong>.</p>',
+            'type' => 'news',
+            'status' => 'published',
+            'published_at' => now()->subDay(),
+            'is_active' => true,
+        ]);
+
+        $related = Post::create([
+            'user_id' => $author->id,
+            'title' => 'Notícia relacionada',
+            'slug' => 'noticia-relacionada',
+            'type' => 'news',
+            'status' => 'published',
+            'published_at' => now()->subDays(2),
+            'is_active' => true,
+        ]);
+
+        // Mesmo eixo (post normal), não deve aparecer como relacionada de uma notícia.
+        Post::create([
+            'user_id' => $author->id,
+            'title' => 'Post de outro tipo',
+            'slug' => 'post-de-outro-tipo',
+            'type' => 'post',
+            'status' => 'published',
+            'published_at' => now()->subDays(3),
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson("/api/v1/noticias/{$post->slug}")->assertOk();
+        $response->assertJsonPath('noticia.title', 'Notícia principal');
+        $response->assertJsonPath('noticia.content', '<p>Corpo completo da <strong>notícia</strong>.</p>');
+        $response->assertJsonPath('noticia.author_name', 'Redação FEL');
+        $response->assertJsonCount(1, 'relacionadas');
+        $response->assertJsonPath('relacionadas.0.slug', $related->slug);
+    }
+
+    public function test_unpublished_news_post_returns_404(): void
+    {
+        $author = User::factory()->create();
+        Post::create([
+            'user_id' => $author->id,
+            'title' => 'Rascunho',
+            'slug' => 'rascunho',
+            'type' => 'news',
+            'status' => 'draft',
+            'published_at' => null,
+            'is_active' => true,
+        ]);
+
+        $this->getJson('/api/v1/noticias/rascunho')->assertNotFound();
+    }
+
+    public function test_contato_returns_public_whatsapp_and_email(): void
+    {
+        SiteSetting::instance()->update([
+            'whatsapp' => '(11) 99999-9999',
+            'email' => 'contato@feiraesquerdalivre.com.br',
+            'mercado_pago_access_token' => 'SEGREDO_NAO_PODE_APARECER',
+        ]);
+
+        $response = $this->getJson('/api/v1/contato')->assertOk();
+        $response->assertJsonPath('data.whatsapp', '(11) 99999-9999');
+        $response->assertJsonPath('data.email', 'contato@feiraesquerdalivre.com.br');
+        $response->assertJsonMissingPath('data.mercado_pago_access_token');
     }
 
     public function test_lists_categories_filtered_by_eixo(): void

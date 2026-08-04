@@ -7,8 +7,11 @@ use App\Http\Controllers\Api\V1\CarrinhoController;
 use App\Http\Controllers\Api\V1\CatalogoController;
 use App\Http\Controllers\Api\V1\CategoriaController;
 use App\Http\Controllers\Api\V1\CheckoutController;
+use App\Http\Controllers\Api\V1\ContatoController;
 use App\Http\Controllers\Api\V1\EnderecoController;
+use App\Http\Controllers\Api\V1\ExpositorSolicitacaoController;
 use App\Http\Controllers\Api\V1\LojaController;
+use App\Http\Controllers\Api\V1\NoticiaController;
 use App\Http\Controllers\Api\V1\Lojista\CursoController as LojistaCursoController;
 use App\Http\Controllers\Api\V1\Lojista\ExposicaoController as LojistaExposicaoController;
 use App\Http\Controllers\Api\V1\Lojista\LojaController as LojistaLojaController;
@@ -51,6 +54,15 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/agenda', [AgendaController::class, 'index'])->name('agenda.index');
     Route::get('/agenda/{slug}', [AgendaController::class, 'show'])->name('agenda.show');
     Route::get('/rastreio/{trackingCode}', [RastreioController::class, 'show'])->name('rastreio.show');
+    Route::get('/noticias', [NoticiaController::class, 'index'])->name('noticias.index');
+    Route::get('/noticias/{slug}', [NoticiaController::class, 'show'])->name('noticias.show');
+    Route::get('/contato', [ContatoController::class, 'show'])->name('contato.show');
+
+    // Mesmos fluxos dos formulários públicos do site (contato e seja-um-
+    // expositor), só que sem sair do app — ver routes/web.php para o
+    // equivalente com view/redirect usado pelo navegador.
+    Route::post('/contato', [ContatoController::class, 'store'])->name('contato.store');
+    Route::post('/seja-um-expositor', [ExpositorSolicitacaoController::class, 'store'])->name('seja-um-expositor.store');
 
     // Reaproveita o mesmo controller já usado pelo checkout web — sem duplicar lógica.
     Route::post('/frete/cotacao', [ShippingController::class, 'quote'])->name('frete.cotacao');

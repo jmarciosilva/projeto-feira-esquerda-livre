@@ -74,6 +74,11 @@ Lojistas **não se cadastram** por aqui — a conta é criada quando a administr
 | GET | `/agenda` | Próximas feiras. Filtros: `?estado=&mes=&ano=` |
 | GET | `/agenda/{slug}` | Detalhe do evento + expositores confirmados |
 | GET | `/rastreio/{trackingCode}` | Rastreio público de uma entrega |
+| GET | `/noticias` | Notícias/posts publicados, paginado, mais recentes primeiro |
+| GET | `/noticias/{slug}` | Notícia completa (corpo em HTML) + até 3 relacionadas do mesmo tipo |
+| GET | `/contato` | WhatsApp e e-mail públicos de contato da plataforma |
+| POST | `/contato` | Mesmo fluxo do formulário de contato do site, sem sair do app. Body: `name, email, phone?, subject, message` |
+| POST | `/seja-um-expositor` | Mesmo fluxo do formulário "Seja um Expositor" do site. Body: `nome_loja, responsavel, cpf_cnpj, whatsapp, email, instagram_url, facebook_url?, pix_tipo, pix_chave, banco_nome?, banco_agencia?, banco_conta?, banco_tipo_conta?, descricao?, eixos?[]` |
 | GET | `/produtos/{id}/perguntas` | Perguntas já respondidas e visíveis |
 | POST | `/produtos/{id}/perguntas` | **Requer login.** Body: `question` (5–500 chars) |
 | POST | `/frete/cotacao` | Cotação de frete (mesmo endpoint do checkout web). Body: `store_id, destination_zipcode, items[{product_id, quantity}]` |
