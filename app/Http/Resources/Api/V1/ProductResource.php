@@ -2,9 +2,9 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Support\PublicUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 /** @mixin \App\Models\Product */
 class ProductResource extends JsonResource
@@ -32,8 +32,8 @@ class ProductResource extends JsonResource
             'length' => $this->length ? (float) $this->length : null,
             'main_image_url' => $this->main_image_url,
             'images' => collect($this->images ?? [])->map(fn (array $image) => [
-                'thumbnail_url' => isset($image['thumb']) ? Storage::url($image['thumb']) : null,
-                'medium_url' => isset($image['medium']) ? Storage::url($image['medium']) : null,
+                'thumbnail_url' => isset($image['thumb']) ? PublicUrl::for($image['thumb']) : null,
+                'medium_url' => isset($image['medium']) ? PublicUrl::for($image['medium']) : null,
             ])->values(),
             'expositor' => $this->whenLoaded('expositor', fn () => new ExpositorResource($this->expositor)),
             'category' => $this->whenLoaded('category', fn () => $this->category ? [

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\ContatoController;
 use App\Http\Controllers\Api\V1\EnderecoController;
 use App\Http\Controllers\Api\V1\ExpositorSolicitacaoController;
+use App\Http\Controllers\Api\V1\FeedController;
 use App\Http\Controllers\Api\V1\LojaController;
 use App\Http\Controllers\Api\V1\NoticiaController;
 use App\Http\Controllers\Api\V1\Lojista\CursoController as LojistaCursoController;
@@ -67,8 +68,17 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // Reaproveita o mesmo controller já usado pelo checkout web — sem duplicar lógica.
     Route::post('/frete/cotacao', [ShippingController::class, 'quote'])->name('frete.cotacao');
 
+    // ─── Comunidade (feed) ──────────────────────────────────────────────
+    // Leitura é pública, igual ao site; curtir/comentar/denunciar exigem login.
+    Route::get('/feed', [FeedController::class, 'index'])->name('feed.index');
+    Route::get('/feed/{post}/comentarios', [FeedController::class, 'comentarios'])->name('feed.comentarios.index');
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/produtos/{product}/perguntas', [ProductQuestionController::class, 'store'])->name('produtos.perguntas.store');
+
+        Route::post('/feed/{post}/curtir', [FeedController::class, 'curtir'])->name('feed.curtir');
+        Route::post('/feed/{post}/comentarios', [FeedController::class, 'comentar'])->name('feed.comentarios.store');
+        Route::post('/feed/{post}/denunciar', [FeedController::class, 'denunciar'])->name('feed.denunciar');
 
         // ─── Carrinho ───────────────────────────────────────────────────
         Route::get('/carrinho', [CarrinhoController::class, 'index'])->name('carrinho.index');

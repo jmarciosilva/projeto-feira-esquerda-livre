@@ -2,9 +2,9 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Support\PublicUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 /** @mixin \App\Models\Event */
 class EventoResource extends JsonResource
@@ -23,8 +23,8 @@ class EventoResource extends JsonResource
             'longitude' => $this->longitude,
             'start_date' => $this->start_date,
             'end_date' => $this->end_date,
-            'image_url' => $this->image_path ? Storage::url($this->image_path) : null,
-            'banner_image_url' => $this->banner_image_path ? Storage::url($this->banner_image_path) : null,
+            'image_url' => PublicUrl::for($this->image_path),
+            'banner_image_url' => PublicUrl::for($this->banner_image_path),
             'is_featured' => (bool) $this->is_featured,
             'capacidade_expositores' => $this->capacidade_expositores,
             'vagas_restantes' => $this->vagas_restantes,

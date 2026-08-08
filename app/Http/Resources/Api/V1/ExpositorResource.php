@@ -2,9 +2,9 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Support\PublicUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 /** @mixin \App\Models\Expositor */
 class ExpositorResource extends JsonResource
@@ -17,8 +17,8 @@ class ExpositorResource extends JsonResource
             'slug' => $this->slug,
             'description' => $this->description,
             'eixos' => $this->eixos,
-            'logo_url' => $this->logo_path ? Storage::url($this->logo_path) : null,
-            'image_url' => $this->image_path ? Storage::url($this->image_path) : null,
+            'logo_url' => PublicUrl::for($this->logo_path),
+            'image_url' => PublicUrl::for($this->image_path),
             'city' => $this->city,
             'state' => $this->state,
             'whatsapp' => $this->whatsapp,

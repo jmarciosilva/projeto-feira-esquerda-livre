@@ -82,6 +82,8 @@ Lojistas **não se cadastram** por aqui — a conta é criada quando a administr
 | GET | `/produtos/{id}/perguntas` | Perguntas já respondidas e visíveis |
 | POST | `/produtos/{id}/perguntas` | **Requer login.** Body: `question` (5–500 chars) |
 | POST | `/frete/cotacao` | Cotação de frete (mesmo endpoint do checkout web). Body: `store_id, destination_zipcode, items[{product_id, quantity}]` |
+| GET | `/feed` | Publicações visíveis da comunidade (posts dos lojistas), paginado. `liked_by_me` só é calculado quando autenticado |
+| GET | `/feed/{post}/comentarios` | Comentários visíveis de uma publicação |
 
 ---
 
@@ -95,6 +97,14 @@ Lojistas **não se cadastram** por aqui — a conta é criada quando a administr
 | POST | `/carrinho/itens` | Body: `product_id, quantity?` (default 1) |
 | PATCH | `/carrinho/itens/{item}` | Body: `quantity` (0 remove o item) |
 | DELETE | `/carrinho/itens/{item}` | Remove o item |
+
+### Comunidade (feed)
+
+| Método | Rota | Descrição |
+|---|---|---|
+| POST | `/feed/{post}/curtir` | Alterna curtir/descurtir. Resposta: `{ "liked": bool, "likes_count": int }` |
+| POST | `/feed/{post}/comentarios` | Body: `content` (máx. 500 chars) |
+| POST | `/feed/{post}/denunciar` | Body: `reason` (máx. 500 chars). Uma denúncia por usuário/post — repetir não duplica |
 
 Carrinho **exige login** no app — não existe carrinho anônimo por dispositivo nesta versão.
 
@@ -160,7 +170,7 @@ Materiais de aula usam URL assinada temporária (`download_url`, 15 min) já pro
 Cortes deliberados para manter a primeira entrega enxuta — podem virar uma fase seguinte:
 
 - **Construtor de curso AVA** (criar/editar módulos, aulas, materiais, reordenar) — hoje só listagem e publicar/despublicar.
-- **Feed/Comunidade** (posts, curtidas, comentários).
+- **Publicar no feed pelo app** — só o lojista publica (pelo site); o app consome (ver, curtir, comentar, denunciar).
 - **Email marketing** — não é uma funcionalidade de app mobile.
 - **Painel administrativo** — permanece exclusivo do site web.
 - **Recuperação de senha via API** — ainda não implementada.

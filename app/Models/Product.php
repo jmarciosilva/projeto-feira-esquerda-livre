@@ -6,12 +6,12 @@ use App\Enums\ItemType;
 use App\Enums\Modality;
 use App\Enums\PriceType;
 use App\Models\Ava\AvaCourse;
+use App\Support\PublicUrl;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Product extends Model
@@ -104,10 +104,10 @@ class Product extends Model
     {
         $images = $this->images;
         if (! empty($images[0]['medium'])) {
-            return Storage::url($images[0]['medium']);
+            return PublicUrl::for($images[0]['medium']);
         }
         if ($this->image_path) {
-            return Storage::url($this->image_path);
+            return PublicUrl::for($this->image_path);
         }
 
         return null;
