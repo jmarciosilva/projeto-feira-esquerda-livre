@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
+use JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence;
 
 class CartService
 {
@@ -31,16 +32,21 @@ class CartService
 
         if ($existing) {
             $existing->increment('quantity', $qty);
-            return;
+        } else {
+            CartItem::create([
+                'session_id'     => $this->sessionId(),
+                'user_id'        => Auth::id(),
+                'product_id'     => $product->id,
+                'expositor_id'   => $product->expositor_id,
+                'quantity'        => $qty,
+                'price_snapshot' => $product->price ?? 0,
+            ]);
         }
 
-        CartItem::create([
-            'session_id'     => $this->sessionId(),
-            'user_id'        => Auth::id(),
-            'product_id'     => $product->id,
-            'expositor_id'   => $product->expositor_id,
-            'quantity'        => $qty,
-            'price_snapshot' => $product->price ?? 0,
+        $this->trackEvent('produto.adicionado_carrinho', [
+            'produto_id' => $product->id,
+            'quantidade' => $qty,
+            'preco_unitario' => (float) ($product->price ?? 0),
         ]);
     }
 
@@ -56,7 +62,35 @@ class CartService
 
     public function remove(int $cartItemId): void
     {
-        $this->baseQuery()->where('id', $cartItemId)->delete();
+        $item = $this->baseQuery()->where('id', $cartItemId)->first();
+
+        if (! $item) {
+            return;
+        }
+
+        $item->delete();
+
+        $this->trackEvent('produto.removido_carrinho', [
+            'produto_id' => $item->product_id,
+            'quantidade' => $item->quantity,
+        ]);
+    }
+
+    /**
+     * Envia evento de rastreamento sem deixar falhas do SDK afetarem o
+     * fluxo de compra — a fila de rastreamento pode estar em modo síncrono
+     * (JMF_CI_QUEUE_CONNECTION=sync), o que propagaria exceções de rede
+     * direto para quem chamou este método.
+     *
+     * @param  array<string, mixed>  $properties
+     */
+    private function trackEvent(string $eventName, array $properties): void
+    {
+        try {
+            CustomerIntelligence::track($eventName, $properties);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     public function clear(): void

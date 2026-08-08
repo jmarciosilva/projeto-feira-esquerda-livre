@@ -10,6 +10,7 @@ use App\Models\OrderSplit;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
+use JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -105,6 +106,17 @@ class PedidoIndex extends Component
             } catch (\Throwable $exception) {
                 report($exception);
             }
+        }
+
+        try {
+            CustomerIntelligence::track('pedido.enviado', [
+                'pedido_id' => $split->order_id,
+                'split_id' => $split->id,
+                'transportadora' => $shipping->carrier,
+                'codigo_rastreio' => $shipping->tracking_code,
+            ]);
+        } catch (\Throwable $exception) {
+            report($exception);
         }
 
         $this->showShipModal = false;

@@ -144,6 +144,15 @@
             </x-admin.nav-item>
             @endcan
 
+            @can('customer_intelligence.visualizar')
+            <div class="pt-4 pb-1 px-3">
+                <p class="text-xs font-bold uppercase tracking-wider" style="color:#F4E294;">Inteligência</p>
+            </div>
+            <x-admin.nav-item href="{{ route('admin.customer-intelligence.dashboard') }}" icon="chart-bar" :active="request()->routeIs('admin.customer-intelligence.*')">
+                Inteligência de Cliente
+            </x-admin.nav-item>
+            @endcan
+
             @can('feed.moderar')
             <div class="pt-4 pb-1 px-3">
                 <p class="text-xs font-bold uppercase tracking-wider" style="color:#F4E294;">Comunidade</p>
@@ -278,6 +287,8 @@ function toggleSidebar() {
     overlay.classList.toggle('hidden');
 }
 </script>
+
+@stack('scripts')
 
 </body>
 </html>

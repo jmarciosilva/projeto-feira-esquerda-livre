@@ -93,6 +93,22 @@ return [
 
     /*
     |---------------------------------------------------------------------------
+    | Class Namespaces
+    |---------------------------------------------------------------------------
+    |
+    | In addition to the primary class namespace defined above, you may specify
+    | additional namespaces to check when discovering components. This is useful
+    | for packages that provide Livewire components.
+    |
+    */
+
+    'class_namespaces' => [
+        'App\\Livewire',
+        'JmfSystem\\CustomerIntelligence\\Livewire\\Plugins\\JmfCi',
+    ],
+
+    /*
+    |---------------------------------------------------------------------------
     | Class Path
     |---------------------------------------------------------------------------
     |

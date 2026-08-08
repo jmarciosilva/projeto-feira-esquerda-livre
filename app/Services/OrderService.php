@@ -10,6 +10,7 @@ use App\Models\OrderSplit;
 use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence;
 
 class OrderService
 {
@@ -37,7 +38,7 @@ class OrderService
             ? 'Retirada combinada diretamente com o(s) lojista(s) via WhatsApp.'
             : ($settings->frete_mensagem_manual ?: 'Frete a combinar diretamente com o(s) lojista(s) via WhatsApp.');
 
-        return DB::transaction(function () use ($customerData, $items, $itemsTotal, $shippingTotal, $cart, $shippingNote, $commission) {
+        $order = DB::transaction(function () use ($customerData, $items, $itemsTotal, $shippingTotal, $cart, $shippingNote, $commission) {
             $order = Order::create([
                 ...$customerData,
                 'user_id' => Auth::id(),
@@ -88,5 +89,19 @@ class OrderService
 
             return $order->load(['items', 'splits.expositor']);
         });
+
+        try {
+            CustomerIntelligence::track('pedido.criado', [
+                'pedido_id' => $order->id,
+                'referencia' => $order->reference,
+                'valor_total' => (float) $order->total_amount,
+                'quantidade_itens' => $order->items->sum('quantity'),
+                'status_pagamento' => $order->status,
+            ]);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        return $order;
     }
 }

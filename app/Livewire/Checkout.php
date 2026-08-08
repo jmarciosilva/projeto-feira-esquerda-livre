@@ -9,6 +9,7 @@ use App\Services\OrderService;
 use App\Services\Shipping\FrenetService;
 use App\Services\Shipping\MelhorEnvioService;
 use Illuminate\View\View;
+use JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence;
 use Livewire\Component;
 
 class Checkout extends Component
@@ -345,6 +346,18 @@ class Checkout extends Component
 
                 return;
             }
+        }
+
+        $cartItems = $cart->items();
+
+        try {
+            CustomerIntelligence::track('carrinho.checkout_iniciado', [
+                'total_itens' => $cartItems->sum('quantity'),
+                'valor_total' => $cart->total(),
+                'quantidade_lojas' => $cartItems->pluck('expositor_id')->unique()->count(),
+            ]);
+        } catch (\Throwable $exception) {
+            report($exception);
         }
 
         $order = $orderService->createFromCart([

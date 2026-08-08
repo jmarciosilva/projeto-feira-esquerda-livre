@@ -12,6 +12,8 @@ use App\Livewire\Admin\Banners\BannerIndex;
 use App\Livewire\Admin\Categorias\CategoriaForm;
 use App\Livewire\Admin\Categorias\CategoriaIndex;
 use App\Livewire\Admin\Clientes\ClienteIndex;
+use App\Livewire\Admin\CustomerIntelligence\DashboardShow as CIDashboardShow;
+use App\Livewire\Admin\CustomerIntelligence\DocsShow as CIDocsShow;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\EmailMarketing\CampaignForm as CampaignFormLivewire;
 use App\Livewire\Admin\EmailMarketing\CampaignIndex as CampaignIndexLivewire;
@@ -454,6 +456,18 @@ Route::get('/loja/{slug}/{productSlug}', function (string $slug, string $product
         ->limit(4)
         ->get();
 
+    try {
+        \JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence::track('produto.visualizado', [
+            'produto_id' => $product->id,
+            'nome' => $product->name,
+            'preco' => (float) ($product->price ?? 0),
+            'eixo' => $product->item_type->value,
+            'expositor_id' => $product->expositor_id,
+        ]);
+    } catch (\Throwable $exception) {
+        report($exception);
+    }
+
     return view('loja.produto', compact('expositor', 'product', 'otherProducts'));
 })->name('loja.produto');
 
@@ -533,6 +547,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/feed/reportes', FeedReportIndex::class)
         ->middleware('can:feed.moderar')
         ->name('feed.reportes');
+
+    // Customer Intelligence
+    Route::get('/customer-intelligence', CIDashboardShow::class)
+        ->middleware('can:customer_intelligence.visualizar')
+        ->name('customer-intelligence.dashboard');
+
+    Route::get('/customer-intelligence/documentacao', CIDocsShow::class)
+        ->middleware('can:customer_intelligence.visualizar')
+        ->name('customer-intelligence.docs');
 
     // Email Marketing
     Route::middleware('can:email-marketing.gerenciar')->prefix('/email-marketing')->name('email-marketing.')->group(function () {

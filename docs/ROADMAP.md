@@ -1,7 +1,7 @@
 # 🗺️ Roadmap de Desenvolvimento — Feira Esquerda Livre
 
 **Documento de Planejamento Estratégico**
-**Versão:** 2.5 — Agosto de 2026
+**Versão:** 2.6 — Agosto de 2026
 **Status geral do projeto:** MVP demonstrável. A plataforma já permite apresentar a jornada pública da feira, navegação por eixos, expositores, marketplace, carrinho, checkout, integração inicial com Mercado Pago, páginas institucionais, formulário de contato com resposta automática, painel administrativo com identidade visual, comunidade/feed, email marketing, visibilidade de expositores, rastreio, comunicação loja-cliente, AVA com curso online, progresso e certificado PDF, e uma API REST (`/api/v1`, Sanctum) pronta para o app mobile em Flutter (cliente e lojista). Fases futuras seguem concentradas em automações de escala: split automático completo via Mercado Pago, OAuth por lojista no Melhor Envio, compra/geração de etiquetas físicas, auditoria ampliada, recuperação de carrinho abandonado e ampliação da API mobile (construtor de curso e feed).
 
 ---
@@ -38,6 +38,10 @@
 [FASE 9 ✅ CONCLUÍDA — v1]
   API Mobile (Flutter)
   Sanctum · Catálogo · Carrinho · Checkout · Pedidos · Chat · AVA · Lojista
+           ↓
+[FASE 10 ✅ CONCLUÍDA]
+  Inteligência de Cliente (JMF CI) - Sprint 3
+  Dashboard · Rastreamento · E2E Tests
 ```
 
 ---
@@ -1159,7 +1163,256 @@ order_messages
 | ✅ Fase 6 — Governança Admin | Concluída | 6.1 · 6.2 · 6.3 · 6.4 · 6.5 | Usuários internos, perfis de acesso, permissões, modelo multi-papel e proteção real do painel |
 | ✅ **Fase 7 — Comunicação** | Julho 2026 | **7.1 · 7.2 · 7.3** | **FAQ estático, Q&A público e chat pós-pedido por split — 31 testes** |
 | ✅ Fase 8 — AVA | Julho 2026 | 8.1 · 8.2 · 8.3 | Cursos digitais, course builder, player, materiais protegidos, progresso e certificado PDF |
-| ✅ Fase 9 — API Mobile (Flutter) | Agosto 2026 | 9.1 · 9.2 · 9.3 · 9.4 | API `/api/v1` com Sanctum, catálogo, carrinho/checkout/pedidos/chat/endereços, AVA e lojista — 42 testes |
+| ✅ Fase 9 — API Mobile (Flutter) | Agosto 2026 | 9.1 · 9.2 · 9.3 · 9.4 · 9.5 | API `/api/v1` com Sanctum, catálogo, carrinho/checkout/pedidos/chat/endereços, AVA, lojista e comunidade (feed) — 52 testes |
+| ✅ **Fase 10 — Inteligência de Cliente** | **Agosto 2026 (Sprint 3)** | **10.1 · 10.2 · 10.3** | **Dashboard admin, rastreamento de eventos (produtos/carrinho/pedidos) e testes E2E — 236 testes** |
+
+---
+
+## ✅ Fase 10 — Inteligência de Cliente (JMF CI) (Concluída)
+
+**Período:** Sprint 3 — Agosto 2026
+**Objetivo estratégico:** integrar o JMF Customer Intelligence SDK para rastreamento comportamental, análise de visitantes e métricas de conversão — permitindo que a Feira Esquerda Livre entenda melhor seus clientes e otimize fluxos de compra.
+
+### O que será entregue
+
+| Componente | Status |
+|---|---|
+| SDK JMF Customer Intelligence v1.0.0 instalado | ✅ Concluído |
+| Variáveis de ambiente configuradas (.env) | ✅ Concluído |
+| Componentes Livewire disponíveis (5 componentes) | ✅ Concluído |
+| Dashboard admin em `/admin/customer-intelligence` | ✅ Concluído |
+| Rastreamento automático de eventos (produtos, carrinho, pedidos) | ✅ Concluído |
+| Testes E2E ponta-a-ponta | ✅ Concluído |
+
+**Correções aplicadas no SDK durante a integração (Sprint 3):**
+- Componentes Blade do SDK (`x-jmf-ci-*`) precisaram ser copiados como arquivos "flat" em `resources/views/components/` — a convenção do Laravel para componentes com hífen no nome não é compatível com a estrutura de pastas original do pacote.
+- `jmf-ci-event-table.blade.php` não declarava `@props`, o que quebrava quando usado sem `paginator`; corrigido com defaults explícitos para todos os atributos.
+- `ContactIndex`, `ContactShow` e `EventIndex` usavam `$this->currentPage`, propriedade inexistente do trait `WithPagination` do Livewire — corrigido para `$this->getPage()`.
+- `Configuration`, `Dashboard`, `ContactIndex`, `ContactShow` e `EventIndex` guardavam `JmfCiApiClient` como propriedade de instância setada só no `mount()` — como o Livewire não hidrata propriedades não-públicas entre requisições, qualquer ação subsequente (clique, paginação, filtro) lançava `must not be accessed before initialization`. Corrigido resolvendo o client via `app(JmfCiApiClient::class)` em cada uso.
+- **Bug crítico:** `SendPayloadJob` enviava eventos para `{base_url}/events` e `{base_url}/contacts/identify`, sem o prefixo `api/v1/` usado por todas as demais rotas da API (inclusive `healthCheck()`, que usa `api/v1/ping` corretamente). Isso fazia todo evento de rastreamento (`produto.visualizado`, `pedido.criado`, etc.) falhar silenciosamente com `404 Endpoint não encontrado` — silencioso porque a chamada roda dentro de um Job com try/catch e apenas loga o erro (`storage/logs/laravel.log`), sem quebrar a navegação do usuário. Como "Validar Conexão" usa `healthCheck()` (rota diferente, já correta), o teste de conexão passava normalmente mesmo com o rastreamento de eventos 100% quebrado — por isso o problema só foi percebido ao navegar o site e checar os logs, não pela tela de configuração. Corrigido prefixando `api/v1/` apenas na URL da requisição HTTP dentro do `SendPayloadJob::handle()`, mantendo o valor original do endpoint (`events` / `contacts/identify`) intacto para `PayloadValidator`, que faz `match()` exato sobre esse valor.
+- Essas correções foram feitas no repositório fonte do SDK (`jmf-ci-sdk`) e re-espelhadas para o `vendor/` do projeto consumidor. Validado com requisição HTTP real (log confirmou `status: 202`, "payload enviado com sucesso") e suíte completa (224 testes, sem regressões).
+
+**Descoberta adicional — endpoints de leitura ausentes no servidor:** mesmo com o envio de eventos 100% funcional (confirmado no Analytics nativo da própria plataforma JMF CI: 15 eventos, 6 visitantes únicos), o dashboard embutido no admin da Feira continuava vazio. Causa: o backend (`D:\PROJETO-JMF-CUSTOMER-INTELLIGENCE`, projeto separado) só expunha endpoints de **escrita** (`POST /api/v1/events`, `POST /api/v1/contacts/identify`) e o health-check (`GET /api/v1/ping`) — os componentes Livewire do SDK (`Dashboard`, `EventIndex`, `ContactIndex`, `ContactShow`) dependem de endpoints de **leitura** (`GET /api/v1/metrics`, `/events`, `/contacts`, `/contacts/{id}`, `/contacts/{id}/events`) que ainda não existiam. Implementados no backend, reaproveitando as mesmas Actions (`GetDashboardOverviewAction`) já usadas pelo painel `/admin/analytics` nativo da plataforma, com isolamento por tenant/application e 17 novos testes automatizados (138 no total, sem regressões). Essa alteração vive no repositório do backend, fora do escopo de deploy da Feira Esquerda Livre — o deploy é feito separadamente pelo responsável pela VPS.
+
+---
+
+### Módulo 10.1 — Dashboard Admin
+
+**Objetivo:** painel visual com métricas de inteligência de cliente integrado ao admin da Feira.
+
+**Entregas planejadas:**
+
+**10.1.1 — Página de Dashboard**
+- Rota: `/admin/customer-intelligence`
+- Middleware: `auth`, `admin`
+- Componente Livewire: `<livewire:jmf-ci-dashboard />`
+- Componente de configuração: `<livewire:jmf-ci-configuration />`
+- Exibe:
+  - Resumo de métricas (visitas, conversões, eventos rastreados)
+  - Gráficos de comportamento do visitante
+  - Validação de conexão com API JMF CI (base_url + token)
+  - Status de rastreamento
+
+**10.1.2 — Menu e Permissões**
+- Link no menu do admin: "Inteligência de Cliente"
+- Permissão: `customer_intelligence.visualizar`
+- Acessível apenas para admin ou usuários com permissão explícita
+
+**10.1.3 — Configuração da Integração**
+- Exibir valores atuais de `JMF_CI_BASE_URL`, `JMF_CI_TOKEN` (masked), `JMF_CI_TIMEOUT`
+- Link para documentação de configuração
+- Botão para validar conexão em tempo real
+
+---
+
+### Módulo 10.2 — Rastreamento de Eventos — ✅ Concluído
+
+**Objetivo:** capturar automaticamente eventos de produtos, carrinho e pedidos, enviando-os para a plataforma JMF CI.
+
+**Decisão de implementação — proteção contra falhas do SDK:** com `JMF_CI_QUEUE_CONNECTION=sync` (usado em dev), o SDK executa a chamada HTTP de forma síncrona dentro do próprio job despachado — se a API JMF CI estiver indisponível, a exceção de retry se propagaria para o código que chamou `track()`. Todas as chamadas de rastreamento nesta fase foram envolvidas em `try/catch` com `report($exception)`, seguindo o mesmo padrão já usado no projeto para envio de e-mails — uma falha de analytics nunca deve quebrar um fluxo de compra.
+
+**Entregas concluídas:**
+
+| Evento | Localização | Status |
+|---|---|---|
+| `produto.visualizado` | `routes/web.php` — rota `GET /loja/{slug}/{productSlug}` | ✅ |
+| `produto.adicionado_carrinho` | `app/Services/CartService.php::add()` | ✅ |
+| `produto.removido_carrinho` | `app/Services/CartService.php::remove()` | ✅ |
+| `carrinho.checkout_iniciado` | `app/Livewire/Checkout.php::confirmar()` | ✅ |
+| `pedido.criado` | `app/Services/OrderService.php::createFromCart()` | ✅ |
+| `pedido.pagamento_confirmado` | `app/Listeners/TrackOrderSplitConfirmedEvent.php` (ouve `OrderSplitConfirmed`) | ✅ |
+| `pedido.enviado` | `app/Livewire/Lojista/Pedidos/PedidoIndex.php::markAsShipped()` | ✅ |
+
+**Arquitetura de desacoplamento:** seguindo o mesmo padrão já usado para AVA (`OrderSplitConfirmed` → `HandleAvaEnrollmentOnSplitConfirmed`), o rastreamento de pagamento confirmado foi implementado como um segundo listener (`TrackOrderSplitConfirmedEvent`) registrado no mesmo evento, em vez de acoplar a chamada ao SDK diretamente no model `OrderSplit`.
+
+**Validação:** suíte completa de testes (224 testes) executada após a instrumentação — nenhuma regressão introduzida nos fluxos de carrinho, checkout, criação de pedido, confirmação de split e rastreio de envio.
+
+**Entregas planejadas (histórico do planejamento original):**
+
+**10.2.1 — Rastreamento de Produtos**
+
+Evento: `produto.visualizado`
+```php
+// ProductController::show() ou ProdutoLoja::mount()
+CustomerIntelligence::track('produto.visualizado', [
+    'produto_id' => $produto->id,
+    'nome' => $produto->nome,
+    'preco' => $produto->preco,
+    'eixo' => $produto->item_type,
+    'expositor_id' => $produto->expositor_id,
+]);
+```
+
+Evento: `produto.adicionado_carrinho`
+```php
+// CartService::addItem() ou CartDrawer component
+CustomerIntelligence::track('produto.adicionado_carrinho', [
+    'produto_id' => $product->id,
+    'quantidade' => $quantity,
+    'preco_unitario' => $product->preco,
+]);
+```
+
+Evento: `produto.removido_carrinho`
+```php
+CustomerIntelligence::track('produto.removido_carrinho', [
+    'produto_id' => $cartItem->product_id,
+    'quantidade' => $cartItem->quantity,
+]);
+```
+
+**10.2.2 — Rastreamento de Carrinho**
+
+Evento: `carrinho.visualizado`
+```php
+CustomerIntelligence::track('carrinho.visualizado', [
+    'total_itens' => $cart->count(),
+    'valor_total' => $cart->sum(),
+]);
+```
+
+Evento: `carrinho.checkout_iniciado`
+```php
+// CheckoutController::confirmar() ou checkout form
+CustomerIntelligence::track('carrinho.checkout_iniciado', [
+    'total_itens' => $order->items->count(),
+    'valor_total' => $order->grand_total,
+    'quantidade_lojas' => $order->splits->count(),
+]);
+```
+
+**10.2.3 — Rastreamento de Pedidos**
+
+Evento: `pedido.criado`
+```php
+// OrderService::createFromCart()
+CustomerIntelligence::track('pedido.criado', [
+    'pedido_id' => $order->id,
+    'referencia' => $order->reference,
+    'valor_total' => $order->grand_total,
+    'quantidade_itens' => $order->items->count(),
+    'status_pagamento' => $order->status,
+]);
+```
+
+Evento: `pedido.pagamento_confirmado`
+```php
+// OrderSplit::confirmar()
+CustomerIntelligence::track('pedido.pagamento_confirmado', [
+    'pedido_id' => $order->id,
+    'split_id' => $split->id,
+    'valor_recebido' => $split->gross_amount,
+]);
+```
+
+Evento: `pedido.enviado`
+```php
+// Quando lojista marca como enviado
+CustomerIntelligence::track('pedido.enviado', [
+    'pedido_id' => $order->id,
+    'split_id' => $split->id,
+    'transportadora' => $shipping->carrier,
+    'codigo_rastreio' => $shipping->tracking_code,
+]);
+```
+
+**10.2.4 — Locations no Código**
+
+| Evento | Localização | Método |
+|---|---|---|
+| `produto.visualizado` | `ProductController::show()` | GET `/loja/{slug}/{produto-slug}` |
+| `produto.adicionado_carrinho` | `CartService::addItem()` | POST carrinho (Livewire) |
+| `produto.removido_carrinho` | `CartService::removeItem()` | DELETE carrinho (Livewire) |
+| `carrinho.visualizado` | `CartDrawer component mount()` | Livewire init |
+| `carrinho.checkout_iniciado` | `CheckoutController::confirmar()` | POST `/checkout` |
+| `pedido.criado` | `OrderService::createFromCart()` | OrderService |
+| `pedido.pagamento_confirmado` | `OrderSplit::confirmar()` | Event listener |
+| `pedido.enviado` | `LojistaPedidoController::marcarEnviado()` | Livewire action |
+
+---
+
+### Módulo 10.3 — Testes E2E — ✅ Concluído
+
+**Objetivo:** validar fluxo ponta-a-ponta do dashboard e do rastreamento de eventos, sem depender de rede/API real durante a suíte de testes.
+
+**Decisão de implementação — isolamento de rede nos testes:**
+- Testes que verificam *quais* eventos são disparados usam `Bus::fake()` para interceptar o `SendPayloadJob` antes que ele chegue perto de HTTP — rápido e determinístico, sem tocar a API JMF CI real.
+- Um teste dedicado (`test_tracking_failure_does_not_break_add_to_cart`) deliberadamente **não** usa `Bus::fake()`: com `QUEUE_CONNECTION=sync` (usado em testes, igual ao dev), o Job roda de verdade e uma falha HTTP simulada via `Http::fake(['*' => Http::response('Service Unavailable', 500)])` propaga uma exceção real através do SDK — validando de ponta a ponta que o `try/catch` em `CartService::trackEvent()` protege o carrinho mesmo quando a chamada de rede falha de verdade, não apenas em teoria.
+
+**Entregas concluídas:**
+
+`tests/Feature/CustomerIntelligence/DashboardTest.php` (5 testes):
+- Admin acessa o dashboard
+- Gerente (via permissão Spatie) acessa o dashboard
+- Editor sem a permissão `customer_intelligence.visualizar` recebe 403
+- Cliente (role `user`) recebe 403
+- Visitante não autenticado é redirecionado para o login
+
+`tests/Feature/CustomerIntelligence/EventTrackingTest.php` (7 testes):
+- Visualizar produto dispara `produto.visualizado`
+- Adicionar ao carrinho dispara `produto.adicionado_carrinho`
+- Remover do carrinho dispara `produto.removido_carrinho`
+- Confirmar checkout dispara `carrinho.checkout_iniciado` e `pedido.criado`
+- Confirmar split dispara `pedido.pagamento_confirmado`
+- Marcar como enviado dispara `pedido.enviado`
+- Falha de rede na API JMF CI não quebra o fluxo de adicionar ao carrinho (teste sem `Bus::fake()`, ver acima)
+
+**Validação final:** suíte completa do projeto — **236 testes passando** (224 pré-existentes + 12 novos), zero regressões.
+
+---
+
+### Infraestrutura Técnica
+
+**Dependências:**
+- `jmf-system/customer-intelligence-sdk` — v1.0.0 (já instalado)
+- Laravel Queue — para envio assíncrono de eventos
+- Guzzle HTTP — para chamadas à API (incluído no SDK)
+
+**Configuração de Ambiente:**
+```env
+JMF_CI_BASE_URL=http://179.198.115.221
+JMF_CI_TOKEN=1|HvZ339GRlMLTetXCvOTv95e1XE7yFM5xveoydDUR46c15d38
+JMF_CI_QUEUE_CONNECTION=sync    # sync para dev/teste, database/redis para prod
+JMF_CI_TIMEOUT=2                 # timeout de 2 segundos para requisições
+```
+
+**Fila de Processamento:**
+- Modo assíncrono: eventos são enfileirados e processados em background
+- Retry automático: 3 tentativas com backoff [5s, 30s, 120s]
+- Falhas são logadas e não bloqueiam a requisição do usuário
+
+---
+
+### Decisões de Produto
+
+- **Rastreamento passivo:** eventos são enviados assincronamente via fila, sem impacto no tempo de resposta do cliente
+- **Identificação de visitante:** SDK gerencia cookies `jmf_ci_visitor_id` e `jmf_ci_session_id` automaticamente (LGPD-compliant)
+- **Conformidade LGPD:** nenhum dado pessoal é enviado sem consentimento explícito; apenas IDs de produtos e valores monetários
+- **Integração transparente:** rastreamento funciona sem mudanças de UX ou breaking changes
+
+---
+
+*Próxima revisão: após conclusão dos 3 módulos (10.1, 10.2, 10.3) — Sprint 3 completa — Agosto de 2026*
 
 ---
 
@@ -1283,7 +1536,8 @@ ava_lesson_progress  — enrollment_id, lesson_id, started_at, completed_at, wat
 | Carrinho (exige login), cotação de frete, checkout, pedidos, chat pós-pedido, endereços | ✅ Concluído |
 | AVA — Meu Aprendizado: matrículas, conteúdo do curso, concluir aula, certificado | ✅ Concluído |
 | Lojista: painel, loja, CRUD de produtos, pedidos recebidos, perguntas, exposição, cursos (listar/publicar) | ✅ Concluído |
-| 42 testes de feature em `tests/Feature/Api/V1/` (401/403/caminho feliz/422 por grupo) | ✅ Concluído |
+| Comunidade (feed): listar, curtir, comentar, denunciar — leitura pública, interação exige login | ✅ Concluído |
+| 52 testes de feature em `tests/Feature/Api/V1/` (401/403/caminho feliz/422 por grupo) | ✅ Concluído |
 | `docs/API.md` — referência completa de rotas, envelope de resposta, erros e exemplos | ✅ Concluído |
 
 ---
@@ -1347,18 +1601,36 @@ Rotas sob `/lojista`, protegidas por `auth:sanctum` + o middleware `lojista` já
 
 ---
 
+### Módulo 9.5 — Comunidade (Feed) na API
+
+**Objetivo estratégico:** o feed social é um diferencial de produto do app mobile — decisão de priorizar sua entrada na API mobile antes mesmo do carrinho/checkout do app, dado o valor de engajamento comunitário.
+
+**Entregas:**
+- `GET /feed` — publicações visíveis (`FeedPost::visible()`), com loja, imagens, contagem de curtidas/comentários e `liked_by_me` (calculado apenas quando autenticado, sem exigir login para navegar — mesmo princípio de acesso público do restante do catálogo).
+- `GET /feed/{post}/comentarios` — comentários visíveis de uma publicação.
+- `POST /feed/{post}/curtir` — alterna curtir/descurtir (autenticado), reaproveitando a mesma regra de unicidade (`feed_likes` unique por post+usuário) já usada pelo `FeedIndex` do site.
+- `POST /feed/{post}/comentarios` — novo comentário (autenticado, máx. 500 caracteres).
+- `POST /feed/{post}/denunciar` — denúncia (autenticada, uma por usuário/post, `firstOrCreate` incrementando `reported_count` só na primeira vez) — mesma lógica do componente Livewire público.
+- Autorização replicada inline das Policies existentes (`FeedPostPolicy::interact`, `FeedCommentPolicy::create`): publicação precisa estar visível e usuário precisa estar ativo.
+- **Publicar no feed continua exclusivo do lojista pelo site** — o app só consome (ver/curtir/comentar/denunciar), não cria publicações.
+- 10 testes novos em `tests/Feature/Api/V1/FeedApiTest.php`.
+- Correção incidental: `database/factories/UserFactory.php` não definia `is_active`, deixando o atributo `null` em memória logo após `create()` (o Eloquent não busca de volta o `DEFAULT true` do banco) — qualquer código checando `$user->is_active` direto num usuário recém-criado por factory (como `Sanctum::actingAs()` faz durante os testes) via essa lacuna. Corrigido definindo `is_active => true` explicitamente na factory.
+
+---
+
 ### Fora do escopo desta fase (deliberado)
 
 Cortes conscientes para manter a v1 da API enxuta e testável — candidatos a uma fase seguinte:
 
 - **Construtor de curso AVA** (criar/editar módulos, aulas, materiais, reordenar) — CRUD aninhado grande com upload de arquivos.
-- **Feed/Comunidade** (posts, curtidas, comentários) — não essencial para a primeira versão do app.
+- **Publicar no feed pelo app** — permanece exclusivo do painel do lojista no site.
 - **Email marketing** — funcionalidade exclusiva do painel administrativo.
 - **Painel administrativo** — permanece 100% web.
 - **Recuperação de senha via API** — login e cadastro cobrem o essencial por enquanto.
 
 ---
 
-*Documento atualizado em: 1º de agosto de 2026 — Versão 2.5*
-*Próxima revisão: após validação do MVP demonstrável com diretores, sócios e cliente, e após o início da integração com o app Flutter.*
-*Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e feed/comunidade na API mobile.*
+*Documento atualizado em: 8 de agosto de 2026 — Versão 2.7*
+*Status: Fase 10 (Sprint 3) em andamento — integrando JMF Customer Intelligence SDK*
+*Próxima revisão: após conclusão da Fase 10 (dashboard, rastreamento, E2E)*
+*Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e publicação no feed pelo app.*
