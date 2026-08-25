@@ -43,7 +43,7 @@ Consequências assumidas:
 | **CI-01** | Auditoria e arquitetura | **CONCLUÍDA** |
 | **CI-02** | Fundação do módulo interno | **CONCLUÍDA** |
 | **CI-03** | Coleta: visitante e sessão (middleware, cookies) | **CONCLUÍDA** |
-| CI-04 | Escrita de eventos pela fila | não iniciada |
+| **CI-04** | Escrita de eventos pela fila dedicada | **CONCLUÍDA** |
 | CI-05 | Migração das 7 chamadas atuais | não iniciada |
 | CI-06 | Dashboard lendo do banco local | não iniciada |
 | CI-07 | Desativação do SDK externo | não iniciada |
@@ -64,6 +64,14 @@ arquivo `config/customer-intelligence-internal.php`.
 **A coleta de visitante está ligada; a de eventos, não.** `ci_events` continua
 vazia, e os sete eventos seguem saindo pelo SDK externo até a CI-05.
 
+### O que a CI-04 entregou
+
+O caminho assíncrono de gravação: `track()` enfileira, o worker grava. Fila
+própria `customer-intelligence`, declarada no `--queue` do worker do Docker.
+
+**A escrita de eventos existe e funciona, mas ninguém a aciona.** `ci_events`
+continua vazia em uso normal.
+
 ### O que ainda **não** foi feito
 
 - nenhuma das 7 chamadas de rastreamento foi migrada;
@@ -78,19 +86,31 @@ Nada do comportamento de produção mudou até aqui.
 ## Arquitetura
 
 ```
-Ação de negócio
+Requisição web
+      │
+      ├── TrackVisitorSession (middleware)  → ci_visitors · ci_sessions
+      │        └── VisitorContext           ← visitante da requisição
+      │
+Ação de negócio                             ← ainda ninguém chama daqui
       │
       ▼
-CustomerIntelligenceService::record()      ← existe, testado, sem chamadores
-      │
-      ├── PropertySanitizer                ← minimização LGPD na escrita
+CustomerIntelligenceService::track()        ← captura sessão, usuário, instante
       │
       ▼
-ci_events (MySQL local)                    ← nenhuma chamada HTTP
+TrackCustomerEventJob                       ← fila customer-intelligence
+      │
+      ▼
+CustomerIntelligenceService::record()
+      │
+      ├── PropertySanitizer                 ← minimização LGPD na escrita
+      │
+      ▼
+ci_events (MySQL local)                     ← nenhuma chamada HTTP
 ```
 
-O `TrackCustomerEventJob` é o mesmo caminho, fora do ciclo da requisição.
-Ele também existe e está testado, mas nada o despacha ainda.
+Da coleta de visitante para baixo tudo existe e está testado. O que falta é a
+seta pontilhada: **nenhuma ação de negócio chama `track()` ainda**. Os sete
+eventos continuam saindo pelo SDK externo até a CI-05.
 
 ### Estrutura de diretórios
 
@@ -401,35 +421,52 @@ topo do arquivo muda e a string vira um caso do enum.
 
 ## Como usar (quando estiver ligado)
 
-Ainda não há chamadores. O caminho previsto:
+Ainda não há chamadores. O caminho previsto para a CI-05:
 
 ```php
 use App\CustomerIntelligence\Enums\EventName;
 use App\CustomerIntelligence\Services\CustomerIntelligenceService;
 
-app(CustomerIntelligenceService::class)->record(
+app(CustomerIntelligenceService::class)->track(
     event: EventName::ProdutoVisualizado,
     properties: ['preco' => 89.90],
     entity: $product,
-    session: $session,
 );
 ```
 
-Ou, fora do ciclo da requisição:
+`track()` enfileira e devolve o controle na hora — é o que a aplicação deve
+usar, para não pagar a gravação dentro da requisição. A sessão vem do
+`VisitorContext` sozinha; passá-la explicitamente é opcional.
 
-```php
-TrackCustomerEventJob::dispatch(
-    EventName::ProdutoVisualizado,
-    ['preco' => 89.90],
-    $product,
-    $session,
-);
-```
+Quando o registro gravado for necessário de volta, `record()` escreve na hora e
+devolve o `TrackedEvent`. É o que o job usa por dentro.
 
-O job fica na **fila padrão** por enquanto, de propósito: a CI-02 não altera o
-serviço `queue` do Docker. A decisão sobre uma fila dedicada
-(`customer-intelligence`) pertence à fase seguinte, junto com o ajuste do
-parâmetro `--queue` do worker.
+### Fila
+
+| | |
+|---|---|
+| Fila | `customer-intelligence` (`CI_QUEUE`) |
+| Conexão | padrão da aplicação (`CI_QUEUE_CONNECTION` sobrescreve) |
+| Tentativas | 3 |
+
+A fila é própria, e não a `default`, porque rastreamento é o trabalho menos
+urgente do sistema. O worker do Docker declara
+`--queue=default,email-marketing,customer-intelligence`, e **a ordem é
+prioridade**: a fila do módulo só é olhada quando as outras estão vazias, então
+um pico de navegação nunca atrasa um e-mail de pedido.
+
+Um teste lê o `compose.yaml` e falha se a fila sumir do `--queue` — é a maneira
+de impedir o erro clássico de despachar para uma fila que ninguém escuta.
+
+### O que viaja com o job
+
+Sessão, usuário autenticado e o instante do fato são capturados **no despacho**,
+porque dentro do worker não existe cookie nem usuário logado para consultar.
+Por isso `occurred_at` (quando o fato aconteceu) e `created_at` (quando a linha
+foi gravada) divergem de propósito — o atraso da fila não desloca a história.
+
+O usuário capturado tem precedência sobre `Auth::id()` na hora de gravar: o job
+pode rodar depois do logout.
 
 ---
 
@@ -445,6 +482,7 @@ docker compose exec app php artisan test tests/Feature/CustomerIntelligence
 | `InternalModelsTest` | UUIDs, casts, relacionamentos, enum |
 | `InternalEventRecordingTest` | gravação, morph, sanitização, job |
 | `InternalVisitorTrackingTest` | middleware, cookies, rotação de sessão, identificação, UTMs, contexto |
+| `InternalEventQueueTest` | fila dedicada, dados capturados no despacho, gravação ponta a ponta |
 
 Dois testes guardam a fronteira desta fase: um verifica que **nada na aplicação
 despacha o job** e que `ci_events` continua vazia após navegar por um produto e

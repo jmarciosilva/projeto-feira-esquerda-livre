@@ -17,13 +17,17 @@ use Illuminate\Support\Carbon;
 /**
  * Grava um evento comportamental fora do ciclo da requisicao.
  *
- * Estado na fase CI-02: o job existe, funciona e esta testado, mas NADA na
- * aplicacao o despacha. Os sete eventos atuais continuam indo para o SDK
- * externo, sem escrita dupla. A ligacao das chamadas reais e a CI-06.
+ * Roda na fila propria do modulo (`customer-intelligence` por padrao), definida
+ * no proprio construtor para que o destino esteja certo mesmo quando o job e
+ * despachado diretamente, sem passar pelo service.
  *
- * Fica na fila padrao de proposito: a CI-02 nao altera o servico `queue` do
- * Docker. A decisao sobre uma fila dedicada pertence a CI-05, junto com o
- * ajuste do parametro `--queue` do worker.
+ * Tudo o que depende da requisicao — sessao, usuario autenticado e o instante
+ * do fato — e capturado no despacho e viaja com o job. Dentro do worker nao ha
+ * cookie nem usuario logado para consultar.
+ *
+ * Estado na fase CI-04: o caminho funciona ponta a ponta e esta testado, mas
+ * NENHUMA chamada da aplicacao o utiliza. Os sete eventos atuais continuam indo
+ * para o SDK externo, sem escrita dupla. A ligacao e a CI-05.
  */
 class TrackCustomerEventJob implements ShouldQueue
 {
@@ -41,11 +45,15 @@ class TrackCustomerEventJob implements ShouldQueue
         public readonly array $properties = [],
         public readonly ?Model $entity = null,
         public readonly ?VisitorSession $session = null,
+        public readonly ?int $userId = null,
         ?DateTimeInterface $occurredAt = null,
     ) {
         // Congelado no despacho, nao no processamento: o atraso da fila nao
         // deve deslocar o instante em que o fato de negocio aconteceu.
         $this->occurredAt = $occurredAt ?? Carbon::now();
+
+        $this->onConnection(config('customer-intelligence-internal.queue.connection'));
+        $this->onQueue(config('customer-intelligence-internal.queue.name'));
     }
 
     public function handle(CustomerIntelligenceService $service): void
@@ -55,6 +63,7 @@ class TrackCustomerEventJob implements ShouldQueue
             properties: $this->properties,
             entity: $this->entity,
             session: $this->session,
+            userId: $this->userId,
             occurredAt: $this->occurredAt,
         );
     }

@@ -44,4 +44,19 @@ return [
         'minutes' => (int) env('CI_SESSION_COOKIE_MINUTES', 30),
     ],
 
+    /*
+    | Fila de gravacao dos eventos.
+    |
+    | `connection` vazio usa a conexao padrao da aplicacao (QUEUE_CONNECTION).
+    |
+    | A fila e propria, e nao a `default`, porque rastreamento e o trabalho
+    | menos urgente do sistema: o worker atende `default` e `email-marketing`
+    | primeiro, entao um pico de navegacao nunca atrasa um e-mail de pedido.
+    | O worker do compose.yaml precisa lista-la em `--queue`.
+    */
+    'queue' => [
+        'connection' => env('CI_QUEUE_CONNECTION'),
+        'name' => env('CI_QUEUE', 'customer-intelligence'),
+    ],
+
 ];

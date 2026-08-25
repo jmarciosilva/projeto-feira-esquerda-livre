@@ -45,7 +45,7 @@
            ↓
 [TRILHA CI 🔄 EM ANDAMENTO]
   Internalização do Customer Intelligence
-  CI-01 ✅ · CI-02 ✅ · CI-03 ✅ · CI-04 a CI-09 pendentes
+  CI-01 ✅ · CI-02 ✅ · CI-03 ✅ · CI-04 ✅ · CI-05 a CI-09 pendentes
   Deixa de depender do SDK externo em ../jmf-ci-sdk
 ```
 
@@ -1181,7 +1181,7 @@ order_messages
 | Trilha | Período | Situação | Entregável Principal |
 |---|---|---|---|
 | ✅ **Infraestrutura — Ambiente Docker** | Agosto 2026 | Concluída | 8 serviços (PHP 8.3, Nginx, MySQL 8.4, phpMyAdmin, Redis 7, Node 22/Vite, queue, Mailpit); dispensa Laragon, XAMPP, PHP, MySQL, Composer e Node no Windows — ver `docs/DOCKER_DEVELOPMENT.md` |
-| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 3 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
+| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 4 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
 
 ---
 
@@ -1464,7 +1464,7 @@ A decisão arquitetural é que **comportamento gerado na Feira Esquerda Livre pe
 | **CI-01** | Auditoria e arquitetura | ✅ Concluída | 25/08/2026 |
 | **CI-02** | Fundação do módulo interno | ✅ Concluída | 25/08/2026 |
 | **CI-03** | Coleta: visitante e sessão (middleware, cookies, ServiceProvider) | ✅ Concluída | 25/08/2026 |
-| CI-04 | Escrita de eventos pela fila dedicada | ⬜ Não iniciada | — |
+| **CI-04** | Escrita de eventos pela fila dedicada | ✅ Concluída | 25/08/2026 |
 | CI-05 | Migração das 7 chamadas de rastreamento | ⬜ Não iniciada | — |
 | CI-06 | Dashboard lendo do banco local | ⬜ Não iniciada | — |
 | CI-07 | Desativação do SDK externo | ⬜ Não iniciada | — |
@@ -1482,7 +1482,8 @@ Nenhuma fase é considerada concluída com teste vermelho. O número nunca deve 
 | Fim da Fase 10 | 236 | — |
 | Ambiente Docker validado | 238 | 624 |
 | Fim da CI-02 | 273 | 744 |
-| Fim da CI-03 | **290** | **798** |
+| Fim da CI-03 | 290 | 798 |
+| Fim da CI-04 | **302** | **819** |
 
 ---
 
@@ -1604,11 +1605,37 @@ Há teste automatizado para as duas coisas: a posição na pilha e a unicidade d
 
 ---
 
+### ✅ CI-04 — Escrita de eventos pela fila dedicada (Concluída)
+
+**Objetivo:** dar ao módulo o caminho assíncrono de gravação, numa fila própria, sem que a requisição pague pela escrita.
+
+**Entregue:**
+
+| Componente | Status |
+|---|---|
+| `CustomerIntelligenceService::track()` — enfileira e devolve o controle | ✅ Concluído |
+| Fila dedicada `customer-intelligence`, definida no próprio job | ✅ Concluído |
+| Worker do Docker escutando a nova fila | ✅ Concluído |
+| Captura de sessão, usuário e instante no despacho | ✅ Concluído |
+| Bloco `queue` em `config/customer-intelligence-internal.php` | ✅ Concluído |
+| 12 testes novos | ✅ Concluído |
+
+**A ordem em `--queue` é prioridade, não lista.** O worker passou a declarar `--queue=default,email-marketing,customer-intelligence`, e o Laravel só olha a fila seguinte quando a anterior está vazia. Rastreamento fica por último de propósito: um pico de navegação nunca deve atrasar um e-mail de pedido.
+
+**O erro clássico que ficou blindado.** Despachar para uma fila que ninguém escuta faz os eventos sumirem em silêncio. Um teste lê o `compose.yaml` e falha se a fila sair do `--queue` — a fiação entre a configuração da aplicação e a infraestrutura passou a ser verificada automaticamente.
+
+**O que viaja com o job.** Sessão, usuário autenticado e o instante do fato são apurados no despacho, porque dentro do worker não existe cookie nem usuário logado para consultar. Por isso `occurred_at` e `created_at` divergem de propósito — o atraso da fila não desloca a história. O usuário capturado tem precedência sobre `Auth::id()` na gravação, já que o job pode rodar depois do logout; há teste para exatamente esse cenário.
+
+**Fronteira preservada.** `track()` existe, funciona e está testado ponta a ponta, mas nenhuma ação de negócio o chama. `ci_events` continua vazia em uso normal e os sete eventos seguem no SDK externo — sem escrita dupla. Um teste navega por um produto, adiciona ao carrinho e afirma que nada foi despachado.
+
+**Validado no ambiente real:** evento enfileirado pelo tinker caiu na fila `customer-intelligence`, o worker do Docker processou em 178 ms e a linha apareceu em `ci_events` com o morph para `Product` e `occurred_at` um segundo antes de `created_at`. A linha de validação foi removida em seguida, para que a invariante "sem escrita dupla" continue verificável.
+
+---
+
 ### Fases pendentes
 
 | Fase | Objetivo | Risco previsto |
 |---|---|---|
-| **CI-04** | Fila dedicada `customer-intelligence` e ajuste do `--queue` do worker no Docker. | BAIXO |
 | **CI-05** | Repontar as 7 chamadas para o módulo interno. | ALTO — toca `CartService`, `OrderService` e `Checkout`, o coração da compra |
 | **CI-06** | Componentes Livewire próprios consultando Eloquent no lugar do `JmfCiApiClient`; agregadores diários. | MÉDIO — agregação sem índice adequado trava o painel |
 | **CI-07** | Cortar o envio remoto; remover registro Livewire duplicado e código morto. | MÉDIO — ponto sem volta para novos dados na VPS |
@@ -1841,6 +1868,6 @@ Cortes conscientes para manter a v1 da API enxuta e testável — candidatos a u
 ---
 
 *Documento atualizado em: 25 de agosto de 2026 — Versão 2.8*
-*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 3 de 9 fases (CI-01 auditoria, CI-02 fundação e CI-03 coleta de visitante e sessão).*
-*Próxima revisão: após a CI-04 (escrita de eventos pela fila dedicada)*
+*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 4 de 9 fases: auditoria, fundação, coleta de visitante/sessão e escrita de eventos pela fila.*
+*Próxima revisão: após a CI-05 (migração das 7 chamadas de rastreamento)*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e publicação no feed pelo app.*

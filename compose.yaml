@@ -125,7 +125,11 @@ services:
     working_dir: /var/www/html
     # Sem env_file pelo mesmo motivo do servico "app".
     # Aguarda o composer install antes de subir o worker, evitando crash-loop
-    # na primeira instalacao. Filas usadas pelo projeto: default e email-marketing.
+    # na primeira instalacao.
+    #
+    # A ordem de --queue e prioridade: o worker so olha customer-intelligence
+    # quando default e email-marketing estao vazias. E de proposito — um pico
+    # de navegacao nunca deve atrasar um e-mail de pedido.
     command:
       - sh
       - -c
@@ -135,7 +139,7 @@ services:
           sleep 5;
         done;
         exec php artisan queue:work
-        --queue=default,email-marketing
+        --queue=default,email-marketing,customer-intelligence
         --tries=3 --sleep=3 --timeout=120 --max-time=3600
     volumes:
       - .:/var/www/html
