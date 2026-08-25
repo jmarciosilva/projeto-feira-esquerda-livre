@@ -2,9 +2,11 @@
 
 Documentação do módulo nativo de Customer Intelligence da Feira Esquerda Livre.
 
-> **Este documento descreve o módulo interno.** A integração com o SDK externo
-> continua ativa e documentada em [JMF_CI_INTEGRATION.md](JMF_CI_INTEGRATION.md).
-> Os dois coexistem de propósito durante a migração.
+> **Este documento descreve o módulo interno**, que desde a CI-07 é o único em
+> execução. O SDK externo continua instalado no `vendor/` até a CI-08, mas não
+> executa mais nada — sua documentação histórica está em
+> [JMF_CI_INTEGRATION.md](JMF_CI_INTEGRATION.md) e descreve um estado que já
+> não vale.
 
 ---
 
@@ -46,7 +48,7 @@ Consequências assumidas:
 | **CI-04** | Escrita de eventos pela fila dedicada | **CONCLUÍDA** |
 | **CI-05** | Migração das 7 chamadas atuais | **CONCLUÍDA** |
 | **CI-06** | Painel e agregação local | **CONCLUÍDA** |
-| CI-07 | Desativação do SDK externo | não iniciada |
+| **CI-07** | Desativação do SDK externo em runtime | **CONCLUÍDA** |
 | CI-08 | Limpeza de Composer, Docker e `.env` | não iniciada |
 | CI-09 | Retenção, LGPD e documentação final | não iniciada |
 
@@ -99,13 +101,24 @@ existia como view mas nunca teve rota, passou a ser alcançável.
 **A leitura e a escrita do Customer Intelligence pertencem agora ao próprio
 projeto.**
 
+### O que a CI-07 entregou
+
+O SDK saiu do runtime. O ServiceProvider dele deixou de ser descoberto pelo
+Composer, então nada mais dele executa: nem o middleware, nem o registro de
+componentes Livewire, nem a validação de configuração no boot.
+
+Uma busca por `JmfSystem\` em `app/`, `routes/`, `bootstrap/` e `config/`
+retorna **zero**. O pacote continua instalado no `vendor/`, mas a aplicação não
+usa nenhuma classe dele.
+
 ### O que ainda **não** foi feito
 
-- o SDK externo, o repositório `path` do Composer e o volume Docker continuam
-  instalados — a remoção é a CI-07;
-- o middleware do SDK ainda roda e ainda emite os cookies;
-- os cinco componentes Livewire do SDK continuam registrados, embora nenhum
-  seja mais renderizado pelo painel;
+- o pacote, o repositório `path` do Composer, o volume Docker e as variáveis
+  `JMF_CI_*` continuam presentes — a remoção física é a CI-08;
+- as views em `resources/views/plugins/jmf-ci/` e os componentes blade
+  `x-jmf-ci-*` continuam com os nomes antigos: são arquivos do projeto e ainda
+  estão em uso, então renomeá-los é cosmética para a CI-08;
+- `docs/JMF_CI_INTEGRATION.md` continua no lugar;
 - não há rotina de expurgo dos 180 dias — é a CI-09.
 
 ---
@@ -183,11 +196,15 @@ fica testável sem simular requisição.
 
 ### Componentes Livewire ficam fora
 
-O painel administrativo continuará em `app/Livewire/Admin/CustomerIntelligence/`,
+O painel administrativo vive em `app/Livewire/Admin/CustomerIntelligence/`,
 **não** dentro do módulo. Motivo concreto: `config/livewire.php` define
-`class_namespace => App\Livewire`. Componentes fora desse namespace exigem
+`class_namespace => App\Livewire`, e componentes fora desse namespace exigiriam
 registro manual no ServiceProvider — exatamente o que o `AppServiceProvider`
-faz hoje com os aliases `jmf-ci-*`. Respeitar a convenção elimina esse registro.
+fazia com os cinco aliases `jmf-ci-*` do SDK. Respeitando a convenção, os quatro
+componentes internos são descobertos sozinhos e nenhum registro é preciso.
+
+A CI-07 removeu esses cinco registros manuais e tirou o namespace do SDK de
+`class_namespaces`.
 
 ### ServiceProvider e ordem do middleware
 
@@ -195,28 +212,47 @@ faz hoje com os aliases `jmf-ci-*`. Respeitar a convenção elimina esse registr
 faz o merge da configuração, registra o `VisitorContext` como `scoped` e anexa
 o middleware ao grupo `web`.
 
-Ele **não** é registrado em `bootstrap/app.php`, e isso é deliberado. Enquanto o
-SDK externo existe, os dois middlewares convivem no mesmo grupo e emitem os
-mesmos cookies. Duas medidas evitam que briguem:
+Ele **não** é registrado em `bootstrap/app.php`, e isso foi deliberado: enquanto
+o middleware do SDK existiu, o do módulo precisava entrar na pilha **depois**
+dele. A configuração de `bootstrap/app.php` é aplicada antes de qualquer
+`boot()`, e providers da aplicação inicializam depois dos descobertos por
+pacote — registrar pelo provider garantia a ordem.
 
-**1. Ordem determinística.** A configuração de `bootstrap/app.php` é aplicada
-antes de qualquer `boot()`; providers da aplicação inicializam depois dos
-descobertos por pacote. Registrando pelo provider, o middleware do módulo entra
-na pilha **depois** do middleware do SDK e enxerga o que ele já decidiu.
+Desde a CI-07 a pilha do grupo `web` termina apenas com `TrackVisitorSession`:
 
-**2. Adoção do valor já enfileirado.** Numa primeira visita não há cookie na
-requisição e o SDK acabou de gerar um identificador próprio. Em vez de gerar
-outro — o que faria o servidor remoto e o banco local conhecerem o mesmo
-visitante por dois nomes —, o middleware lê o valor enfileirado via
-`Cookie::queued()`. Sem acoplamento a classes do SDK: é API do próprio Laravel.
+```
+[0] EncryptCookies              [4] ValidateCsrfToken
+[1] AddQueuedCookiesToResponse  [5] SubstituteBindings
+[2] StartSession                [6] TrackVisitorSession   ← único coletor
+[3] ShareErrorsFromSession
+```
+
+A adoção do cookie já enfileirado (`Cookie::queued()`) continua no código e
+deixou de ter efeito prático — sem ninguém para adotar, o middleware gera os
+próprios identificadores. Foi mantida por ser API do próprio Laravel, sem
+acoplamento a classe nenhuma, e por proteger o caso de outro middleware vir a
+emitir os mesmos cookies.
 
 Reenfileirar o cookie com o mesmo nome é seguro: o CookieJar indexa a fila por
-nome e caminho, então a segunda chamada substitui a primeira e apenas um
-`Set-Cookie` sai na resposta. Há testes para as duas coisas — a ordem na pilha e
-a unicidade do cookie.
+nome e caminho, então apenas um `Set-Cookie` sai na resposta. Há teste para a
+unicidade do cookie e para a ausência de qualquer middleware `JmfSystem\` no
+grupo `web`.
 
-Quando o SDK for removido (CI-07), nada disso precisa mudar: sem ninguém para
-adotar, o middleware passa a gerar os próprios identificadores.
+### Como o SDK foi desligado
+
+`composer.json` passou a declarar:
+
+```json
+"extra": { "laravel": { "dont-discover": ["jmf-system/customer-intelligence-sdk"] } }
+```
+
+O Composer continua instalando o pacote, mas o Laravel deixa de auto-registrar
+o `CustomerIntelligenceServiceProvider` dele. Com isso caem de uma vez o
+middleware, o registro dos cinco componentes Livewire, o merge de configuração e
+o `ConfigValidator` que rodava no boot.
+
+Foi a forma mais limpa de chegar ao estado que a fase pedia — pacote instalado,
+runtime intacto — sem tocar em `require`, em `repositories` ou no `composer.lock`.
 
 ---
 

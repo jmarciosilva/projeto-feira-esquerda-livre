@@ -85,7 +85,9 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [
+                "jmf-system/customer-intelligence-sdk"
+            ]
         }
     },
     "config": {

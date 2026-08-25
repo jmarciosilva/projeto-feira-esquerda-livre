@@ -104,7 +104,6 @@ return [
 
     'class_namespaces' => [
         'App\\Livewire',
-        'JmfSystem\\CustomerIntelligence\\Livewire\\Plugins\\JmfCi',
     ],
 
     /*

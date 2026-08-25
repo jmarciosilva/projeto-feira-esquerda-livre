@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Admin\CustomerIntelligence;
 
-use JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence;
 use Livewire\Component;
 
 class DashboardShow extends Component

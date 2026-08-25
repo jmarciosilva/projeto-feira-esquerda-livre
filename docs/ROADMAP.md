@@ -45,7 +45,7 @@
            ↓
 [TRILHA CI 🔄 EM ANDAMENTO]
   Internalização do Customer Intelligence
-  CI-01 a CI-06 ✅ · CI-07 a CI-09 pendentes
+  CI-01 a CI-07 ✅ · CI-08 e CI-09 pendentes
   Deixa de depender do SDK externo em ../jmf-ci-sdk
 ```
 
@@ -1181,7 +1181,7 @@ order_messages
 | Trilha | Período | Situação | Entregável Principal |
 |---|---|---|---|
 | ✅ **Infraestrutura — Ambiente Docker** | Agosto 2026 | Concluída | 8 serviços (PHP 8.3, Nginx, MySQL 8.4, phpMyAdmin, Redis 7, Node 22/Vite, queue, Mailpit); dispensa Laragon, XAMPP, PHP, MySQL, Composer e Node no Windows — ver `docs/DOCKER_DEVELOPMENT.md` |
-| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 6 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
+| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 7 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
 
 ---
 
@@ -1467,7 +1467,7 @@ A decisão arquitetural é que **comportamento gerado na Feira Esquerda Livre pe
 | **CI-04** | Escrita de eventos pela fila dedicada | ✅ Concluída | 25/08/2026 |
 | **CI-05** | Migração das 7 chamadas de rastreamento | ✅ Concluída | 25/08/2026 |
 | **CI-06** | Painel e agregação local | ✅ Concluída | 25/08/2026 |
-| CI-07 | Desativação do SDK externo | ⬜ Não iniciada | — |
+| **CI-07** | Desativação do SDK externo em runtime | ✅ Concluída | 25/08/2026 |
 | CI-08 | Limpeza de Composer, Docker e `.env` | ⬜ Não iniciada | — |
 | CI-09 | Retenção, LGPD e documentação final | ⬜ Não iniciada | — |
 
@@ -1485,7 +1485,8 @@ Nenhuma fase é considerada concluída com teste vermelho. O número nunca deve 
 | Fim da CI-03 | 290 | 798 |
 | Fim da CI-04 | 302 | 819 |
 | Fim da CI-05 | 304 | 837 |
-| Fim da CI-06 | **327** | **907** |
+| Fim da CI-06 | 327 | 907 |
+| Fim da CI-07 | **327** | **907** |
 
 ---
 
@@ -1711,11 +1712,49 @@ O benchmark encontrou um N+1 real durante a implementação: a timeline do detal
 
 ---
 
+### ✅ CI-07 — Desativação do SDK externo em runtime (Concluída)
+
+**Objetivo:** provar que o SDK externo já é tecnicamente dispensável. Ao final, nenhuma classe dele executa — embora o pacote continue instalado até a CI-08.
+
+**Como foi desligado.** O `composer.json` passou a declarar:
+
+```json
+"extra": { "laravel": { "dont-discover": ["jmf-system/customer-intelligence-sdk"] } }
+```
+
+O Composer segue instalando o pacote, mas o Laravel deixa de auto-registrar o `CustomerIntelligenceServiceProvider` dele. Com uma linha caem de uma vez o middleware, o registro dos cinco componentes Livewire, o merge de configuração e o `ConfigValidator` que rodava no boot. Foi a forma mais limpa de chegar ao estado que a fase pedia — pacote instalado, runtime intacto — sem tocar em `require`, em `repositories` ou no `composer.lock`.
+
+**Referências de runtime removidas:**
+
+| Arquivo | O que saiu |
+|---|---|
+| `app/Providers/AppServiceProvider.php` | 5 imports `JmfSystem\` + método `registerJmfCiLivewireComponents()` + sua chamada no `boot()` |
+| `config/livewire.php` | namespace `JmfSystem\...\Plugins\JmfCi` de `class_namespaces` |
+| `app/Livewire/Admin/CustomerIntelligence/DashboardShow.php` | import morto da Facade do SDK, sinalizado desde a auditoria CI-01 |
+| `composer.json` | — (adição do `dont-discover`) |
+
+`Gate`, os listeners de `OrderSplitConfirmed` e a configuração de e-mail do `AppServiceProvider` foram preservados.
+
+**Middleware.** O `ResolveVisitorAndSession` do SDK entrava no grupo `web` pelo `boot()` do ServiceProvider auto-descoberto — ocupava a posição `[6]`, logo antes do middleware interno. Sem descoberta, a pilha do grupo `web` termina em `TrackVisitorSession`, agora o único coletor. Um teste afirma que nenhum middleware `JmfSystem\` participa do grupo; ele compara nomes como string, de propósito, para não reintroduzir a dependência dentro do próprio teste.
+
+**Cookies.** Continuam sendo `jmf_ci_visitor_id` e `jmf_ci_session_id`, conforme a decisão 3. Validado no ambiente real: **um `Set-Cookie` de cada**, visitante e sessão criados apenas pelo módulo interno. A adoção via `Cookie::queued()` ficou no código e perdeu efeito prático — foi mantida por ser API do próprio Laravel, sem acoplamento a classe nenhuma.
+
+**Componentes Livewire.** Os cinco aliases `jmf-ci-*` deixaram de ser registrados. Os quatro componentes internos — `Dashboard`, `EventIndex`, `VisitorIndex`, `VisitorShow` — são descobertos sozinhos pela convenção de `class_namespace`, sem registro manual.
+
+**Verificação final.** Busca por `JmfSystem\`, `JmfCiApiClient`, `SendPayloadJob`, `PayloadLogger`, `ConfigValidator` e `healthCheck` em `app/`, `routes/`, `bootstrap/` e `config/` retorna **zero**. Os caches `bootstrap/cache/packages.php` e `services.php` também.
+
+**Bootstrap validado** com `artisan about`, `route:list` (175 rotas) e `optimize:clear` — nenhum passo falha sem o SDK.
+
+**Validado no ambiente real:** navegação por home, produto e catálogo gerou um evento em `ci_events`, um visitante, uma sessão e os quatro agregados, com zero jobs falhos e um cookie de cada nome. `/checkout` responde 200.
+
+**O que continua de pé, de propósito:** pacote no `vendor/`, bloco `repositories`, volumes `../jmf-ci-sdk` em `app` e `queue`, variáveis `JMF_CI_*` no `.env` — todas sem uso. É o estado deliberado desta fase: **SDK instalado e completamente fora do runtime**.
+
+---
+
 ### Fases pendentes
 
 | Fase | Objetivo | Risco previsto |
 |---|---|---|
-| **CI-07** | Cortar o envio remoto; remover registro Livewire duplicado e código morto. | MÉDIO — ponto sem volta para novos dados na VPS |
 | **CI-08** | Remover pacote Composer, bloco `repositories` do tipo `path`, as 2 linhas do `compose.yaml` e as variáveis `JMF_CI_*`. | MÉDIO — `composer update` mexe no lock; conferir o diff |
 | **CI-09** | Expurgo agendado dos 180 dias, comando de exclusão por titular, documentação final. Aposentar `docs/JMF_CI_INTEGRATION.md`. | BAIXO — mas exclusão é irreversível |
 
@@ -1945,6 +1984,6 @@ Cortes conscientes para manter a v1 da API enxuta e testável — candidatos a u
 ---
 
 *Documento atualizado em: 25 de agosto de 2026 — Versão 2.8*
-*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 6 de 9 fases. Escrita e leitura do Customer Intelligence já pertencem ao projeto: os 7 eventos são gravados localmente e o painel lê o próprio banco, sem nenhuma chamada à plataforma externa.*
-*Próxima revisão: após a CI-07 (desativação do SDK externo)*
+*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 7 de 9 fases. O SDK externo está instalado mas completamente fora do runtime: escrita, leitura e painel do Customer Intelligence pertencem ao projeto.*
+*Próxima revisão: após a CI-08 (limpeza física de Composer, Docker e .env)*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e publicação no feed pelo app.*

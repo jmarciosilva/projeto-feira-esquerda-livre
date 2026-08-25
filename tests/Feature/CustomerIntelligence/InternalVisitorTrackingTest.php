@@ -15,7 +15,6 @@ use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Testing\TestResponse;
-use JmfSystem\CustomerIntelligence\Http\Middleware\ResolveVisitorAndSession;
 use Tests\TestCase;
 
 /**
@@ -78,21 +77,21 @@ class InternalVisitorTrackingTest extends TestCase
     }
 
     /**
-     * A ordem é a mitigação do risco levantado na auditoria: o middleware do
-     * módulo precisa rodar depois do middleware do SDK para poder adotar o
-     * cookie que ele já tenha enfileirado.
+     * Desde a CI-07 o ServiceProvider do SDK nao e mais descoberto, entao o
+     * middleware dele nao entra no grupo `web`. A coleta passou a ser
+     * responsabilidade exclusiva do modulo interno.
+     *
+     * O nome da classe e comparado como string de proposito: importa-la
+     * reintroduziria uma dependencia de runtime no proprio teste.
      */
-    public function test_the_module_middleware_runs_after_the_sdk_middleware(): void
+    public function test_the_sdk_middleware_no_longer_runs(): void
     {
         $web = app(Kernel::class)->getMiddlewareGroups()['web'];
-        $sdk = ResolveVisitorAndSession::class;
 
-        $this->assertContains($sdk, $web, 'O SDK externo deve continuar ativo nesta fase.');
-        $this->assertGreaterThan(
-            array_search($sdk, $web, true),
-            array_search(TrackVisitorSession::class, $web, true),
-            'O middleware do módulo deve vir depois do middleware do SDK.'
-        );
+        $doSdk = array_filter($web, fn (string $m) => str_starts_with($m, 'JmfSystem\\'));
+
+        $this->assertSame([], array_values($doSdk), 'Nenhum middleware do SDK deve participar do grupo web.');
+        $this->assertContains(TrackVisitorSession::class, $web);
     }
 
     // ─── Primeira visita ──────────────────────────────────────────────────

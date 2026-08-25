@@ -9,12 +9,6 @@ use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
-use Livewire\Livewire;
-use JmfSystem\CustomerIntelligence\Livewire\Plugins\JmfCi\Configuration;
-use JmfSystem\CustomerIntelligence\Livewire\Plugins\JmfCi\Dashboard;
-use JmfSystem\CustomerIntelligence\Livewire\Plugins\JmfCi\Contacts\ContactIndex;
-use JmfSystem\CustomerIntelligence\Livewire\Plugins\JmfCi\Contacts\ContactShow;
-use JmfSystem\CustomerIntelligence\Livewire\Plugins\JmfCi\Events\EventIndex;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,18 +21,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(OrderSplitConfirmed::class, HandleAvaEnrollmentOnSplitConfirmed::class);
         Event::listen(OrderSplitConfirmed::class, TrackOrderSplitConfirmedEvent::class);
 
-        $this->registerJmfCiLivewireComponents();
-
         $this->applyMailConfigFromDatabase();
-    }
-
-    private function registerJmfCiLivewireComponents(): void
-    {
-        Livewire::component('jmf-ci-configuration', Configuration::class);
-        Livewire::component('jmf-ci-dashboard', Dashboard::class);
-        Livewire::component('jmf-ci-contact-index', ContactIndex::class);
-        Livewire::component('jmf-ci-contact-show', ContactShow::class);
-        Livewire::component('jmf-ci-event-index', EventIndex::class);
     }
 
     private function applyMailConfigFromDatabase(): void
