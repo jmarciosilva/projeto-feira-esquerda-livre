@@ -1,8 +1,8 @@
 # 🗺️ Roadmap de Desenvolvimento — Feira Esquerda Livre
 
 **Documento de Planejamento Estratégico**
-**Versão:** 2.6 — Agosto de 2026
-**Status geral do projeto:** MVP demonstrável. A plataforma já permite apresentar a jornada pública da feira, navegação por eixos, expositores, marketplace, carrinho, checkout, integração inicial com Mercado Pago, páginas institucionais, formulário de contato com resposta automática, painel administrativo com identidade visual, comunidade/feed, email marketing, visibilidade de expositores, rastreio, comunicação loja-cliente, AVA com curso online, progresso e certificado PDF, e uma API REST (`/api/v1`, Sanctum) pronta para o app mobile em Flutter (cliente e lojista). Fases futuras seguem concentradas em automações de escala: split automático completo via Mercado Pago, OAuth por lojista no Melhor Envio, compra/geração de etiquetas físicas, auditoria ampliada, recuperação de carrinho abandonado e ampliação da API mobile (construtor de curso e feed).
+**Versão:** 2.8 — Agosto de 2026
+**Status geral do projeto:** MVP demonstrável. A plataforma já permite apresentar a jornada pública da feira, navegação por eixos, expositores, marketplace, carrinho, checkout, integração inicial com Mercado Pago, páginas institucionais, formulário de contato com resposta automática, painel administrativo com identidade visual, comunidade/feed, email marketing, visibilidade de expositores, rastreio, comunicação loja-cliente, AVA com curso online, progresso e certificado PDF, e uma API REST (`/api/v1`, Sanctum) pronta para o app mobile em Flutter (cliente e lojista). Fases futuras seguem concentradas em automações de escala: split automático completo via Mercado Pago, OAuth por lojista no Melhor Envio, compra/geração de etiquetas físicas, auditoria ampliada, recuperação de carrinho abandonado e ampliação da API mobile (construtor de curso e feed). Em paralelo, corre a **Trilha CI**, que transforma o Customer Intelligence de integração externa em módulo nativo do projeto, e o ambiente de desenvolvimento passou a rodar inteiramente em **Docker**.
 
 ---
 
@@ -42,7 +42,17 @@
 [FASE 10 ✅ CONCLUÍDA]
   Inteligência de Cliente (JMF CI) - Sprint 3
   Dashboard · Rastreamento · E2E Tests
+           ↓
+[TRILHA CI 🔄 EM ANDAMENTO]
+  Internalização do Customer Intelligence
+  CI-01 ✅ · CI-02 ✅ · CI-03 a CI-09 pendentes
+  Deixa de depender do SDK externo em ../jmf-ci-sdk
 ```
+
+> A Trilha CI não substitui a Fase 10: ela reaproveita o que a Fase 10 entregou
+> (eventos, painel, permissão, views) e troca a origem dos dados — de uma API
+> remota para o próprio banco da Feira. Detalhes em
+> [Trilha CI](#-trilha-ci--internalização-do-customer-intelligence-em-andamento).
 
 ---
 
@@ -1166,9 +1176,20 @@ order_messages
 | ✅ Fase 9 — API Mobile (Flutter) | Agosto 2026 | 9.1 · 9.2 · 9.3 · 9.4 · 9.5 | API `/api/v1` com Sanctum, catálogo, carrinho/checkout/pedidos/chat/endereços, AVA, lojista e comunidade (feed) — 52 testes |
 | ✅ **Fase 10 — Inteligência de Cliente** | **Agosto 2026 (Sprint 3)** | **10.1 · 10.2 · 10.3** | **Dashboard admin, rastreamento de eventos (produtos/carrinho/pedidos) e testes E2E — 236 testes** |
 
+### Trilhas paralelas
+
+| Trilha | Período | Situação | Entregável Principal |
+|---|---|---|---|
+| ✅ **Infraestrutura — Ambiente Docker** | Agosto 2026 | Concluída | 8 serviços (PHP 8.3, Nginx, MySQL 8.4, phpMyAdmin, Redis 7, Node 22/Vite, queue, Mailpit); dispensa Laragon, XAMPP, PHP, MySQL, Composer e Node no Windows — ver `docs/DOCKER_DEVELOPMENT.md` |
+| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 2 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
+
 ---
 
 ## ✅ Fase 10 — Inteligência de Cliente (JMF CI) (Concluída)
+
+> **Continuação:** a arquitetura desta fase — SDK externo com envio por HTTP — está sendo
+> substituída por um módulo nativo do projeto. As funcionalidades permanecem; muda a origem
+> dos dados. Acompanhamento na [Trilha CI](#-trilha-ci--internalização-do-customer-intelligence-em-andamento).
 
 **Período:** Sprint 3 — Agosto 2026
 **Objetivo estratégico:** integrar o JMF Customer Intelligence SDK para rastreamento comportamental, análise de visitantes e métricas de conversão — permitindo que a Feira Esquerda Livre entenda melhor seus clientes e otimize fluxos de compra.
@@ -1416,6 +1437,162 @@ JMF_CI_TIMEOUT=2                 # timeout de 2 segundos para requisições
 
 ---
 
+## 🧩 Trilha CI — Internalização do Customer Intelligence (em andamento)
+
+**Período:** Agosto de 2026 — em curso
+**Objetivo estratégico:** transformar o Customer Intelligence de integração externa em módulo nativo da Feira Esquerda Livre, preservando todas as funcionalidades já entregues na Fase 10.
+**Documentação técnica:** `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md`
+
+### Por que internalizar
+
+A Fase 10 entregou o rastreamento funcionando, mas com uma característica que virou limitação: o Customer Intelligence é um **cliente de telemetria**, não um módulo de analytics. Cada ação de negócio vira uma requisição HTTP para uma plataforma externa; nenhum dado comportamental fica no banco da Feira, e o painel administrativo só mostra números enquanto aquele servidor de terceiro estiver no ar.
+
+A decisão arquitetural é que **comportamento gerado na Feira Esquerda Livre pertence à Feira Esquerda Livre**.
+
+| Hoje | Depois |
+|---|---|
+| Ação de negócio → job síncrono → HTTP para VPS externa | Ação de negócio → evento Laravel → fila → MySQL local |
+| Painel lê 5 endpoints remotos; VPS fora do ar = painel zerado | Painel lê o próprio banco; funciona offline |
+| `produto_id` e `pedido_id` soltos dentro de JSON | Referência real por `entity_type` / `entity_id` |
+| Exige o repositório `../jmf-ci-sdk` clonado ao lado | `git clone` + `docker compose up -d` e pronto |
+| Dado comportamental compartilhado com terceiro | Feira como controladora integral (ver LGPD) |
+
+### Acompanhamento das fases
+
+| Fase | Escopo | Status | Concluída em |
+|---|---|---|---|
+| **CI-01** | Auditoria e arquitetura | ✅ Concluída | 25/08/2026 |
+| **CI-02** | Fundação do módulo interno | ✅ Concluída | 25/08/2026 |
+| CI-03 | Coleta: visitante e sessão (middleware, cookies, ServiceProvider) | ⬜ Não iniciada | — |
+| CI-04 | Escrita de eventos pela fila dedicada | ⬜ Não iniciada | — |
+| CI-05 | Migração das 7 chamadas de rastreamento | ⬜ Não iniciada | — |
+| CI-06 | Dashboard lendo do banco local | ⬜ Não iniciada | — |
+| CI-07 | Desativação do SDK externo | ⬜ Não iniciada | — |
+| CI-08 | Limpeza de Composer, Docker e `.env` | ⬜ Não iniciada | — |
+| CI-09 | Retenção, LGPD e documentação final | ⬜ Não iniciada | — |
+
+> **Nota de numeração:** a auditoria CI-01 propôs originalmente 10 fases. Como a CI-02 acabou absorvendo a persistência e os Models — que estavam previstos numa fase própria —, o roteiro foi consolidado em 9. Esta tabela é a numeração válida.
+
+### Evolução da suíte de testes
+
+Nenhuma fase é considerada concluída com teste vermelho. O número nunca deve cair sem justificativa escrita.
+
+| Marco | Testes | Asserções |
+|---|---|---|
+| Fim da Fase 10 | 236 | — |
+| Ambiente Docker validado | 238 | 624 |
+| Fim da CI-02 | **273** | **744** |
+
+---
+
+### ✅ CI-01 — Auditoria e arquitetura (Concluída)
+
+**Objetivo:** saber exatamente o que existe antes de mexer em qualquer coisa. Fase inteiramente de leitura — nenhum arquivo alterado.
+
+**O que a auditoria encontrou:**
+
+| Achado | Consequência |
+|---|---|
+| O SDK não tem nenhum Model nem migration | Não há dado para migrar; a persistência é construção nova. Elimina a classe de risco mais pesada de uma internalização |
+| As 10 views do painel (`resources/views/plugins/jmf-ci/`) já são do projeto e idênticas às do SDK | A camada visual já estava internalizada; o SDK não faz `loadViewsFrom()` |
+| Cerca de 590 das 1.465 linhas do SDK são infraestrutura de rede | Job HTTP, cliente de leitura, logger e validador de configuração remota simplesmente desaparecem |
+| `identify()` e `conversion()` nunca são chamados | Os "contatos" do painel são visitantes anônimos |
+| Rotas do plugin e `JmfCiPluginRouteServiceProvider` não estão registrados | Código morto |
+| Superfície de acoplamento: 9 arquivos usam `JmfSystem`, com 7 chamadas de `::track()` | Escopo da CI-05 |
+| Dependência Docker do repositório vizinho: exatamente 2 linhas no `compose.yaml` | Escopo da CI-08 |
+
+**Decisões tomadas ao fim da CI-01:**
+
+| # | Decisão | Definição |
+|---|---|---|
+| 1 | Corte direto ou escrita dupla na migração das chamadas | **Corte direto** — dual-write dobra o custo por requisição e mantém vivo o acoplamento que se quer eliminar |
+| 2 | Importar o histórico já acumulado na VPS | **Recomeçar**, dado o volume pequeno |
+| 3 | Nome dos cookies de visitante | **Manter `jmf_ci_*`** — renomear zeraria a identidade de todos os visitantes conhecidos |
+| 4 | Retenção de eventos brutos | **180 dias**, com agregado diário permanente |
+| 5 | `expositor_impressions` (analytics nativo já existente) | **Manter separado** nesta migração |
+| 6 | Nomenclatura pública do tracking | **Manter a forma da chamada**, tornando a CI-05 uma troca mecânica |
+
+---
+
+### ✅ CI-02 — Fundação do módulo interno (Concluída)
+
+**Objetivo:** criar a fundação técnica do módulo — persistência, Models e caminho de gravação — sem ligar nada e sem tocar no SDK externo.
+
+**Entregue:**
+
+| Componente | Status |
+|---|---|
+| Módulo `app/CustomerIntelligence/` (529 linhas, 8 classes) | ✅ Concluído |
+| 4 migrations aditivas (`ci_visitors`, `ci_sessions`, `ci_events`, `ci_daily_metrics`) | ✅ Concluído |
+| 4 Models com relacionamentos, casts e UUID | ✅ Concluído |
+| `CustomerIntelligenceService::record()` gravando no banco local | ✅ Concluído |
+| `TrackCustomerEventJob` para gravação assíncrona | ✅ Concluído |
+| `EventName` — os 7 eventos tipados em enum | ✅ Concluído |
+| `PropertySanitizer` — minimização LGPD no caminho de escrita | ✅ Concluído |
+| 35 testes novos (schema, Models, gravação) | ✅ Concluído |
+| `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` | ✅ Concluído |
+
+**Estrutura criada:**
+
+```
+app/CustomerIntelligence/
+├── Enums/EventName.php                      os 7 eventos, tipados
+├── Jobs/TrackCustomerEventJob.php           gravação assíncrona
+├── Models/
+│   ├── Visitor.php                          ci_visitors
+│   ├── VisitorSession.php                   ci_sessions
+│   ├── TrackedEvent.php                     ci_events
+│   └── DailyMetric.php                      ci_daily_metrics
+├── Services/CustomerIntelligenceService.php porta de entrada do módulo
+└── Support/PropertySanitizer.php            redige dados sensíveis
+```
+
+**Banco criado (4 tabelas, todas aditivas):**
+
+| Tabela | Responsabilidade | Chaves e índices |
+|---|---|---|
+| `ci_visitors` | Identidade anônima persistente | `visitor_uuid` unique · FK `user_id` nullOnDelete · índice `last_seen_at` |
+| `ci_sessions` | Janela de navegação | `session_uuid` unique · FK `visitor_id` cascade · índice `started_at` |
+| `ci_events` | Fato comportamental (append-only) | `event_uuid` unique · 3 FKs nullOnDelete · `(event_name, occurred_at)` · `(occurred_at)` · `(entity_type, entity_id)` |
+| `ci_daily_metrics` | Agregado diário, retenção permanente | unique `(metric_date, metric_name, dimension_type, dimension_value)` |
+
+**Decisões de arquitetura:**
+
+- **Só existem as pastas que têm conteúdo.** Sem `Contracts/`, `DTOs/`, `Repositories/` ou `Exceptions/`: nenhuma teria consumidor nesta fase, e o projeto usa Services concretos com Eloquent direto.
+- **Sem ServiceProvider ainda.** Nada precisa de binding, config merge ou middleware — o container resolve o Service por autowiring. Um provider vazio seria camada artificial. Ele nasce na CI-03.
+- **Livewire fica fora do módulo.** `config/livewire.php` define `class_namespace => App\Livewire`; componentes fora desse namespace exigem registro manual — exatamente o que o `AppServiceProvider` faz hoje com os aliases `jmf-ci-*`. O painel continuará em `app/Livewire/Admin/CustomerIntelligence/`.
+- **`ci_events` é append-only.** Um evento é um fato ocorrido, nunca editado: não existe `updated_at`.
+- **Nomes sem ambiguidade.** `TrackedEvent` e não `Event`, porque `App\Models\Event` já é uma feira da agenda; `VisitorSession` e não `Session`, porque `sessions` é a tabela de sessão do Laravel.
+- **UUID público + `id` interno.** O bigint auto incremental continua sendo a chave e o alvo das foreign keys; o UUID ordenado é o identificador público e mantém localidade de índice numa tabela que só cresce.
+- **Dimensões de métrica são `NOT NULL` com default vazio.** No MySQL, valores `NULL` são distintos entre si em índice `UNIQUE` — com colunas nuláveis a chave única não impediria gravar a mesma métrica global duas vezes.
+
+**O que a CI-02 deliberadamente não fez:** não migrou nenhuma das 7 chamadas, não gravou nenhum evento real, não removeu o SDK, não criou cookies nem middleware, não implementou expurgo nem agregadores. Um teste específico garante isso: navega por um produto, adiciona ao carrinho e afirma que `ci_events` continua vazia.
+
+---
+
+### Fases pendentes
+
+| Fase | Objetivo | Risco previsto |
+|---|---|---|
+| **CI-03** | Middleware próprio resolvendo visitante e sessão a partir dos cookies, gravando em `ci_visitors` e `ci_sessions`. Nasce aqui o ServiceProvider do módulo. | MÉDIO — dois middlewares no grupo `web` ao mesmo tempo; a ordem importa |
+| **CI-04** | Fila dedicada `customer-intelligence` e ajuste do `--queue` do worker no Docker. | BAIXO |
+| **CI-05** | Repontar as 7 chamadas para o módulo interno. | ALTO — toca `CartService`, `OrderService` e `Checkout`, o coração da compra |
+| **CI-06** | Componentes Livewire próprios consultando Eloquent no lugar do `JmfCiApiClient`; agregadores diários. | MÉDIO — agregação sem índice adequado trava o painel |
+| **CI-07** | Cortar o envio remoto; remover registro Livewire duplicado e código morto. | MÉDIO — ponto sem volta para novos dados na VPS |
+| **CI-08** | Remover pacote Composer, bloco `repositories` do tipo `path`, as 2 linhas do `compose.yaml` e as variáveis `JMF_CI_*`. | MÉDIO — `composer update` mexe no lock; conferir o diff |
+| **CI-09** | Expurgo agendado dos 180 dias, comando de exclusão por titular, documentação final. Aposentar `docs/JMF_CI_INTEGRATION.md`. | BAIXO — mas exclusão é irreversível |
+
+### Critério de conclusão da trilha
+
+```bash
+git clone projeto-feira-esquerda-livre
+docker compose up -d
+```
+
+funcionando sem nenhum repositório JMF ao lado, com o painel de Inteligência de Cliente lendo dados reais do banco local e a suíte de testes verde.
+
+---
+
 ## 🎯 Princípios Transversais de Desenvolvimento
 
 Estes princípios se aplicam a todas as fases e devem guiar cada decisão de UX e arquitetura:
@@ -1630,7 +1807,7 @@ Cortes conscientes para manter a v1 da API enxuta e testável — candidatos a u
 
 ---
 
-*Documento atualizado em: 8 de agosto de 2026 — Versão 2.7*
-*Status: Fase 10 (Sprint 3) em andamento — integrando JMF Customer Intelligence SDK*
-*Próxima revisão: após conclusão da Fase 10 (dashboard, rastreamento, E2E)*
+*Documento atualizado em: 25 de agosto de 2026 — Versão 2.8*
+*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 2 de 9 fases (CI-01 auditoria e CI-02 fundação).*
+*Próxima revisão: após a CI-03 (coleta de visitante e sessão)*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e publicação no feed pelo app.*
