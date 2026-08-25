@@ -45,8 +45,8 @@
            ↓
 [TRILHA CI 🔄 EM ANDAMENTO]
   Internalização do Customer Intelligence
-  CI-01 a CI-07 ✅ · CI-08 e CI-09 pendentes
-  Deixa de depender do SDK externo em ../jmf-ci-sdk
+  CI-01 a CI-08 ✅ · CI-09 pendente
+  Dependência do SDK externo eliminada
 ```
 
 > A Trilha CI não substitui a Fase 10: ela reaproveita o que a Fase 10 entregou
@@ -1181,7 +1181,7 @@ order_messages
 | Trilha | Período | Situação | Entregável Principal |
 |---|---|---|---|
 | ✅ **Infraestrutura — Ambiente Docker** | Agosto 2026 | Concluída | 8 serviços (PHP 8.3, Nginx, MySQL 8.4, phpMyAdmin, Redis 7, Node 22/Vite, queue, Mailpit); dispensa Laragon, XAMPP, PHP, MySQL, Composer e Node no Windows — ver `docs/DOCKER_DEVELOPMENT.md` |
-| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 7 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
+| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 8 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
 
 ---
 
@@ -1412,7 +1412,7 @@ CustomerIntelligence::track('pedido.enviado', [
 **Configuração de Ambiente:**
 ```env
 JMF_CI_BASE_URL=http://179.198.115.221
-JMF_CI_TOKEN=1|HvZ339GRlMLTetXCvOTv95e1XE7yFM5xveoydDUR46c15d38
+JMF_CI_TOKEN=<removido — segredo legado, revogar na plataforma>
 JMF_CI_QUEUE_CONNECTION=sync    # sync para dev/teste, database/redis para prod
 JMF_CI_TIMEOUT=2                 # timeout de 2 segundos para requisições
 ```
@@ -1468,7 +1468,7 @@ A decisão arquitetural é que **comportamento gerado na Feira Esquerda Livre pe
 | **CI-05** | Migração das 7 chamadas de rastreamento | ✅ Concluída | 25/08/2026 |
 | **CI-06** | Painel e agregação local | ✅ Concluída | 25/08/2026 |
 | **CI-07** | Desativação do SDK externo em runtime | ✅ Concluída | 25/08/2026 |
-| CI-08 | Limpeza de Composer, Docker e `.env` | ⬜ Não iniciada | — |
+| **CI-08** | Remoção física do SDK externo | ✅ Concluída | 25/08/2026 |
 | CI-09 | Retenção, LGPD e documentação final | ⬜ Não iniciada | — |
 
 > **Nota de numeração:** a auditoria CI-01 propôs originalmente 10 fases. Como a CI-02 acabou absorvendo a persistência e os Models — que estavam previstos numa fase própria —, o roteiro foi consolidado em 9. Esta tabela é a numeração válida.
@@ -1486,7 +1486,8 @@ Nenhuma fase é considerada concluída com teste vermelho. O número nunca deve 
 | Fim da CI-04 | 302 | 819 |
 | Fim da CI-05 | 304 | 837 |
 | Fim da CI-06 | 327 | 907 |
-| Fim da CI-07 | **327** | **907** |
+| Fim da CI-07 | 327 | 907 |
+| Fim da CI-08 | **327** | **907** |
 
 ---
 
@@ -1751,12 +1752,54 @@ O Composer segue instalando o pacote, mas o Laravel deixa de auto-registrar o `C
 
 ---
 
+### ✅ CI-08 — Remoção física do SDK externo (Concluída)
+
+**Objetivo:** o projeto passa a funcionar com um único `git clone`. O diretório `../jmf-ci-sdk` pode deixar de existir sem qualquer impacto.
+
+**Composer:**
+
+| O que saiu | Como |
+|---|---|
+| `jmf-system/customer-intelligence-sdk` do `require` | `composer remove` |
+| bloco `repositories` do tipo `path` | edição do `composer.json` |
+| `dont-discover` transitório da CI-07 | voltou a `[]`, o padrão do projeto |
+| entrada do pacote no `composer.lock` | pelo Composer, nunca à mão |
+
+`composer validate` passa. `composer show jmf-system/customer-intelligence-sdk` não encontra nada.
+
+**Docker:** os dois bind mounts `../jmf-ci-sdk:/var/www/jmf-ci-sdk:ro` saíram dos serviços `app` e `queue`, junto com os comentários que os explicavam. Os volumes de performance — `vendor`, `node-modules`, `mysql-data`, `redis-data` — ficaram intactos.
+
+**Ambiente:** removidas `JMF_CI_BASE_URL`, `JMF_CI_TOKEN`, `JMF_CI_QUEUE_CONNECTION` e `JMF_CI_TIMEOUT` do `.env` e do `.env.example`. O token real da plataforma antiga deixou de existir no ambiente local; **a revogação na plataforma continua sendo ação humana.**
+
+**Também saíram**, encontrados na auditoria mas não previstos no roteiro:
+
+- `config/customer-intelligence.php` — a configuração publicada do SDK, que lia treze variáveis `JMF_CI_*` e não tinha mais nenhum leitor;
+- `docs/JMF_CI_INTEGRATION.md` — 432 linhas descrevendo instalação de SDK, clone de repositório vizinho e configuração de token e VPS. `DocsShow`, que renderizava esse arquivo na página `/admin/customer-intelligence/documentacao`, foi repontado para `CUSTOMER_INTELLIGENCE_INTERNAL.md`;
+- o **token real** que estava versionado em texto puro no próprio ROADMAP, na seção histórica da Fase 10. Foi redigido.
+
+**Prova de independência.** Não bastava rodar os testes com o `vendor` atual, que ainda continha arquivos antigos do SDK. A validação foi feita destruindo o volume `vendor` e reinstalando do zero, já sem o bind mount:
+
+```
+/var/www/jmf-ci-sdk dentro do container   NÃO EXISTE
+vendor antes do install                    0 itens
+composer install                           123 pacotes, 0 erros
+vendor/jmf-system depois                   NÃO EXISTE
+JmfSystem no autoload_psr4                 0
+```
+
+Antes eram 124 pacotes. Se o repositório vizinho ainda fosse necessário, o `composer install` teria falhado com pacote não encontrado.
+
+**Validado no ambiente real:** home, produto, catálogo, checkout e agenda respondem 200; o painel admin segue protegido; um evento foi coletado, enfileirado em `customer-intelligence`, gravado em `ci_events` e agregado em `ci_daily_metrics`, com zero jobs falhos e um cookie de cada nome. As quatro telas do painel enxergam os dados.
+
+**Preservado de propósito:** os cookies `jmf_ci_*`, as views em `resources/views/plugins/jmf-ci/` e os componentes `x-jmf-ci-*`. São nomes legados que agora pertencem ao módulo interno; renomeá-los é cosmética e não justifica risco.
+
+---
+
 ### Fases pendentes
 
 | Fase | Objetivo | Risco previsto |
 |---|---|---|
-| **CI-08** | Remover pacote Composer, bloco `repositories` do tipo `path`, as 2 linhas do `compose.yaml` e as variáveis `JMF_CI_*`. | MÉDIO — `composer update` mexe no lock; conferir o diff |
-| **CI-09** | Expurgo agendado dos 180 dias, comando de exclusão por titular, documentação final. Aposentar `docs/JMF_CI_INTEGRATION.md`. | BAIXO — mas exclusão é irreversível |
+| **CI-09** | Expurgo agendado dos 180 dias, comando de exclusão por titular, consentimento e auditoria de acesso ao painel. Opcionalmente, renomear as views `plugins/jmf-ci/` e os componentes `x-jmf-ci-*`, que hoje são o último nome legado além dos cookies. | BAIXO — mas exclusão é irreversível |
 
 ### Critério de conclusão da trilha
 
@@ -1984,6 +2027,6 @@ Cortes conscientes para manter a v1 da API enxuta e testável — candidatos a u
 ---
 
 *Documento atualizado em: 25 de agosto de 2026 — Versão 2.8*
-*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 7 de 9 fases. O SDK externo está instalado mas completamente fora do runtime: escrita, leitura e painel do Customer Intelligence pertencem ao projeto.*
-*Próxima revisão: após a CI-08 (limpeza física de Composer, Docker e .env)*
+*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 8 de 9 fases. O SDK externo foi removido: o Customer Intelligence é 100% interno e o projeto roda com um único git clone.*
+*Próxima revisão: após a CI-09 (retenção de 180 dias, LGPD e limpeza final)*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e publicação no feed pelo app.*

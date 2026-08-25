@@ -15,7 +15,7 @@ class DocsShow extends Component
 
     public function render()
     {
-        $path = base_path('docs/JMF_CI_INTEGRATION.md');
+        $path = base_path('docs/CUSTOMER_INTELLIGENCE_INTERNAL.md');
 
         $html = File::exists($path)
             ? (new CommonMarkConverter())->convert(File::get($path))->getContent()

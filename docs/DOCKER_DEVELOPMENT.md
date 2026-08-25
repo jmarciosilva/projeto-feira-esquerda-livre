@@ -346,48 +346,6 @@ docker compose exec app php artisan schedule:work    # em primeiro plano
 
 ---
 
-## JMF Customer Intelligence
-
-O `composer.json` declara um repositório do tipo `path`:
-
-```json
-"repositories": [
-    { "type": "path", "url": "../jmf-ci-sdk/packages/jmf-system/customer-intelligence-sdk" }
-]
-```
-
-Esse diretório fica **fora** da raiz do projeto. Sem ele, `composer install`
-falha dentro do container.
-
-Solução adotada (sem alterar a integração): os serviços `app` e `queue` montam
-o diretório em modo somente leitura, preservando o caminho relativo.
-
-```yaml
-volumes:
-  - ../jmf-ci-sdk:/var/www/jmf-ci-sdk:ro
-```
-
-Como o projeto fica em `/var/www/html`, o `../jmf-ci-sdk` do `composer.json`
-resolve para `/var/www/jmf-ci-sdk` — exatamente o que foi montado.
-
-**Requisito:** o repositório `jmf-ci-sdk` precisa estar clonado ao lado de
-`feira-esquerda-livre`:
-
-```
-projeto-feira-esquerda-livre/
-├── feira-esquerda-livre/     <- este projeto
-└── jmf-ci-sdk/               <- necessário para o composer install
-```
-
-Sem ele o Docker cria um diretório vazio no lugar e o `composer install` acusa
-o pacote como não encontrado.
-
-> A remoção da integração JMF está prevista para uma etapa futura e **não** foi
-> iniciada aqui. Quando ela ocorrer, o volume `../jmf-ci-sdk` e o bloco
-> `repositories` do `composer.json` poderão ser removidos juntos.
-
----
-
 ## Testes
 
 ```bash
@@ -453,6 +411,25 @@ docker compose down
 docker volume rm feira-esquerda-livre_node-modules
 docker compose up -d
 ```
+
+### 502 Bad Gateway depois de recriar o container `app`
+
+O Nginx resolve `app:9000` uma vez, na subida, e guarda o IP. Se o container
+`app` for recriado (`docker compose up -d --force-recreate app`), ele ganha um
+IP novo e o Nginx continua tentando o antigo:
+
+```
+connect() failed (111: Connection refused) while connecting to upstream
+```
+
+Reiniciar o Nginx resolve:
+
+```bash
+docker compose restart nginx
+```
+
+Recriar a stack inteira (`docker compose up -d --force-recreate`) não tem esse
+problema, porque o Nginx sobe junto.
 
 ### `SQLSTATE[HY000] [2002] Connection refused`
 

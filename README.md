@@ -34,61 +34,42 @@ O projeto já possui um fluxo mínimo viável para apresentação a clientes, di
 | Processamento de imagens | Intervention/Image 3 |
 | PDF | barryvdh/laravel-dompdf |
 | Filas | Laravel Queue |
-| Inteligência de Cliente | JMF Customer Intelligence SDK 1.0.0 |
+| Inteligência de Cliente | Módulo nativo (`app/CustomerIntelligence`) |
 
 ---
 
-## Inteligência de Cliente (JMF CI)
+## Inteligência de Cliente
 
-A plataforma integra o SDK JMF Customer Intelligence para rastreamento e análise comportamental de visitantes e clientes.
+Módulo nativo do projeto: coleta comportamental, análise de visitantes e métricas de conversão, tudo no próprio banco. Nenhuma dependência externa e nenhuma chamada HTTP.
 
 ### Funcionalidades
-- **Dashboard em tempo real:** métricas de visitas, conversões, eventos
-- **Rastreamento automático:** eventos de produtos, carrinho, pedidos
-- **Gestão de contatos:** CRM integrado com histórico de interações
-- **Relatórios:** visualização de padrões de comportamento
+- **Dashboard:** eventos, visitantes, sessões e conversões por período, com tendência diária
+- **Rastreamento automático:** produtos, carrinho e pedidos
+- **Visitantes:** identidade anônima persistente, vinculada à conta quando o visitante se autentica
+- **Eventos:** listagem filtrável e timeline por visitante
 
-### Configuração
-
-Variáveis de ambiente obrigatórias:
-```env
-JMF_CI_BASE_URL=http://179.198.115.221
-JMF_CI_TOKEN=<token-gerado-no-painel-admin>
-JMF_CI_QUEUE_CONNECTION=sync
-JMF_CI_TIMEOUT=2
-```
-
-### Componentes Livewire Disponíveis
-- `<livewire:jmf-ci-dashboard />` — Dashboard com métricas
-- `<livewire:jmf-ci-configuration />` — Validação de conexão
-- `<livewire:jmf-ci-contact-index />` — Lista de contatos
-- `<livewire:jmf-ci-contact-show />` — Detalhe de contato
-- `<livewire:jmf-ci-event-index />` — Tabela de eventos
-
-### Rastreamento de Eventos
+### Rastreamento de eventos
 
 ```php
-use JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence;
+use App\CustomerIntelligence\Enums\EventName;
+use App\CustomerIntelligence\Facades\CustomerIntelligence;
 
-// Rastrear eventos principais
-CustomerIntelligence::track('produto.visualizado', [
-    'produto_id' => $produto->id,
-    'nome' => $produto->nome,
-    'preco' => $produto->preco,
-]);
-
-CustomerIntelligence::track('carrinho.adicionado', [
-    'item_id' => $cartItem->id,
-    'quantidade' => $cartItem->quantity,
-]);
-
-CustomerIntelligence::track('pedido.criado', [
-    'pedido_id' => $order->id,
-    'total' => $order->total,
-]);
+CustomerIntelligence::track(
+    EventName::ProdutoVisualizado,
+    ['produto_id' => $produto->id, 'preco' => $produto->price],
+    $produto,
+);
 ```
 
-Consulte [`docs/JMF_CI_INTEGRATION.md`](docs/JMF_CI_INTEGRATION.md) para documentação completa.
+`track()` enfileira na fila `customer-intelligence` e devolve o controle na hora — a requisição não paga pela gravação. O terceiro argumento é a entidade de domínio do evento, que vira referência real em vez de ficar dentro do JSON.
+
+Os sete eventos rastreados hoje: `produto.visualizado`, `produto.adicionado_carrinho`, `produto.removido_carrinho`, `carrinho.checkout_iniciado`, `pedido.criado`, `pedido.pagamento_confirmado` e `pedido.enviado`.
+
+### Painel
+
+`/admin/customer-intelligence`, protegido pela permissão `customer_intelligence.visualizar`.
+
+Consulte [`docs/CUSTOMER_INTELLIGENCE_INTERNAL.md`](docs/CUSTOMER_INTELLIGENCE_INTERNAL.md) para arquitetura, agregação, retenção e LGPD.
 
 ---
 
@@ -434,7 +415,7 @@ Consulte [`docs/ROADMAP.md`](docs/ROADMAP.md) para o planejamento detalhado. O c
 | Fase 7 — Comunicação Loja-Cliente | Concluída | FAQ, Q&A público e chat pós-pedido |
 | Fase 8 — AVA | Concluída | Course builder, player, materiais protegidos, progresso e certificado PDF |
 | Fase 9 — API Mobile (Flutter) | Concluída (v1) | API `/api/v1` com Sanctum, catálogo, carrinho, checkout, pedidos, chat, endereços, AVA e endpoints de lojista |
-| Fase 10 — Inteligência de Cliente (JMF CI) | Concluída | Dashboard admin, rastreamento de eventos (produtos, carrinho, pedidos) e testes E2E |
+| Fase 10 — Inteligência de Cliente | Concluída | Dashboard admin, rastreamento de eventos (produtos, carrinho, pedidos) e testes E2E — depois internalizado pela Trilha CI |
 
 ### Cenário demo do AVA
 

@@ -2,11 +2,9 @@
 
 Documentação do módulo nativo de Customer Intelligence da Feira Esquerda Livre.
 
-> **Este documento descreve o módulo interno**, que desde a CI-07 é o único em
-> execução. O SDK externo continua instalado no `vendor/` até a CI-08, mas não
-> executa mais nada — sua documentação histórica está em
-> [JMF_CI_INTEGRATION.md](JMF_CI_INTEGRATION.md) e descreve um estado que já
-> não vale.
+> **O Customer Intelligence é 100% interno.** Desde a CI-08 não existe mais SDK
+> externo: nem no Composer, nem no Docker, nem no ambiente. O projeto funciona
+> com um único `git clone`.
 
 ---
 
@@ -49,7 +47,7 @@ Consequências assumidas:
 | **CI-05** | Migração das 7 chamadas atuais | **CONCLUÍDA** |
 | **CI-06** | Painel e agregação local | **CONCLUÍDA** |
 | **CI-07** | Desativação do SDK externo em runtime | **CONCLUÍDA** |
-| CI-08 | Limpeza de Composer, Docker e `.env` | não iniciada |
+| **CI-08** | Remoção física do SDK externo | **CONCLUÍDA** |
 | CI-09 | Retenção, LGPD e documentação final | não iniciada |
 
 ### O que a CI-02 entregou
@@ -111,14 +109,24 @@ Uma busca por `JmfSystem\` em `app/`, `routes/`, `bootstrap/` e `config/`
 retorna **zero**. O pacote continua instalado no `vendor/`, mas a aplicação não
 usa nenhuma classe dele.
 
+### O que a CI-08 entregou
+
+A remoção física. Saíram o pacote do Composer, o bloco `repositories` do tipo
+`path`, os dois bind mounts `../jmf-ci-sdk` do `compose.yaml`, a configuração
+publicada do SDK, as quatro variáveis `JMF_CI_*` e a documentação operacional
+obsoleta.
+
+Provado com instalação limpa: volume `vendor` destruído e recriado do zero,
+`composer install` com `/var/www/jmf-ci-sdk` inexistente dentro do container —
+123 pacotes instalados, nenhum erro, `vendor/jmf-system` não recriado.
+
 ### O que ainda **não** foi feito
 
-- o pacote, o repositório `path` do Composer, o volume Docker e as variáveis
-  `JMF_CI_*` continuam presentes — a remoção física é a CI-08;
 - as views em `resources/views/plugins/jmf-ci/` e os componentes blade
-  `x-jmf-ci-*` continuam com os nomes antigos: são arquivos do projeto e ainda
-  estão em uso, então renomeá-los é cosmética para a CI-08;
-- `docs/JMF_CI_INTEGRATION.md` continua no lugar;
+  `x-jmf-ci-*` continuam com os nomes antigos. São arquivos do projeto e estão
+  em uso; renomeá-los é cosmética, prevista para a CI-09;
+- os cookies continuam `jmf_ci_*` — e vão continuar, para não zerar a
+  identidade dos visitantes já conhecidos;
 - não há rotina de expurgo dos 180 dias — é a CI-09.
 
 ---
@@ -238,21 +246,19 @@ nome e caminho, então apenas um `Set-Cookie` sai na resposta. Há teste para a
 unicidade do cookie e para a ausência de qualquer middleware `JmfSystem\` no
 grupo `web`.
 
-### Como o SDK foi desligado
+### Como o SDK saiu
 
-`composer.json` passou a declarar:
+Em duas etapas, de propósito. A **CI-07** desligou o runtime com uma linha
+declarativa em `composer.json` — `dont-discover` — que fez o Laravel parar de
+auto-registrar o ServiceProvider do pacote, derrubando de uma vez o middleware,
+os cinco registros Livewire, o merge de configuração e o `ConfigValidator`.
 
-```json
-"extra": { "laravel": { "dont-discover": ["jmf-system/customer-intelligence-sdk"] } }
-```
+Com o runtime já provado independente, a **CI-08** removeu o pacote de verdade:
+`composer remove`, o bloco `repositories`, os bind mounts e o `dont-discover`,
+que deixou de fazer sentido apontando para pacote inexistente.
 
-O Composer continua instalando o pacote, mas o Laravel deixa de auto-registrar
-o `CustomerIntelligenceServiceProvider` dele. Com isso caem de uma vez o
-middleware, o registro dos cinco componentes Livewire, o merge de configuração e
-o `ConfigValidator` que rodava no boot.
-
-Foi a forma mais limpa de chegar ao estado que a fase pedia — pacote instalado,
-runtime intacto — sem tocar em `require`, em `repositories` ou no `composer.lock`.
+Separar as duas etapas permitiu validar cada risco isoladamente: primeiro que
+nada usava o SDK, depois que nada precisava dele instalado.
 
 ---
 

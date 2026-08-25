@@ -22,10 +22,6 @@ services:
     # contra o MySQL de desenvolvimento em vez do SQLite em memoria.
     volumes:
       - .:/var/www/html
-      # Repositorio Composer do tipo "path" declarado em composer.json.
-      # O SDK JMF Customer Intelligence vive FORA da raiz do projeto e precisa
-      # estar visivel no mesmo caminho relativo (../jmf-ci-sdk) dentro do container.
-      - ../jmf-ci-sdk:/var/www/jmf-ci-sdk:ro
       # vendor/ em volume nomeado (ext4 da VM), NAO no bind mount do Windows.
       # Sao ~9.000 arquivos PHP: servidos via virtiofs, cada requisicao levava
       # ~25s; no volume nomeado cai para menos de 1s. O vendor/ do Windows
@@ -143,7 +139,6 @@ services:
         --tries=3 --sleep=3 --timeout=120 --max-time=3600
     volumes:
       - .:/var/www/html
-      - ../jmf-ci-sdk:/var/www/jmf-ci-sdk:ro
       - vendor:/var/www/html/vendor
       - ./docker/php/php.ini:/usr/local/etc/php/conf.d/zz-app.ini:ro
     depends_on:
