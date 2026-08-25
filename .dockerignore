@@ -1,0 +1,42 @@
+# O contexto de build serve apenas para copiar docker/php/entrypoint.sh.
+# Tudo que nao for necessario fica de fora para o build ser rapido.
+
+.git
+.gitattributes
+.gitignore
+.editorconfig
+.claude
+.idea
+.vscode
+.fleet
+.nova
+.zed
+
+node_modules
+vendor
+public/build
+public/hot
+public/storage
+
+storage/logs
+storage/framework/cache/data
+storage/framework/sessions
+storage/framework/testing
+storage/framework/views
+storage/pail
+.phpunit.cache
+.phpunit.result.cache
+
+# App Flutter: nao participa do ambiente PHP
+feira_esquerda_livre_app
+
+docs
+*.md
+!docker/**/*.md
+
+.env
+.env.*
+!.env.example
+
+compose.yaml
+docker-compose*.yml

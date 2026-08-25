@@ -86,7 +86,18 @@ class ProductShareImageService
     {
         $windowsPath = "C:\\Windows\\Fonts\\{$name}";
 
-        return file_exists($windowsPath) ? $windowsPath : $windowsPath;
+        if (file_exists($windowsPath)) {
+            return $windowsPath;
+        }
+
+        // Fora do Windows (Docker/Linux) usa Liberation Sans, metricamente
+        // compativel com Arial.
+        $fallback = [
+            'arial.ttf' => '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+            'arialbd.ttf' => '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+        ];
+
+        return $fallback[$name] ?? $windowsPath;
     }
 
     private function wrap(string $text, int $width, int $lines): string

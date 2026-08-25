@@ -1,0 +1,204 @@
+# Ambiente de desenvolvimento local da Feira Esquerda Livre.
+# Producao NAO usa este arquivo.
+#
+# Portas do host sao configuraveis via .env (DOCKER_*_PORT) para conviver com
+# outros projetos ja rodando na maquina.
+
+name: feira-esquerda-livre
+
+services:
+  # ---------------------------------------------------------------- PHP-FPM
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    image: feira-esquerda-livre/php:8.3-fpm
+    container_name: fel_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    # SEM env_file: o Laravel le o proprio .env pelo bind mount. Injetar as
+    # variaveis como env reais do container faria elas terem precedencia sobre
+    # o <env> do phpunit.xml, e "php artisan test" rodaria com RefreshDatabase
+    # contra o MySQL de desenvolvimento em vez do SQLite em memoria.
+    volumes:
+      - .:/var/www/html
+      # Repositorio Composer do tipo "path" declarado em composer.json.
+      # O SDK JMF Customer Intelligence vive FORA da raiz do projeto e precisa
+      # estar visivel no mesmo caminho relativo (../jmf-ci-sdk) dentro do container.
+      - ../jmf-ci-sdk:/var/www/jmf-ci-sdk:ro
+      # vendor/ em volume nomeado (ext4 da VM), NAO no bind mount do Windows.
+      # Sao ~9.000 arquivos PHP: servidos via virtiofs, cada requisicao levava
+      # ~25s; no volume nomeado cai para menos de 1s. O vendor/ do Windows
+      # continua existindo no host e serve para o autocomplete da IDE.
+      - vendor:/var/www/html/vendor
+      - ./docker/php/php.ini:/usr/local/etc/php/conf.d/zz-app.ini:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    networks: [fel]
+
+  # ------------------------------------------------------------------ Nginx
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: fel_nginx
+    restart: unless-stopped
+    ports:
+      - "${DOCKER_HTTP_PORT:-80}:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      app:
+        condition: service_started
+    networks: [fel]
+
+  # ------------------------------------------------------------------ MySQL
+  mysql:
+    image: mysql:8.4
+    container_name: fel_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:-root_local}"
+      MYSQL_DATABASE: "${DB_DATABASE:-feira_esquerda_livre}"
+      MYSQL_USER: "${DB_USERNAME:-feira}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-feira_local}"
+    ports:
+      - "${DOCKER_MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/zz-app.cnf:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${DB_ROOT_PASSWORD:-root_local}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks: [fel]
+
+  # ------------------------------------------------------------- phpMyAdmin
+  phpmyadmin:
+    image: phpmyadmin:5.2-apache
+    container_name: fel_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 0
+      UPLOAD_LIMIT: 256M
+      MEMORY_LIMIT: 512M
+      MAX_EXECUTION_TIME: 600
+    ports:
+      - "${DOCKER_PHPMYADMIN_PORT:-8081}:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks: [fel]
+
+  # ------------------------------------------------------------------ Redis
+  redis:
+    image: redis:7.4-alpine
+    container_name: fel_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${DOCKER_REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [fel]
+
+  # --------------------------------------------------- Laravel Queue Worker
+  # Mesma imagem do servico "app" (nenhum Dockerfile extra).
+  queue:
+    image: feira-esquerda-livre/php:8.3-fpm
+    container_name: fel_queue
+    restart: unless-stopped
+    working_dir: /var/www/html
+    # Sem env_file pelo mesmo motivo do servico "app".
+    # Aguarda o composer install antes de subir o worker, evitando crash-loop
+    # na primeira instalacao. Filas usadas pelo projeto: default e email-marketing.
+    command:
+      - sh
+      - -c
+      - >
+        until [ -f vendor/autoload.php ]; do
+          echo "aguardando composer install...";
+          sleep 5;
+        done;
+        exec php artisan queue:work
+        --queue=default,email-marketing
+        --tries=3 --sleep=3 --timeout=120 --max-time=3600
+    volumes:
+      - .:/var/www/html
+      - ../jmf-ci-sdk:/var/www/jmf-ci-sdk:ro
+      - vendor:/var/www/html/vendor
+      - ./docker/php/php.ini:/usr/local/etc/php/conf.d/zz-app.ini:ro
+    depends_on:
+      app:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [fel]
+
+  # ------------------------------------------------------------ Node / Vite
+  node:
+    image: node:22-bookworm-slim
+    container_name: fel_node
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      # Bind mount Windows -> WSL2 nao propaga eventos inotify.
+      VITE_USE_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "${DOCKER_VITE_PORT:-5173}:5173"
+    volumes:
+      - .:/var/www/html
+      # node_modules em volume nomeado: o node_modules do Windows contem
+      # binarios nativos win32 (rollup/esbuild) que nao rodam em Linux.
+      - node-modules:/var/www/html/node_modules
+      # Mesmo vendor/ em ext4 usado pelo app: o Tailwind le o @source de
+      # paginacao do Laravel sem atravessar 13.000 arquivos no bind mount.
+      - vendor:/var/www/html/vendor
+      # Mascara o app Flutter (1.775 arquivos) para o Tailwind nao varre-lo
+      # pelo bind mount: cada passada custava ~13s. Nao afeta o projeto Flutter,
+      # que continua intacto no host e fora do build web.
+      - type: tmpfs
+        target: /var/www/html/feira_esquerda_livre_app
+    networks: [fel]
+
+  # ---------------------------------------------------------------- Mailpit
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: fel_mailpit
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "${DOCKER_MAILPIT_HTTP_PORT:-8025}:8025"
+      - "${DOCKER_MAILPIT_SMTP_PORT:-1025}:1025"
+    networks: [fel]
+
+networks:
+  fel:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  node-modules:
+  vendor:

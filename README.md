@@ -107,6 +107,28 @@ A Feira Esquerda Livre está organizada em seis grandes áreas funcionais:
 
 ---
 
+## Desenvolvimento com Docker (recomendado)
+
+O ambiente local roda inteiramente em containers (PHP 8.3, Nginx, MySQL 8.4,
+phpMyAdmin, Redis 7, Node 22 + Vite, queue worker e Mailpit). Não é necessário
+Laragon, XAMPP, PHP, MySQL, Composer ou Node instalados no Windows.
+
+```bash
+docker compose up -d
+```
+
+| | |
+|---|---|
+| Aplicação | http://localhost |
+| phpMyAdmin | http://localhost:8081 |
+| Vite | http://localhost:5173 |
+| Mailpit | http://localhost:8025 |
+
+Instalação inicial, comandos do dia a dia e troubleshooting em
+**[docs/DOCKER_DEVELOPMENT.md](docs/DOCKER_DEVELOPMENT.md)**.
+
+---
+
 ## Requisitos
 
 - PHP >= 8.2 com extensões: `pdo`, `pdo_mysql` ou `pdo_sqlite`, `mbstring`, `fileinfo`, `gd` ou `imagick`
