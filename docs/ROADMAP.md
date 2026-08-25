@@ -45,7 +45,7 @@
            ↓
 [TRILHA CI 🔄 EM ANDAMENTO]
   Internalização do Customer Intelligence
-  CI-01 ✅ · CI-02 ✅ · CI-03 a CI-09 pendentes
+  CI-01 ✅ · CI-02 ✅ · CI-03 ✅ · CI-04 a CI-09 pendentes
   Deixa de depender do SDK externo em ../jmf-ci-sdk
 ```
 
@@ -1181,7 +1181,7 @@ order_messages
 | Trilha | Período | Situação | Entregável Principal |
 |---|---|---|---|
 | ✅ **Infraestrutura — Ambiente Docker** | Agosto 2026 | Concluída | 8 serviços (PHP 8.3, Nginx, MySQL 8.4, phpMyAdmin, Redis 7, Node 22/Vite, queue, Mailpit); dispensa Laragon, XAMPP, PHP, MySQL, Composer e Node no Windows — ver `docs/DOCKER_DEVELOPMENT.md` |
-| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 2 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
+| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 3 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
 
 ---
 
@@ -1463,7 +1463,7 @@ A decisão arquitetural é que **comportamento gerado na Feira Esquerda Livre pe
 |---|---|---|---|
 | **CI-01** | Auditoria e arquitetura | ✅ Concluída | 25/08/2026 |
 | **CI-02** | Fundação do módulo interno | ✅ Concluída | 25/08/2026 |
-| CI-03 | Coleta: visitante e sessão (middleware, cookies, ServiceProvider) | ⬜ Não iniciada | — |
+| **CI-03** | Coleta: visitante e sessão (middleware, cookies, ServiceProvider) | ✅ Concluída | 25/08/2026 |
 | CI-04 | Escrita de eventos pela fila dedicada | ⬜ Não iniciada | — |
 | CI-05 | Migração das 7 chamadas de rastreamento | ⬜ Não iniciada | — |
 | CI-06 | Dashboard lendo do banco local | ⬜ Não iniciada | — |
@@ -1481,7 +1481,8 @@ Nenhuma fase é considerada concluída com teste vermelho. O número nunca deve 
 |---|---|---|
 | Fim da Fase 10 | 236 | — |
 | Ambiente Docker validado | 238 | 624 |
-| Fim da CI-02 | **273** | **744** |
+| Fim da CI-02 | 273 | 744 |
+| Fim da CI-03 | **290** | **798** |
 
 ---
 
@@ -1570,11 +1571,43 @@ app/CustomerIntelligence/
 
 ---
 
+### ✅ CI-03 — Coleta: visitante e sessão (Concluída)
+
+**Objetivo:** o módulo passa a resolver visitante e sessão a cada requisição web e gravá-los no banco local, convivendo com o middleware do SDK externo sem disputar cookies.
+
+**Entregue:**
+
+| Componente | Status |
+|---|---|
+| `CustomerIntelligenceServiceProvider` registrado em `bootstrap/providers.php` | ✅ Concluído |
+| Middleware `TrackVisitorSession` anexado ao grupo `web` | ✅ Concluído |
+| `Actions/ResolveVisitorSession` — regra de abertura e rotação de sessão | ✅ Concluído |
+| `Support/VisitorContext` — visitante/sessão da requisição, `scoped` | ✅ Concluído |
+| `config/customer-intelligence-internal.php` | ✅ Concluído |
+| Vínculo automático visitante ↔ usuário autenticado | ✅ Concluído |
+| Captura de landing, referrer e UTMs na abertura da sessão | ✅ Concluído |
+| 17 testes novos | ✅ Concluído |
+
+**O risco previsto e como foi tratado.** A auditoria classificou esta fase como MÉDIO por causa dos dois middlewares convivendo no grupo `web` — ambos emitindo os mesmos cookies. Duas medidas resolvem:
+
+*Ordem determinística.* O middleware é anexado pelo `boot()` do provider do módulo, não por `bootstrap/app.php`. A configuração de bootstrap é aplicada antes de qualquer `boot()`, e providers da aplicação inicializam depois dos descobertos por pacote — então o middleware do módulo entra na pilha depois do middleware do SDK e enxerga o que ele já decidiu.
+
+*Adoção do valor já enfileirado.* Numa primeira visita não há cookie na requisição e o SDK acabou de gerar um identificador. Em vez de gerar outro — o que faria o servidor remoto e o banco local conhecerem o mesmo visitante por dois nomes —, o middleware lê o valor via `Cookie::queued()`, API do próprio Laravel, sem acoplar a classes do SDK. Reenfileirar com o mesmo nome é seguro: o CookieJar indexa a fila por nome e caminho, então sai um único `Set-Cookie`.
+
+Há teste automatizado para as duas coisas: a posição na pilha e a unicidade do cookie.
+
+**Minimização de dados.** `landing_url` guarda apenas o caminho, sem query string; o referrer é reduzido a esquema, host e caminho. Nenhum IP e nenhum user-agent são coletados. Um teste navega com `?busca=segredo` e referrer contendo dado pessoal e confirma que nada disso é persistido.
+
+**Fronteira preservada.** A coleta de visitante está ligada; a de eventos, não. `ci_events` continua vazia e os sete eventos seguem saindo pelo SDK externo — sem escrita dupla, como decidido na CI-01. Dois testes guardam essa fronteira.
+
+**Validado no ambiente real:** três requisições com o mesmo navegador produziram um visitante, uma sessão, um cookie de cada nome e zero eventos.
+
+---
+
 ### Fases pendentes
 
 | Fase | Objetivo | Risco previsto |
 |---|---|---|
-| **CI-03** | Middleware próprio resolvendo visitante e sessão a partir dos cookies, gravando em `ci_visitors` e `ci_sessions`. Nasce aqui o ServiceProvider do módulo. | MÉDIO — dois middlewares no grupo `web` ao mesmo tempo; a ordem importa |
 | **CI-04** | Fila dedicada `customer-intelligence` e ajuste do `--queue` do worker no Docker. | BAIXO |
 | **CI-05** | Repontar as 7 chamadas para o módulo interno. | ALTO — toca `CartService`, `OrderService` e `Checkout`, o coração da compra |
 | **CI-06** | Componentes Livewire próprios consultando Eloquent no lugar do `JmfCiApiClient`; agregadores diários. | MÉDIO — agregação sem índice adequado trava o painel |
@@ -1808,6 +1841,6 @@ Cortes conscientes para manter a v1 da API enxuta e testável — candidatos a u
 ---
 
 *Documento atualizado em: 25 de agosto de 2026 — Versão 2.8*
-*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 2 de 9 fases (CI-01 auditoria e CI-02 fundação).*
-*Próxima revisão: após a CI-03 (coleta de visitante e sessão)*
+*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 3 de 9 fases (CI-01 auditoria, CI-02 fundação e CI-03 coleta de visitante e sessão).*
+*Próxima revisão: após a CI-04 (escrita de eventos pela fila dedicada)*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e publicação no feed pelo app.*

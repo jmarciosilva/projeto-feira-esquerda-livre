@@ -42,7 +42,7 @@ Consequências assumidas:
 |---|---|---|
 | **CI-01** | Auditoria e arquitetura | **CONCLUÍDA** |
 | **CI-02** | Fundação do módulo interno | **CONCLUÍDA** |
-| CI-03 | Coleta: visitante e sessão (middleware, cookies) | não iniciada |
+| **CI-03** | Coleta: visitante e sessão (middleware, cookies) | **CONCLUÍDA** |
 | CI-04 | Escrita de eventos pela fila | não iniciada |
 | CI-05 | Migração das 7 chamadas atuais | não iniciada |
 | CI-06 | Dashboard lendo do banco local | não iniciada |
@@ -54,15 +54,24 @@ Consequências assumidas:
 
 Persistência, Models e o caminho de gravação — testados e funcionando.
 
-### O que a CI-02 deliberadamente **não** fez
+### O que a CI-03 entregou
 
-- não migrou nenhuma das 7 chamadas de rastreamento existentes;
-- não gravou nenhum evento real no banco (o módulo não é acionado por nada);
-- não removeu o SDK externo, o repositório `path` do Composer nem o volume Docker;
-- não criou cookies nem middleware;
-- não implementou expurgo, agregadores nem interface administrativa.
+Coleta real. O módulo passou a resolver visitante e sessão a cada requisição
+web e a gravá-los em `ci_visitors` e `ci_sessions`. Nasceram o ServiceProvider,
+o middleware `TrackVisitorSession`, o `VisitorContext` por requisição e o
+arquivo `config/customer-intelligence-internal.php`.
 
-Nada do comportamento de produção mudou nesta fase.
+**A coleta de visitante está ligada; a de eventos, não.** `ci_events` continua
+vazia, e os sete eventos seguem saindo pelo SDK externo até a CI-05.
+
+### O que ainda **não** foi feito
+
+- nenhuma das 7 chamadas de rastreamento foi migrada;
+- nenhum evento é gravado no banco local (sem escrita dupla);
+- o SDK externo, o repositório `path` do Composer e o volume Docker continuam;
+- não há expurgo, agregadores nem interface administrativa nova.
+
+Nada do comportamento de produção mudou até aqui.
 
 ---
 
@@ -87,8 +96,12 @@ Ele também existe e está testado, mas nada o despacha ainda.
 
 ```
 app/CustomerIntelligence/
+├── Actions/
+│   └── ResolveVisitorSession.php          encontra ou abre visitante e sessão
 ├── Enums/
 │   └── EventName.php                      os 7 eventos, tipados
+├── Http/Middleware/
+│   └── TrackVisitorSession.php            coleta a cada requisição web
 ├── Jobs/
 │   └── TrackCustomerEventJob.php          gravação assíncrona
 ├── Models/
@@ -98,15 +111,21 @@ app/CustomerIntelligence/
 │   └── DailyMetric.php                    ci_daily_metrics
 ├── Services/
 │   └── CustomerIntelligenceService.php    porta de entrada do módulo
-└── Support/
-    └── PropertySanitizer.php              redige dados sensíveis
+├── Support/
+│   ├── PropertySanitizer.php              redige dados sensíveis
+│   └── VisitorContext.php                 visitante/sessão da requisição
+└── CustomerIntelligenceServiceProvider.php
 ```
 
 Só existem as pastas que têm conteúdo. Não há `Contracts/`, `DTOs/`,
-`Repositories/` nem `Exceptions/` porque nada nesta fase os justificaria — o
+`Repositories/` nem `Exceptions/` porque nada até aqui os justificaria — o
 projeto usa Services concretos e Eloquent direto, e uma interface com uma única
 implementação e nenhum consumidor seria abstração vazia. Quando houver um
 segundo implementador ou um ponto de troca real, a interface entra.
+
+A regra de sessão vive em `Actions/ResolveVisitorSession`, e não no middleware,
+porque "quando uma sessão termina e outra começa" não depende de HTTP — assim
+fica testável sem simular requisição.
 
 ### Componentes Livewire ficam fora
 
@@ -116,11 +135,34 @@ O painel administrativo continuará em `app/Livewire/Admin/CustomerIntelligence/
 registro manual no ServiceProvider — exatamente o que o `AppServiceProvider`
 faz hoje com os aliases `jmf-ci-*`. Respeitar a convenção elimina esse registro.
 
-### Ainda não existe um ServiceProvider do módulo
+### ServiceProvider e ordem do middleware
 
-Nada nesta fase precisa de binding, config merge ou middleware — o container
-resolve o Service por autowiring. Um provider vazio seria camada artificial.
-Ele nasce na CI-03, junto com o middleware de visitante.
+`CustomerIntelligenceServiceProvider` (registrado em `bootstrap/providers.php`)
+faz o merge da configuração, registra o `VisitorContext` como `scoped` e anexa
+o middleware ao grupo `web`.
+
+Ele **não** é registrado em `bootstrap/app.php`, e isso é deliberado. Enquanto o
+SDK externo existe, os dois middlewares convivem no mesmo grupo e emitem os
+mesmos cookies. Duas medidas evitam que briguem:
+
+**1. Ordem determinística.** A configuração de `bootstrap/app.php` é aplicada
+antes de qualquer `boot()`; providers da aplicação inicializam depois dos
+descobertos por pacote. Registrando pelo provider, o middleware do módulo entra
+na pilha **depois** do middleware do SDK e enxerga o que ele já decidiu.
+
+**2. Adoção do valor já enfileirado.** Numa primeira visita não há cookie na
+requisição e o SDK acabou de gerar um identificador próprio. Em vez de gerar
+outro — o que faria o servidor remoto e o banco local conhecerem o mesmo
+visitante por dois nomes —, o middleware lê o valor enfileirado via
+`Cookie::queued()`. Sem acoplamento a classes do SDK: é API do próprio Laravel.
+
+Reenfileirar o cookie com o mesmo nome é seguro: o CookieJar indexa a fila por
+nome e caminho, então a segunda chamada substitui a primeira e apenas um
+`Set-Cookie` sai na resposta. Há testes para as duas coisas — a ordem na pilha e
+a unicidade do cookie.
+
+Quando o SDK for removido (CI-07), nada disso precisa mudar: sem ninguém para
+adotar, o middleware passa a gerar os próprios identificadores.
 
 ---
 
@@ -306,20 +348,30 @@ Serão tratados na fase de LGPD, não agora:
 
 ## Cookies
 
-Decisão registrada: quando a identificação de visitante for implementada, os
-nomes de cookie atuais serão **preservados**:
+O middleware do módulo emite dois cookies, com os nomes **preservados** do SDK:
 
-```
-jmf_ci_visitor_id     2 anos
-jmf_ci_session_id     30 minutos, rolante
-```
+| Cookie | Validade | Papel |
+|---|---|---|
+| `jmf_ci_visitor_id` | 2 anos | identidade anônima persistente |
+| `jmf_ci_session_id` | 30 minutos, rolante | janela de navegação |
 
 Renomeá-los zeraria a identidade de todos os visitantes já conhecidos, e o ganho
 seria apenas cosmético. O prefixo `jmf_ci_` passa a ser um nome histórico, sem
 vínculo com o serviço externo.
 
-**Nenhum cookie foi criado ou alterado nesta fase.** Os cookies que existem hoje
-continuam sendo emitidos pelo middleware do SDK externo.
+Nomes e validades são configuráveis por `CI_VISITOR_COOKIE_NAME`,
+`CI_VISITOR_COOKIE_MINUTES`, `CI_SESSION_COOKIE_NAME` e
+`CI_SESSION_COOKIE_MINUTES`. Os valores padrão espelham os do SDK de propósito,
+para que os dois middlewares não disputem a validade do mesmo cookie durante a
+coexistência.
+
+A rotação da sessão acontece no servidor, não só no cookie: se a última
+atividade for mais antiga que a janela, ou se o registro pertencer a outro
+visitante, `ResolveVisitorSession` encerra a sessão anterior (preenchendo
+`ended_at`) e abre outra — mantendo o mesmo visitante.
+
+`CI_ENABLED=false` desliga a coleta por completo: o middleware não grava nada e
+não emite cookies.
 
 ---
 
@@ -392,10 +444,17 @@ docker compose exec app php artisan test tests/Feature/CustomerIntelligence
 | `InternalSchemaTest` | tabelas, colunas, nulabilidade, unicidade, FKs, índices críticos |
 | `InternalModelsTest` | UUIDs, casts, relacionamentos, enum |
 | `InternalEventRecordingTest` | gravação, morph, sanitização, job |
+| `InternalVisitorTrackingTest` | middleware, cookies, rotação de sessão, identificação, UTMs, contexto |
 
-Um dos testes verifica explicitamente que **nada na aplicação despacha o job**
-e que `ci_events` continua vazia após navegar por um produto e adicionar ao
-carrinho — a garantia automatizada de que a CI-02 não alterou comportamento.
+Dois testes guardam a fronteira desta fase: um verifica que **nada na aplicação
+despacha o job** e que `ci_events` continua vazia após navegar por um produto e
+adicionar ao carrinho; outro navega por duas páginas carregando os cookies, como
+um navegador faria, e confirma que o visitante é único e que nenhum evento foi
+gravado.
+
+Outros dois cobrem o risco da coexistência: que o middleware do módulo está na
+pilha **depois** do middleware do SDK, e que sai **um único** `Set-Cookie` de
+cada nome.
 
 Os testes rodam em **SQLite em memória** (`phpunit.xml`). O banco MySQL de
 desenvolvimento não é tocado.

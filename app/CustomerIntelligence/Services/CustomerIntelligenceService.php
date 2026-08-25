@@ -7,6 +7,7 @@ use App\CustomerIntelligence\Models\TrackedEvent;
 use App\CustomerIntelligence\Models\Visitor;
 use App\CustomerIntelligence\Models\VisitorSession;
 use App\CustomerIntelligence\Support\PropertySanitizer;
+use App\CustomerIntelligence\Support\VisitorContext;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -29,6 +30,7 @@ class CustomerIntelligenceService
 {
     public function __construct(
         private readonly PropertySanitizer $sanitizer,
+        private readonly VisitorContext $context,
     ) {}
 
     /**
@@ -44,6 +46,10 @@ class CustomerIntelligenceService
         ?Visitor $visitor = null,
         ?DateTimeInterface $occurredAt = null,
     ): TrackedEvent {
+        // Sem visitante/sessao explicitos, usa o que o middleware resolveu para
+        // esta requisicao. Fora do ciclo HTTP o contexto esta vazio e o evento e
+        // gravado sem vinculo, em vez de descartado.
+        $session ??= $this->context->session();
         $visitor ??= $session?->visitor;
 
         return TrackedEvent::create([
