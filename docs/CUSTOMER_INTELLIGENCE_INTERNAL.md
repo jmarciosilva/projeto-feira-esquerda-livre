@@ -44,7 +44,7 @@ Consequências assumidas:
 | **CI-02** | Fundação do módulo interno | **CONCLUÍDA** |
 | **CI-03** | Coleta: visitante e sessão (middleware, cookies) | **CONCLUÍDA** |
 | **CI-04** | Escrita de eventos pela fila dedicada | **CONCLUÍDA** |
-| CI-05 | Migração das 7 chamadas atuais | não iniciada |
+| **CI-05** | Migração das 7 chamadas atuais | **CONCLUÍDA** |
 | CI-06 | Dashboard lendo do banco local | não iniciada |
 | CI-07 | Desativação do SDK externo | não iniciada |
 | CI-08 | Limpeza de Composer, Docker e `.env` | não iniciada |
@@ -72,14 +72,28 @@ própria `customer-intelligence`, declarada no `--queue` do worker do Docker.
 **A escrita de eventos existe e funciona, mas ninguém a aciona.** `ci_events`
 continua vazia em uso normal.
 
+### O que a CI-05 entregou
+
+**A virada.** As sete chamadas de rastreamento deixaram de apontar para o SDK
+externo e passaram a alimentar o módulo interno. Corte direto, sem escrita
+dupla, conforme a decisão 1 da auditoria.
+
+Nasceu a fachada `App\CustomerIntelligence\Facades\CustomerIntelligence`, para
+que as chamadas continuassem se lendo como sempre — a migração virou uma troca
+de `use` mais a substituição da string pelo enum, conforme a decisão 6.
+
+**Nenhum evento sai mais da aplicação por HTTP.** Os produtos, pedidos e splits
+envolvidos deixaram de viver apenas dentro do JSON de `properties` e viraram
+referência real em `entity_type`/`entity_id`.
+
 ### O que ainda **não** foi feito
 
-- nenhuma das 7 chamadas de rastreamento foi migrada;
-- nenhum evento é gravado no banco local (sem escrita dupla);
-- o SDK externo, o repositório `path` do Composer e o volume Docker continuam;
-- não há expurgo, agregadores nem interface administrativa nova.
-
-Nada do comportamento de produção mudou até aqui.
+- o SDK externo, o repositório `path` do Composer e o volume Docker continuam
+  instalados — a remoção é a CI-07;
+- o middleware do SDK ainda roda e ainda emite os cookies;
+- o painel administrativo ainda lê da API remota, não do banco local (CI-06);
+- não há expurgo, agregadores nem limpeza do código morto que a auditoria
+  encontrou.
 
 ---
 
@@ -91,7 +105,7 @@ Requisição web
       ├── TrackVisitorSession (middleware)  → ci_visitors · ci_sessions
       │        └── VisitorContext           ← visitante da requisição
       │
-Ação de negócio                             ← ainda ninguém chama daqui
+Ação de negócio                             ← os 7 eventos entram aqui
       │
       ▼
 CustomerIntelligenceService::track()        ← captura sessão, usuário, instante
@@ -108,9 +122,8 @@ CustomerIntelligenceService::record()
 ci_events (MySQL local)                     ← nenhuma chamada HTTP
 ```
 
-Da coleta de visitante para baixo tudo existe e está testado. O que falta é a
-seta pontilhada: **nenhuma ação de negócio chama `track()` ainda**. Os sete
-eventos continuam saindo pelo SDK externo até a CI-05.
+Desde a CI-05 o caminho está inteiro: as sete ações de negócio chamam `track()`
+e os eventos terminam em `ci_events`, sem nenhuma chamada de rede.
 
 ### Estrutura de diretórios
 
@@ -120,6 +133,8 @@ app/CustomerIntelligence/
 │   └── ResolveVisitorSession.php          encontra ou abre visitante e sessão
 ├── Enums/
 │   └── EventName.php                      os 7 eventos, tipados
+├── Facades/
+│   └── CustomerIntelligence.php           fachada usada pelas 7 chamadas
 ├── Http/Middleware/
 │   └── TrackVisitorSession.php            coleta a cada requisição web
 ├── Jobs/
@@ -410,7 +425,7 @@ Os sete eventos que o projeto rastreia hoje estão tipados em
 | `PedidoPagamentoConfirmado` | `pedido.pagamento_confirmado` | pedido |
 | `PedidoEnviado` | `pedido.enviado` | pedido |
 
-Os valores são idênticos aos que o SDK externo já envia. Isso preserva o
+Os valores são idênticos aos que o SDK externo enviava. Isso preserva o
 histórico e torna a migração da fase seguinte uma troca mecânica: o `use` no
 topo do arquivo muda e a string vira um caso do enum.
 
@@ -419,20 +434,29 @@ topo do arquivo muda e a string vira um caso do enum.
 
 ---
 
-## Como usar (quando estiver ligado)
+## Como usar
 
-Ainda não há chamadores. O caminho previsto para a CI-05:
+É assim que as sete chamadas ficaram:
 
 ```php
 use App\CustomerIntelligence\Enums\EventName;
-use App\CustomerIntelligence\Services\CustomerIntelligenceService;
+use App\CustomerIntelligence\Facades\CustomerIntelligence;
 
-app(CustomerIntelligenceService::class)->track(
-    event: EventName::ProdutoVisualizado,
-    properties: ['preco' => 89.90],
-    entity: $product,
+CustomerIntelligence::track(
+    EventName::ProdutoVisualizado,
+    ['preco' => 89.90],
+    $product,
 );
 ```
+
+O terceiro argumento é a **entidade de domínio** do evento — `Product`, `Order`,
+`OrderSplit`. É o que permite perguntar "quantas visualizações este produto teve
+antes da primeira venda" sem vasculhar JSON. Opcional: passe apenas quando o
+model já estiver em mãos, sem provocar consulta extra.
+
+Quem preferir injeção de dependência resolve `CustomerIntelligenceService`
+diretamente; a fachada é açúcar para os pontos onde não há construtor, como
+closures de rota e componentes Livewire.
 
 `track()` enfileira e devolve o controle na hora — é o que a aplicação deve
 usar, para não pagar a gravação dentro da requisição. A sessão vem do

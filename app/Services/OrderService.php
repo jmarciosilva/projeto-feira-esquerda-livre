@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\CustomerIntelligence\Enums\EventName;
+use App\CustomerIntelligence\Facades\CustomerIntelligence;
 use App\Enums\MarketplaceStatus;
 use App\Models\CustomerProfile;
 use App\Models\Order;
@@ -10,7 +12,6 @@ use App\Models\OrderSplit;
 use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence;
 
 class OrderService
 {
@@ -91,13 +92,13 @@ class OrderService
         });
 
         try {
-            CustomerIntelligence::track('pedido.criado', [
+            CustomerIntelligence::track(EventName::PedidoCriado, [
                 'pedido_id' => $order->id,
                 'referencia' => $order->reference,
                 'valor_total' => (float) $order->total_amount,
                 'quantidade_itens' => $order->items->sum('quantity'),
                 'status_pagamento' => $order->status,
-            ]);
+            ], $order);
         } catch (\Throwable $exception) {
             report($exception);
         }

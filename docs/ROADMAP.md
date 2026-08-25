@@ -45,7 +45,7 @@
            ↓
 [TRILHA CI 🔄 EM ANDAMENTO]
   Internalização do Customer Intelligence
-  CI-01 ✅ · CI-02 ✅ · CI-03 ✅ · CI-04 ✅ · CI-05 a CI-09 pendentes
+  CI-01 a CI-05 ✅ · CI-06 a CI-09 pendentes
   Deixa de depender do SDK externo em ../jmf-ci-sdk
 ```
 
@@ -1181,7 +1181,7 @@ order_messages
 | Trilha | Período | Situação | Entregável Principal |
 |---|---|---|---|
 | ✅ **Infraestrutura — Ambiente Docker** | Agosto 2026 | Concluída | 8 serviços (PHP 8.3, Nginx, MySQL 8.4, phpMyAdmin, Redis 7, Node 22/Vite, queue, Mailpit); dispensa Laragon, XAMPP, PHP, MySQL, Composer e Node no Windows — ver `docs/DOCKER_DEVELOPMENT.md` |
-| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 4 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
+| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 5 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
 
 ---
 
@@ -1465,7 +1465,7 @@ A decisão arquitetural é que **comportamento gerado na Feira Esquerda Livre pe
 | **CI-02** | Fundação do módulo interno | ✅ Concluída | 25/08/2026 |
 | **CI-03** | Coleta: visitante e sessão (middleware, cookies, ServiceProvider) | ✅ Concluída | 25/08/2026 |
 | **CI-04** | Escrita de eventos pela fila dedicada | ✅ Concluída | 25/08/2026 |
-| CI-05 | Migração das 7 chamadas de rastreamento | ⬜ Não iniciada | — |
+| **CI-05** | Migração das 7 chamadas de rastreamento | ✅ Concluída | 25/08/2026 |
 | CI-06 | Dashboard lendo do banco local | ⬜ Não iniciada | — |
 | CI-07 | Desativação do SDK externo | ⬜ Não iniciada | — |
 | CI-08 | Limpeza de Composer, Docker e `.env` | ⬜ Não iniciada | — |
@@ -1483,7 +1483,8 @@ Nenhuma fase é considerada concluída com teste vermelho. O número nunca deve 
 | Ambiente Docker validado | 238 | 624 |
 | Fim da CI-02 | 273 | 744 |
 | Fim da CI-03 | 290 | 798 |
-| Fim da CI-04 | **302** | **819** |
+| Fim da CI-04 | 302 | 819 |
+| Fim da CI-05 | **304** | **837** |
 
 ---
 
@@ -1632,11 +1633,34 @@ Há teste automatizado para as duas coisas: a posição na pilha e a unicidade d
 
 ---
 
+### ✅ CI-05 — Migração das 7 chamadas de rastreamento (Concluída)
+
+**Objetivo:** repontar as sete chamadas de rastreamento do SDK externo para o módulo interno. Corte direto, sem escrita dupla, conforme a decisão 1 da auditoria.
+
+Esta era a fase de risco **ALTO** da trilha: as chamadas vivem em `CartService`, `OrderService` e `Checkout` — o coração da compra.
+
+**Como o risco foi contido:**
+
+*Uma fachada preservou a forma da chamada.* Nasceu `App\CustomerIntelligence\Facades\CustomerIntelligence`, cumprindo a decisão 6. A migração de cada ponto virou uma troca de `use` mais a substituição da string pelo enum — diff mecânico e revisável, em vez de reescrita.
+
+*Os `try/catch` foram mantidos.* Uma falha de analytics continua sem poder derrubar um carrinho ou um pedido. Dois testes novos provam isso injetando um serviço que lança exceção e verificando que o item entra no carrinho e o pedido é criado assim mesmo.
+
+*Os payloads não mudaram.* As propriedades de cada evento seguem idênticas às que o SDK enviava, o que mantém o histórico comparável.
+
+**O que mudou para melhor:** produtos, pedidos e splits deixaram de viver apenas dentro do JSON de `properties` e viraram referência real em `entity_type`/`entity_id`. É o que permite perguntar "quantas visualizações este produto teve antes da primeira venda" sem vasculhar JSON. A entidade só é anexada quando o model já está em mãos, sem provocar consulta extra.
+
+**Os testes mudaram de alvo.** `EventTrackingTest` verificava o despacho do `SendPayloadJob` do SDK; passou a verificar a linha que ficou em `ci_events`. Os dois testes de fronteira das fases anteriores — que afirmavam que navegar *não* dispara nada — foram invertidos: agora guardam a direção da fiação, verificando que navegar alimenta o módulo e cai na fila certa.
+
+**Descoberta durante a validação.** O log mostra que o último envio bem-sucedido para a plataforma externa foi em **8 de agosto**. Todas as tentativas de 25 de agosto — 48 no total — falharam com **401, token inválido ou expirado**. O rastreamento externo estava quebrado em silêncio havia mais de duas semanas, e nada de valor se perdeu no corte. A suíte de testes também fazia chamadas HTTP reais à VPS a cada execução; isso acabou.
+
+**Validado no ambiente real:** duas visitas ao mesmo produto geraram dois eventos em `ci_events`, ambos ligados ao mesmo visitante e à mesma sessão — a continuidade da CI-03 alimentando os eventos da CI-05 —, com referência ao `Product` e zero jobs falhos. Nenhum registro novo do SDK apareceu no log.
+
+---
+
 ### Fases pendentes
 
 | Fase | Objetivo | Risco previsto |
 |---|---|---|
-| **CI-05** | Repontar as 7 chamadas para o módulo interno. | ALTO — toca `CartService`, `OrderService` e `Checkout`, o coração da compra |
 | **CI-06** | Componentes Livewire próprios consultando Eloquent no lugar do `JmfCiApiClient`; agregadores diários. | MÉDIO — agregação sem índice adequado trava o painel |
 | **CI-07** | Cortar o envio remoto; remover registro Livewire duplicado e código morto. | MÉDIO — ponto sem volta para novos dados na VPS |
 | **CI-08** | Remover pacote Composer, bloco `repositories` do tipo `path`, as 2 linhas do `compose.yaml` e as variáveis `JMF_CI_*`. | MÉDIO — `composer update` mexe no lock; conferir o diff |
@@ -1868,6 +1892,6 @@ Cortes conscientes para manter a v1 da API enxuta e testável — candidatos a u
 ---
 
 *Documento atualizado em: 25 de agosto de 2026 — Versão 2.8*
-*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 4 de 9 fases: auditoria, fundação, coleta de visitante/sessão e escrita de eventos pela fila.*
-*Próxima revisão: após a CI-05 (migração das 7 chamadas de rastreamento)*
+*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 5 de 9 fases. Os 7 eventos de negócio já são gravados pelo módulo interno; nenhum sai mais por HTTP.*
+*Próxima revisão: após a CI-06 (dashboard lendo do banco local)*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e publicação no feed pelo app.*

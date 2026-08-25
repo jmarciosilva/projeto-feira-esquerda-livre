@@ -2,6 +2,8 @@
 
 namespace App\Livewire;
 
+use App\CustomerIntelligence\Enums\EventName;
+use App\CustomerIntelligence\Facades\CustomerIntelligence;
 use App\Models\SiteSetting;
 use App\Services\CartService;
 use App\Services\MercadoPagoService;
@@ -9,7 +11,6 @@ use App\Services\OrderService;
 use App\Services\Shipping\FrenetService;
 use App\Services\Shipping\MelhorEnvioService;
 use Illuminate\View\View;
-use JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence;
 use Livewire\Component;
 
 class Checkout extends Component
@@ -351,7 +352,7 @@ class Checkout extends Component
         $cartItems = $cart->items();
 
         try {
-            CustomerIntelligence::track('carrinho.checkout_iniciado', [
+            CustomerIntelligence::track(EventName::CarrinhoCheckoutIniciado, [
                 'total_itens' => $cartItems->sum('quantity'),
                 'valor_total' => $cart->total(),
                 'quantidade_lojas' => $cartItems->pluck('expositor_id')->unique()->count(),

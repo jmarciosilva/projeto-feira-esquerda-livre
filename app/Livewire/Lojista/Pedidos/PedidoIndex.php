@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Lojista\Pedidos;
 
+use App\CustomerIntelligence\Enums\EventName;
+use App\CustomerIntelligence\Facades\CustomerIntelligence;
 use App\Enums\ShippingStatus;
 use App\Enums\TrackingEventSource;
 use App\Mail\ShipmentShippedMail;
@@ -10,7 +12,6 @@ use App\Models\OrderSplit;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
-use JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -109,12 +110,12 @@ class PedidoIndex extends Component
         }
 
         try {
-            CustomerIntelligence::track('pedido.enviado', [
+            CustomerIntelligence::track(EventName::PedidoEnviado, [
                 'pedido_id' => $split->order_id,
                 'split_id' => $split->id,
                 'transportadora' => $shipping->carrier,
                 'codigo_rastreio' => $shipping->tracking_code,
-            ]);
+            ], $split);
         } catch (\Throwable $exception) {
             report($exception);
         }

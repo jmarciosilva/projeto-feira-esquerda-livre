@@ -2,13 +2,14 @@
 
 namespace App\Services;
 
+use App\CustomerIntelligence\Enums\EventName;
+use App\CustomerIntelligence\Facades\CustomerIntelligence;
 use App\Models\CartItem;
 use App\Models\Product;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
-use JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence;
 
 class CartService
 {
@@ -43,11 +44,11 @@ class CartService
             ]);
         }
 
-        $this->trackEvent('produto.adicionado_carrinho', [
+        $this->trackEvent(EventName::ProdutoAdicionadoCarrinho, [
             'produto_id' => $product->id,
             'quantidade' => $qty,
             'preco_unitario' => (float) ($product->price ?? 0),
-        ]);
+        ], $product);
     }
 
     public function update(int $cartItemId, int $qty): void
@@ -70,24 +71,23 @@ class CartService
 
         $item->delete();
 
-        $this->trackEvent('produto.removido_carrinho', [
+        $this->trackEvent(EventName::ProdutoRemovidoCarrinho, [
             'produto_id' => $item->product_id,
             'quantidade' => $item->quantity,
         ]);
     }
 
     /**
-     * Envia evento de rastreamento sem deixar falhas do SDK afetarem o
-     * fluxo de compra — a fila de rastreamento pode estar em modo síncrono
-     * (JMF_CI_QUEUE_CONNECTION=sync), o que propagaria exceções de rede
-     * direto para quem chamou este método.
+     * Envia evento de rastreamento sem deixar uma falha de analytics afetar
+     * o fluxo de compra. O módulo interno apenas enfileira o evento, então o
+     * risco é pequeno — mas rastreamento nunca deve derrubar um carrinho.
      *
      * @param  array<string, mixed>  $properties
      */
-    private function trackEvent(string $eventName, array $properties): void
+    private function trackEvent(EventName $event, array $properties, ?Product $product = null): void
     {
         try {
-            CustomerIntelligence::track($eventName, $properties);
+            CustomerIntelligence::track($event, $properties, $product);
         } catch (\Throwable $exception) {
             report($exception);
         }

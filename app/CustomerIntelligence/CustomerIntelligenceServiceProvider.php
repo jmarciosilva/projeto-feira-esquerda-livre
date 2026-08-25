@@ -3,6 +3,7 @@
 namespace App\CustomerIntelligence;
 
 use App\CustomerIntelligence\Http\Middleware\TrackVisitorSession;
+use App\CustomerIntelligence\Services\CustomerIntelligenceService;
 use App\CustomerIntelligence\Support\VisitorContext;
 use Illuminate\Contracts\Http\Kernel as KernelContract;
 use Illuminate\Foundation\Http\Kernel;
@@ -28,6 +29,10 @@ class CustomerIntelligenceServiceProvider extends ServiceProvider
         // scoped() e nao singleton(): sob Octane um singleton vazaria o
         // visitante de uma requisicao para a proxima.
         $this->app->scoped(VisitorContext::class);
+
+        // Uma instancia por requisicao, compartilhando o mesmo VisitorContext
+        // que o middleware preenche. E o que a fachada resolve.
+        $this->app->scoped(CustomerIntelligenceService::class);
     }
 
     public function boot(): void

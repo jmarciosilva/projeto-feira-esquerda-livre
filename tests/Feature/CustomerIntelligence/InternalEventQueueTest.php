@@ -211,17 +211,21 @@ class InternalEventQueueTest extends TestCase
         Carbon::setTestNow();
     }
 
-    // ─── Fronteira da fase ────────────────────────────────────────────────
+    // ─── Fiacao com a aplicacao ───────────────────────────────────────────
 
-    public function test_browsing_still_does_not_dispatch_anything(): void
+    /**
+     * Os eventos de negocio tambem precisam cair na fila propria — nao adianta
+     * a fiacao estar certa se o destino estiver errado.
+     */
+    public function test_events_from_real_browsing_land_on_the_module_queue(): void
     {
-        Bus::fake();
+        Queue::fake();
 
         $product = $this->makeProduct();
         $this->get(route('loja.produto', [$product->expositor->slug, $product->slug]))->assertOk();
         app(CartService::class)->add($product, 1);
 
-        Bus::assertNotDispatched(TrackCustomerEventJob::class);
-        $this->assertDatabaseCount('ci_events', 0);
+        Queue::assertPushedOn('customer-intelligence', TrackCustomerEventJob::class);
+        Queue::assertPushed(TrackCustomerEventJob::class, 2);
     }
 }

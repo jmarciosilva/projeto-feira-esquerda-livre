@@ -2,26 +2,39 @@
 
 namespace Tests\Feature\CustomerIntelligence;
 
-use App\Enums\ShippingStatus;
+use App\CustomerIntelligence\Enums\EventName;
+use App\CustomerIntelligence\Facades\CustomerIntelligence;
+use App\CustomerIntelligence\Models\TrackedEvent;
+use App\CustomerIntelligence\Services\CustomerIntelligenceService;
+use App\Enums\UserRole;
 use App\Livewire\Checkout;
 use App\Livewire\Lojista\Pedidos\PedidoIndex;
 use App\Models\CartItem;
 use App\Models\Expositor;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\OrderShipping;
 use App\Models\OrderSplit;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\CartService;
 use App\Services\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-use JmfSystem\CustomerIntelligence\Jobs\SendPayloadJob;
 use Livewire\Livewire;
+use RuntimeException;
 use Tests\TestCase;
 
+/**
+ * Os sete eventos de negocio rastreados pela plataforma.
+ *
+ * Desde a CI-05 estes eventos sao gravados pelo MODULO INTERNO, direto em
+ * `ci_events`. Antes iam por HTTP para a plataforma externa; estes testes
+ * verificavam o despacho do `SendPayloadJob` do SDK e passaram a verificar o
+ * que realmente interessa: a linha que ficou no banco.
+ *
+ * Em testes `QUEUE_CONNECTION=sync`, entao `track()` enfileira e o job e
+ * processado na hora — o caminho inteiro e exercitado.
+ */
 class EventTrackingTest extends TestCase
 {
     use RefreshDatabase;
@@ -32,7 +45,7 @@ class EventTrackingTest extends TestCase
         $counter++;
 
         $expositor = Expositor::create(['name' => "Loja CI {$counter}", 'slug' => "loja-ci-{$counter}"]);
-        $expositor->update(['user_id' => User::factory()->create(['role' => \App\Enums\UserRole::Lojista])->id]);
+        $expositor->update(['user_id' => User::factory()->create(['role' => UserRole::Lojista])->id]);
 
         return $expositor;
     }
@@ -49,55 +62,76 @@ class EventTrackingTest extends TestCase
         ]);
     }
 
-    private function assertEventTracked(string $eventName, ?callable $propertiesCallback = null): void
+    /**
+     * @param  callable(array<string, mixed>): bool|null  $propertiesCallback
+     */
+    private function assertEventTracked(EventName $event, ?callable $propertiesCallback = null): TrackedEvent
     {
-        Bus::assertDispatched(SendPayloadJob::class, function (SendPayloadJob $job) use ($eventName, $propertiesCallback) {
-            if ($job->endpoint !== 'events' || $job->payload['event_name'] !== $eventName) {
-                return false;
-            }
+        $tracked = TrackedEvent::where('event_name', $event->value)->get();
 
-            if ($propertiesCallback === null) {
-                return true;
-            }
+        $this->assertNotEmpty(
+            $tracked,
+            "Esperava o evento {$event->value} gravado em ci_events, mas ele não foi registrado."
+        );
 
-            return $propertiesCallback($job->payload['properties'] ?? []);
-        });
+        if ($propertiesCallback === null) {
+            return $tracked->first();
+        }
+
+        $match = $tracked->first(fn (TrackedEvent $e) => $propertiesCallback($e->properties ?? []));
+
+        $this->assertNotNull(
+            $match,
+            "O evento {$event->value} foi gravado, mas com propriedades diferentes das esperadas."
+        );
+
+        return $match;
     }
 
     // ─── produto.visualizado ──────────────────────────────────────────────
 
     public function test_viewing_product_page_tracks_produto_visualizado(): void
     {
-        Bus::fake();
-
         $expositor = $this->makeExpositor();
         $product = $this->makeProduct($expositor);
 
         $this->get(route('loja.produto', [$expositor->slug, $product->slug]))->assertOk();
 
-        $this->assertEventTracked('produto.visualizado', fn (array $props) => $props['produto_id'] === $product->id
-            && $props['expositor_id'] === $expositor->id);
+        $event = $this->assertEventTracked(
+            EventName::ProdutoVisualizado,
+            fn (array $props) => $props['produto_id'] === $product->id
+                && $props['expositor_id'] === $expositor->id
+        );
+
+        // O produto deixou de viver apenas dentro do JSON: virou referência.
+        $this->assertSame($product->getMorphClass(), $event->entity_type);
+        $this->assertSame($product->id, $event->entity_id);
+
+        // A visita web resolve visitante e sessão pelo middleware.
+        $this->assertNotNull($event->visitor_id);
+        $this->assertNotNull($event->session_id);
     }
 
     // ─── carrinho ─────────────────────────────────────────────────────────
 
     public function test_adding_to_cart_tracks_produto_adicionado_carrinho(): void
     {
-        Bus::fake();
-
         $expositor = $this->makeExpositor();
         $product = $this->makeProduct($expositor);
 
         app(CartService::class)->add($product, 2);
 
-        $this->assertEventTracked('produto.adicionado_carrinho', fn (array $props) => $props['produto_id'] === $product->id
-            && $props['quantidade'] === 2);
+        $event = $this->assertEventTracked(
+            EventName::ProdutoAdicionadoCarrinho,
+            fn (array $props) => $props['produto_id'] === $product->id
+                && $props['quantidade'] === 2
+        );
+
+        $this->assertSame($product->id, $event->entity_id);
     }
 
     public function test_removing_from_cart_tracks_produto_removido_carrinho(): void
     {
-        Bus::fake();
-
         $buyer = User::factory()->create();
         $expositor = $this->makeExpositor();
         $product = $this->makeProduct($expositor);
@@ -114,16 +148,17 @@ class EventTrackingTest extends TestCase
         $this->actingAs($buyer);
         app(CartService::class)->remove($item->id);
 
-        $this->assertEventTracked('produto.removido_carrinho', fn (array $props) => $props['produto_id'] === $product->id
-            && $props['quantidade'] === 3);
+        $this->assertEventTracked(
+            EventName::ProdutoRemovidoCarrinho,
+            fn (array $props) => $props['produto_id'] === $product->id
+                && $props['quantidade'] === 3
+        );
     }
 
     // ─── checkout ─────────────────────────────────────────────────────────
 
     public function test_confirming_checkout_tracks_carrinho_iniciado_e_pedido_criado(): void
     {
-        Bus::fake();
-
         $buyer = User::factory()->create();
         $expositor = $this->makeExpositor();
         $product = $this->makeProduct($expositor);
@@ -144,16 +179,21 @@ class EventTrackingTest extends TestCase
             ->set('delivery_type', 'retirada')
             ->call('confirmar');
 
-        $this->assertEventTracked('carrinho.checkout_iniciado');
-        $this->assertEventTracked('pedido.criado', fn (array $props) => $props['valor_total'] === 89.9);
+        $this->assertEventTracked(EventName::CarrinhoCheckoutIniciado);
+
+        $pedido = $this->assertEventTracked(
+            EventName::PedidoCriado,
+            fn (array $props) => $props['valor_total'] === 89.9
+        );
+
+        $this->assertSame(Order::sole()->id, $pedido->entity_id);
+        $this->assertSame($buyer->id, $pedido->user_id);
     }
 
     // ─── pagamento confirmado ─────────────────────────────────────────────
 
     public function test_confirming_split_tracks_pedido_pagamento_confirmado(): void
     {
-        Bus::fake();
-
         $buyer = User::factory()->create();
         $expositor = $this->makeExpositor();
         $product = $this->makeProduct($expositor);
@@ -192,16 +232,19 @@ class EventTrackingTest extends TestCase
 
         $split->confirmar();
 
-        $this->assertEventTracked('pedido.pagamento_confirmado', fn (array $props) => $props['pedido_id'] === $order->id
-            && $props['split_id'] === $split->id);
+        $event = $this->assertEventTracked(
+            EventName::PedidoPagamentoConfirmado,
+            fn (array $props) => $props['pedido_id'] === $order->id
+                && $props['split_id'] === $split->id
+        );
+
+        $this->assertSame($split->id, $event->entity_id);
     }
 
     // ─── pedido enviado ───────────────────────────────────────────────────
 
     public function test_marking_split_as_shipped_tracks_pedido_enviado(): void
     {
-        Bus::fake();
-
         $buyer = User::factory()->create();
         $expositor = $this->makeExpositor();
         $product = $this->makeProduct($expositor);
@@ -239,23 +282,38 @@ class EventTrackingTest extends TestCase
             ->set('shippedAtDate', now()->format('Y-m-d'))
             ->call('markAsShipped');
 
-        $this->assertEventTracked('pedido.enviado', fn (array $props) => $props['pedido_id'] === $order->id
-            && $props['split_id'] === $split->id
-            && $props['transportadora'] === 'Correios');
+        $this->assertEventTracked(
+            EventName::PedidoEnviado,
+            fn (array $props) => $props['pedido_id'] === $order->id
+                && $props['split_id'] === $split->id
+                && $props['transportadora'] === 'Correios'
+        );
     }
 
-    // ─── proteção contra falhas do SDK ──────────────────────────────────────
+    // ─── garantias da migração ────────────────────────────────────────────
+
+    public function test_the_seven_events_no_longer_leave_the_application(): void
+    {
+        // Nada de rede: se alguma chamada tentasse sair, o teste falharia.
+        Http::preventStrayRequests();
+
+        $expositor = $this->makeExpositor();
+        $product = $this->makeProduct($expositor);
+
+        $this->get(route('loja.produto', [$expositor->slug, $product->slug]))->assertOk();
+        app(CartService::class)->add($product, 1);
+
+        $this->assertSame(2, TrackedEvent::count());
+    }
 
     public function test_tracking_failure_does_not_break_add_to_cart(): void
     {
-        // Sem Bus::fake() aqui: o Job roda de verdade (QUEUE_CONNECTION=sync
-        // em testes), mas a chamada HTTP real é substituída por uma falha
-        // simulada via Http::fake(). Isso exercita o try/catch do
-        // CartService ponta a ponta — o carrinho precisa continuar
-        // funcionando mesmo se a API JMF CI estiver fora do ar.
-        Http::fake([
-            '*' => Http::response('Service Unavailable', 500),
-        ]);
+        // O módulo interno fora do ar não pode derrubar o carrinho.
+        $this->mock(
+            CustomerIntelligenceService::class,
+            fn ($mock) => $mock->shouldReceive('track')->andThrow(new RuntimeException('analytics indisponível'))
+        );
+        CustomerIntelligence::clearResolvedInstances();
 
         $expositor = $this->makeExpositor();
         $product = $this->makeProduct($expositor);
@@ -266,5 +324,38 @@ class EventTrackingTest extends TestCase
             'product_id' => $product->id,
             'quantity' => 1,
         ]);
+        $this->assertSame(0, TrackedEvent::count());
+    }
+
+    public function test_order_creation_survives_a_tracking_failure(): void
+    {
+        $this->mock(
+            CustomerIntelligenceService::class,
+            fn ($mock) => $mock->shouldReceive('track')->andThrow(new RuntimeException('analytics indisponível'))
+        );
+        CustomerIntelligence::clearResolvedInstances();
+
+        $buyer = User::factory()->create();
+        $expositor = $this->makeExpositor();
+        $product = $this->makeProduct($expositor);
+
+        CartItem::create([
+            'session_id' => 'buyer-session',
+            'user_id' => $buyer->id,
+            'product_id' => $product->id,
+            'expositor_id' => $expositor->id,
+            'quantity' => 1,
+            'price_snapshot' => $product->price,
+        ]);
+
+        $this->actingAs($buyer);
+        $order = app(OrderService::class)->createFromCart([
+            'customer_name' => 'Maria Compradora',
+            'customer_whatsapp' => '11999990000',
+            'delivery_type' => 'retirada',
+        ], app(CartService::class));
+
+        $this->assertNotNull($order->id);
+        $this->assertSame(0, TrackedEvent::count());
     }
 }

@@ -457,13 +457,17 @@ Route::get('/loja/{slug}/{productSlug}', function (string $slug, string $product
         ->get();
 
     try {
-        \JmfSystem\CustomerIntelligence\Facades\CustomerIntelligence::track('produto.visualizado', [
-            'produto_id' => $product->id,
-            'nome' => $product->name,
-            'preco' => (float) ($product->price ?? 0),
-            'eixo' => $product->item_type->value,
-            'expositor_id' => $product->expositor_id,
-        ]);
+        \App\CustomerIntelligence\Facades\CustomerIntelligence::track(
+            \App\CustomerIntelligence\Enums\EventName::ProdutoVisualizado,
+            [
+                'produto_id' => $product->id,
+                'nome' => $product->name,
+                'preco' => (float) ($product->price ?? 0),
+                'eixo' => $product->item_type->value,
+                'expositor_id' => $product->expositor_id,
+            ],
+            $product,
+        );
     } catch (\Throwable $exception) {
         report($exception);
     }

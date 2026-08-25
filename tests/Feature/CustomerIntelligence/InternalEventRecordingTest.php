@@ -212,17 +212,19 @@ class InternalEventRecordingTest extends TestCase
         Carbon::setTestNow();
     }
 
-    public function test_nothing_in_the_application_dispatches_the_job_yet(): void
+    /**
+     * Desde a CI-05 a aplicacao alimenta o modulo interno. Este teste guarda a
+     * direcao da fiacao: navegar precisa passar pelo job do modulo.
+     */
+    public function test_browsing_now_feeds_the_internal_module(): void
     {
         Bus::fake();
 
-        // Percursos que na CI-06 passarao a alimentar o modulo interno. Hoje
-        // eles continuam indo apenas para o SDK externo — sem escrita dupla.
         $product = $this->makeProduct();
         $this->get(route('loja.produto', [$product->expositor->slug, $product->slug]))->assertOk();
         app(CartService::class)->add($product, 1);
 
-        Bus::assertNotDispatched(TrackCustomerEventJob::class);
-        $this->assertDatabaseCount('ci_events', 0);
+        // produto.visualizado + produto.adicionado_carrinho
+        Bus::assertDispatchedTimes(TrackCustomerEventJob::class, 2);
     }
 }
