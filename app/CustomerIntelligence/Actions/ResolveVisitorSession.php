@@ -2,6 +2,7 @@
 
 namespace App\CustomerIntelligence\Actions;
 
+use App\CustomerIntelligence\Enums\MetricName;
 use App\CustomerIntelligence\Models\Visitor;
 use App\CustomerIntelligence\Models\VisitorSession;
 use Illuminate\Support\Carbon;
@@ -15,6 +16,10 @@ use Illuminate\Support\Carbon;
  */
 class ResolveVisitorSession
 {
+    public function __construct(
+        private readonly IncrementDailyMetric $increment,
+    ) {}
+
     /**
      * @param  array<string, string|null>  $origin  landing_url, referrer e UTMs,
      *                                              gravados apenas na abertura da sessao
@@ -37,6 +42,7 @@ class ResolveVisitorSession
         $session->forceFill(['last_activity_at' => $now])->save();
         $session->setRelation('visitor', $visitor);
 
+        // Sessao reaproveitada: nada a agregar, ela ja foi contada na abertura.
         return $session;
     }
 
@@ -107,6 +113,30 @@ class ResolveVisitorSession
 
         $session->setRelation('visitor', $visitor);
 
+        $this->countSession($visitor, $session, $now);
+
         return $session;
+    }
+
+    /**
+     * Agregados diarios de sessao e visitante.
+     *
+     * Sessoes sao aditivas: cada abertura soma 1. Visitantes distintos nao sao —
+     * por isso so contamos quando esta e a PRIMEIRA sessao do visitante no dia,
+     * o que uma consulta indexada por `visitor_id` resolve. Sessoes sao raras
+     * (uma por janela de 30 minutos), entao o custo por requisicao e desprezivel.
+     */
+    private function countSession(Visitor $visitor, VisitorSession $session, Carbon $now): void
+    {
+        ($this->increment)(MetricName::Sessoes, $now);
+
+        $anteriores = VisitorSession::where('visitor_id', $visitor->id)
+            ->whereDate('started_at', $now->toDateString())
+            ->where('id', '!=', $session->id)
+            ->exists();
+
+        if (! $anteriores) {
+            ($this->increment)(MetricName::Visitantes, $now);
+        }
     }
 }

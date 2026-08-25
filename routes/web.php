@@ -14,6 +14,7 @@ use App\Livewire\Admin\Categorias\CategoriaIndex;
 use App\Livewire\Admin\Clientes\ClienteIndex;
 use App\Livewire\Admin\CustomerIntelligence\DashboardShow as CIDashboardShow;
 use App\Livewire\Admin\CustomerIntelligence\DocsShow as CIDocsShow;
+use App\Livewire\Admin\CustomerIntelligence\VisitorShow as CIVisitorShow;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\EmailMarketing\CampaignForm as CampaignFormLivewire;
 use App\Livewire\Admin\EmailMarketing\CampaignIndex as CampaignIndexLivewire;
@@ -556,6 +557,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/customer-intelligence', CIDashboardShow::class)
         ->middleware('can:customer_intelligence.visualizar')
         ->name('customer-intelligence.dashboard');
+
+    Route::get('/customer-intelligence/visitantes/{visitor}', CIVisitorShow::class)
+        ->middleware('can:customer_intelligence.visualizar')
+        ->name('customer-intelligence.visitante');
 
     Route::get('/customer-intelligence/documentacao', CIDocsShow::class)
         ->middleware('can:customer_intelligence.visualizar')

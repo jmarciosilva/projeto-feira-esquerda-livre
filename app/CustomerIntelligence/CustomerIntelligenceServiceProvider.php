@@ -2,6 +2,7 @@
 
 namespace App\CustomerIntelligence;
 
+use App\CustomerIntelligence\Console\RebuildDailyMetricsCommand;
 use App\CustomerIntelligence\Http\Middleware\TrackVisitorSession;
 use App\CustomerIntelligence\Services\CustomerIntelligenceService;
 use App\CustomerIntelligence\Support\VisitorContext;
@@ -37,6 +38,10 @@ class CustomerIntelligenceServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->runningInConsole()) {
+            $this->commands([RebuildDailyMetricsCommand::class]);
+        }
+
         if (! config('customer-intelligence-internal.enabled', true)) {
             return;
         }

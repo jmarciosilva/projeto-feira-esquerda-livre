@@ -2,8 +2,8 @@
 <div class="space-y-8">
     {{-- Header com Link Voltar --}}
     <div class="flex items-center space-x-4">
-        <a href="#" class="text-blue-600 hover:text-blue-700 font-medium">
-            ← Voltar para Contatos
+        <a href="{{ route('admin.customer-intelligence.dashboard') }}" class="text-blue-600 hover:text-blue-700 font-medium">
+            ← Voltar para Inteligência de Cliente
         </a>
     </div>
 
@@ -13,26 +13,25 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <h1 class="text-3xl font-bold text-gray-900">
-                        {{ $contact['name'] ?? 'Sem Nome' }}
+                        {{ $contact['name'] ?? 'Visitante anônimo' }}
                     </h1>
-                    <p class="text-gray-600 mt-1">{{ $contact['email'] ?? 'Sem Email' }}</p>
+                    <p class="text-gray-600 mt-1">{{ $contact['email'] ?? 'Sem conta associada' }}</p>
                 </div>
                 <div class="space-y-4 text-sm">
                     <div>
-                        <span class="text-gray-600">Lead Score:</span>
-                        <div class="flex items-center mt-1">
-                            <div class="w-24 bg-gray-200 rounded-full h-2">
-                                <div class="bg-blue-600 h-2 rounded-full" style="width: {{ ($contact['lead_score'] ?? 0) * 1 }}%"></div>
-                            </div>
-                            <span class="ml-2 font-medium">{{ $contact['lead_score'] ?? 0 }}</span>
-                        </div>
+                        <span class="text-gray-600">Identificador:</span>
+                        <p class="text-gray-900 mt-1"><code class="text-xs bg-gray-100 px-2 py-1 rounded">{{ $contact['visitor_uuid'] ?? '-' }}</code></p>
                     </div>
                     <div>
-                        <span class="text-gray-600">Cadastrado em:</span>
+                        <span class="text-gray-600">Sessões / Eventos:</span>
+                        <p class="text-gray-900 mt-1">{{ $contact['sessions_count'] ?? 0 }} / {{ $contact['events_count'] ?? 0 }}</p>
+                    </div>
+                    <div>
+                        <span class="text-gray-600">Primeira visita:</span>
                         <p class="text-gray-900 mt-1">{{ $contact['created_at'] ?? '-' }}</p>
                     </div>
                     <div>
-                        <span class="text-gray-600">Último Evento:</span>
+                        <span class="text-gray-600">Última visita:</span>
                         <p class="text-gray-900 mt-1">{{ $contact['last_event_at'] ?? 'Nunca' }}</p>
                     </div>
                 </div>

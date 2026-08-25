@@ -2,7 +2,9 @@
 
 namespace App\CustomerIntelligence\Services;
 
+use App\CustomerIntelligence\Actions\IncrementDailyMetric;
 use App\CustomerIntelligence\Enums\EventName;
+use App\CustomerIntelligence\Enums\MetricName;
 use App\CustomerIntelligence\Jobs\TrackCustomerEventJob;
 use App\CustomerIntelligence\Models\TrackedEvent;
 use App\CustomerIntelligence\Models\Visitor;
@@ -37,6 +39,7 @@ class CustomerIntelligenceService
     public function __construct(
         private readonly PropertySanitizer $sanitizer,
         private readonly VisitorContext $context,
+        private readonly IncrementDailyMetric $increment,
     ) {}
 
     /**
@@ -86,7 +89,7 @@ class CustomerIntelligenceService
         $session ??= $this->context->session();
         $visitor ??= $session?->visitor;
 
-        return TrackedEvent::create([
+        $tracked = TrackedEvent::create([
             'visitor_id' => $visitor?->getKey(),
             'session_id' => $session?->getKey(),
             'user_id' => $this->resolveUserId($userId, $visitor),
@@ -97,6 +100,35 @@ class CustomerIntelligenceService
             'properties' => $properties === [] ? null : $this->sanitizer->sanitize($properties),
             'occurred_at' => $occurredAt ?? now(),
         ]);
+
+        $this->aggregate($tracked);
+
+        return $tracked;
+    }
+
+    /**
+     * Atualiza os agregados diarios que o painel consulta.
+     *
+     * Incremental: cada evento soma 1 no dia em que ocorreu, em vez de o painel
+     * recontar `ci_events` inteira a cada carregamento. Roda dentro do job de
+     * gravacao, entao fica fora do caminho da requisicao.
+     */
+    private function aggregate(TrackedEvent $tracked): void
+    {
+        $dia = $tracked->occurred_at;
+
+        ($this->increment)(MetricName::Eventos, $dia);
+
+        ($this->increment)(
+            MetricName::Eventos,
+            $dia,
+            dimensionType: MetricName::DIMENSION_EVENT_NAME,
+            dimensionValue: $tracked->event_name->value,
+        );
+
+        if ($tracked->event_name === MetricName::conversionEvent()) {
+            ($this->increment)(MetricName::Conversoes, $dia);
+        }
     }
 
     /**

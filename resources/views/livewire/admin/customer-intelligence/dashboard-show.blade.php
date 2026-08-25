@@ -8,26 +8,21 @@
             </p>
         </div>
 
-        <!-- Status de Conexão -->
-        <div class="mb-8">
-            <livewire:jmf-ci-configuration />
-        </div>
-
         <!-- Dashboard Metrics -->
         <div class="mb-8">
-            <livewire:jmf-ci-dashboard />
+            <livewire:admin.customer-intelligence.dashboard />
         </div>
 
         <!-- Seção de Contatos -->
         <div class="bg-white rounded-lg shadow mb-8">
             <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-900">Contatos Rastreados</h2>
+                <h2 class="text-lg font-semibold text-gray-900">Visitantes Rastreados</h2>
                 <p class="mt-1 text-sm text-gray-600">
                     Visitantes e clientes que interagiram com a plataforma
                 </p>
             </div>
             <div class="p-6">
-                <livewire:jmf-ci-contact-index />
+                <livewire:admin.customer-intelligence.visitor-index />
             </div>
         </div>
 
@@ -40,7 +35,7 @@
                 </p>
             </div>
             <div class="p-6">
-                <livewire:jmf-ci-event-index />
+                <livewire:admin.customer-intelligence.event-index />
             </div>
         </div>
 

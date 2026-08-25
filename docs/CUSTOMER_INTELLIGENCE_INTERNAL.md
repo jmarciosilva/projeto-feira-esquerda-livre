@@ -45,7 +45,7 @@ Consequências assumidas:
 | **CI-03** | Coleta: visitante e sessão (middleware, cookies) | **CONCLUÍDA** |
 | **CI-04** | Escrita de eventos pela fila dedicada | **CONCLUÍDA** |
 | **CI-05** | Migração das 7 chamadas atuais | **CONCLUÍDA** |
-| CI-06 | Dashboard lendo do banco local | não iniciada |
+| **CI-06** | Painel e agregação local | **CONCLUÍDA** |
 | CI-07 | Desativação do SDK externo | não iniciada |
 | CI-08 | Limpeza de Composer, Docker e `.env` | não iniciada |
 | CI-09 | Retenção, LGPD e documentação final | não iniciada |
@@ -86,14 +86,27 @@ de `use` mais a substituição da string pelo enum, conforme a decisão 6.
 envolvidos deixaram de viver apenas dentro do JSON de `properties` e viraram
 referência real em `entity_type`/`entity_id`.
 
+### O que a CI-06 entregou
+
+O painel deixou de falar com a plataforma externa. Dashboard, eventos,
+visitantes e detalhe passaram a ler `ci_daily_metrics`, `ci_events`,
+`ci_visitors` e `ci_sessions` — nenhuma chamada HTTP em nenhuma das telas.
+
+Nasceram a camada de consultas (`Queries/`), a agregação diária incremental e o
+comando de reconstrução dos agregados. A tela de detalhe do visitante, que
+existia como view mas nunca teve rota, passou a ser alcançável.
+
+**A leitura e a escrita do Customer Intelligence pertencem agora ao próprio
+projeto.**
+
 ### O que ainda **não** foi feito
 
 - o SDK externo, o repositório `path` do Composer e o volume Docker continuam
   instalados — a remoção é a CI-07;
 - o middleware do SDK ainda roda e ainda emite os cookies;
-- o painel administrativo ainda lê da API remota, não do banco local (CI-06);
-- não há expurgo, agregadores nem limpeza do código morto que a auditoria
-  encontrou.
+- os cinco componentes Livewire do SDK continuam registrados, embora nenhum
+  seja mais renderizado pelo painel;
+- não há rotina de expurgo dos 180 dias — é a CI-09.
 
 ---
 
@@ -135,6 +148,8 @@ app/CustomerIntelligence/
 │   └── EventName.php                      os 7 eventos, tipados
 ├── Facades/
 │   └── CustomerIntelligence.php           fachada usada pelas 7 chamadas
+├── Console/
+│   └── RebuildDailyMetricsCommand.php     reconstroi os agregados
 ├── Http/Middleware/
 │   └── TrackVisitorSession.php            coleta a cada requisição web
 ├── Jobs/
@@ -144,6 +159,10 @@ app/CustomerIntelligence/
 │   ├── VisitorSession.php                 ci_sessions
 │   ├── TrackedEvent.php                   ci_events
 │   └── DailyMetric.php                    ci_daily_metrics
+├── Queries/
+│   ├── DashboardQuery.php                 cartões, gráfico e recentes
+│   ├── EventQuery.php                     listagem e timeline
+│   └── VisitorQuery.php                   listagem e detalhe
 ├── Services/
 │   └── CustomerIntelligenceService.php    porta de entrada do módulo
 ├── Support/
@@ -323,6 +342,168 @@ tabela que cresce por append como `ci_events`, isso mantém a localidade do
 
 Um UUID informado explicitamente é preservado, o que permite idempotência
 quando a gravação passar pela fila.
+
+---
+
+## Painel administrativo
+
+Desde a CI-06 o painel lê exclusivamente o banco local. Não há nenhuma chamada
+HTTP em nenhuma das telas.
+
+```
+Livewire (App\Livewire\Admin\CustomerIntelligence)
+   │
+   ▼
+Queries (App\CustomerIntelligence\Queries)
+   │
+   ├── DashboardQuery  → ci_daily_metrics (cartões e gráfico)
+   │                     ci_events · ci_visitors (listas de recentes)
+   ├── EventQuery      → ci_events
+   └── VisitorQuery    → ci_visitors + users (por relação)
+```
+
+As queries vivem fora dos componentes de propósito: um componente Livewire cheio
+de `selectRaw` e `groupBy` é difícil de testar e impossível de reaproveitar.
+
+| Tela | Componente | Fonte |
+|---|---|---|
+| Dashboard | `Dashboard` | `ci_daily_metrics` + recentes |
+| Eventos | `EventIndex` | `ci_events`, paginado no banco |
+| Visitantes | `VisitorIndex` | `ci_visitors` + `users` |
+| Detalhe | `VisitorShow` | `ci_visitors` + timeline de `ci_events` |
+
+Os componentes ficam em `App\Livewire\Admin\CustomerIntelligence`, respeitando o
+`class_namespace` de `config/livewire.php` — nenhum registro manual é preciso.
+
+### O que mudou na interface
+
+O layout foi preservado. Duas exceções, ambas por não ter como reproduzir o dado
+com honestidade:
+
+**`lead_score` deixou de existir.** Vinha do CRM da plataforma remota, que nunca
+recebeu um `identify()` — na prática o número sempre foi de um cadastro que o
+projeto não alimentava. A coluna passou a mostrar a **contagem de eventos** do
+visitante, que é um dado real do banco local.
+
+**O card "Validar Conexão" saiu do dashboard.** Ele testava a conexão com a VPS.
+Sem servidor externo, não há conexão a validar. O componente do SDK continua
+registrado até a CI-07, apenas não é mais renderizado.
+
+A tela de detalhe do visitante ganhou rota
+(`admin.customer-intelligence.visitante`) e passou a mostrar identificador,
+primeira visita, última visita e contagem de sessões e eventos. Antes ela existia
+como view mas era inalcançável: as rotas do plugin do SDK nunca foram
+registradas.
+
+---
+
+## Agregação diária
+
+`ci_daily_metrics` guarda agregados, nunca cópias de eventos.
+
+| Métrica | Dimensão | Quando é incrementada |
+|---|---|---|
+| `eventos` | — | a cada evento gravado |
+| `eventos` | `event_name` | a cada evento gravado, por tipo |
+| `sessoes` | — | a cada sessão aberta |
+| `visitantes` | — | na primeira sessão do visitante no dia |
+| `conversoes` | — | a cada `pedido.criado` |
+
+**Conversão é `pedido.criado`.** Na plataforma externa isso vivia numa
+configuração do servidor; aqui é uma decisão explícita do projeto, registrada em
+`MetricName::conversionEvent()`.
+
+### Quando ocorre
+
+De forma **incremental**, no momento em que o evento é gravado — ou seja, dentro
+do job da fila, fora do caminho da requisição. O painel nunca recalcula o
+histórico: ele soma linhas já prontas de `ci_daily_metrics`.
+
+A contagem de sessões e visitantes acontece na abertura da sessão, que é o único
+ponto no caminho da requisição. Sessões são raras — uma por janela de 30 minutos
+por visitante —, então o custo é desprezível.
+
+### Concorrência
+
+Dois jobs podem incrementar a mesma métrica ao mesmo tempo. Ler o valor em PHP,
+somar e gravar perderia incrementos. Por isso a soma acontece no banco:
+
+```sql
+UPDATE ci_daily_metrics SET metric_value = metric_value + ? WHERE ...
+```
+
+atômico tanto no MySQL quanto no SQLite. Se a linha ainda não existir, tentamos
+inserir; se outra conexão inserir primeiro, a chave única rejeita a segunda
+tentativa e caímos de volta no incremento. Nada se perde e nada duplica.
+
+Não há ramificação por dialeto de banco: `increment()` do query builder resolve
+igual nos dois.
+
+### Visitantes distintos
+
+É a única métrica que não é aditiva — somar visitantes de dois dias não dá
+visitantes distintos no período. Duas consequências assumidas:
+
+- no incremento, contamos apenas quando é a **primeira sessão do visitante no
+  dia**, o que uma consulta indexada por `visitor_id` resolve;
+- o total exibido para um período é a **soma dos dias**, então um visitante que
+  volta em dias diferentes conta uma vez por dia. É a mesma semântica de
+  "visitantes diários" que a plataforma externa usava.
+
+### Reconstrução
+
+```bash
+docker compose exec app php artisan customer-intelligence:rebuild-daily-metrics
+docker compose exec app php artisan customer-intelligence:rebuild-daily-metrics --from=2026-08-01 --to=2026-08-25
+```
+
+Recalcula os agregados a partir de `ci_events` e `ci_sessions`. Existe para os
+casos em que o incremento não aconteceu: eventos anteriores à CI-06, uma falha de
+job, ou uma correção de métrica.
+
+**Idempotente:** apaga os agregados do intervalo antes de recalcular, então rodar
+duas vezes produz o mesmo resultado. **Nunca toca os eventos brutos** — só
+`ci_daily_metrics`. Há teste para as duas garantias.
+
+---
+
+## Índices e performance
+
+A CI-06 acrescentou **um** índice:
+
+| Índice | Query que o justificou |
+|---|---|
+| `ci_events (visitor_id, occurred_at)` | timeline do detalhe: `WHERE visitor_id = ? ORDER BY occurred_at DESC`. A foreign key já cobria o filtro, mas a ordenação caía em filesort. Como o índice começa por `visitor_id`, também satisfaz a exigência da FK — nada ficou redundante. |
+
+Os demais índices, criados na CI-02, atendem as consultas desta fase sem
+alteração: `(event_name, occurred_at)` para o filtro por tipo, `(occurred_at)`
+para recortes de período, e a chave única de `ci_daily_metrics`, que começa por
+`metric_date`, para as somas do dashboard.
+
+### Medições
+
+Massa sintética, em SQLite de teste:
+
+| Tela | 10.000 eventos | 100.000 eventos |
+|---|---|---|
+| Dashboard | 5 queries · 375 ms | 5 queries · 699 ms |
+| Eventos | 3 queries · 211 ms | 3 queries · 167 ms |
+| Visitantes | 2 queries · 159 ms | 2 queries · 121 ms |
+| Detalhe | 5 queries · 135 ms | 5 queries · 119 ms |
+
+O que importa é a **forma** das consultas: a contagem de queries não muda com o
+volume. O teste falha se qualquer tela passar de 15 queries — um N+1 numa página
+de 50 eventos passaria disso com folga.
+
+Foi assim que um N+1 real apareceu durante a implementação: a timeline do
+detalhe fazia 29 queries porque carregava visitante e usuário evento a evento.
+Resolvido com eager loading.
+
+### Cache
+
+Nenhum. A modelagem, os índices e a agregação resolveram o problema; acrescentar
+cache serviria apenas para esconder query ruim. Redis continua disponível se
+algum dia houver benefício claro.
 
 ---
 
@@ -507,16 +688,24 @@ docker compose exec app php artisan test tests/Feature/CustomerIntelligence
 | `InternalEventRecordingTest` | gravação, morph, sanitização, job |
 | `InternalVisitorTrackingTest` | middleware, cookies, rotação de sessão, identificação, UTMs, contexto |
 | `InternalEventQueueTest` | fila dedicada, dados capturados no despacho, gravação ponta a ponta |
+| `InternalPanelTest` | dashboard, filtros, paginação, detalhe, agregação, comando de reconstrução |
+| `InternalPanelPerformanceTest` | volume de 10.000 eventos, contagem de queries, ausência de N+1 |
 
-Dois testes guardam a fronteira desta fase: um verifica que **nada na aplicação
-despacha o job** e que `ci_events` continua vazia após navegar por um produto e
-adicionar ao carrinho; outro navega por duas páginas carregando os cookies, como
-um navegador faria, e confirma que o visitante é único e que nenhum evento foi
-gravado.
+Dois testes guardam a direção da fiação: navegar por um produto e adicionar ao
+carrinho precisa despachar o job do módulo, e o evento precisa cair na fila
+`customer-intelligence`. Outro navega por duas páginas carregando os cookies,
+como um navegador faria, e confirma que o mesmo navegador continua sendo um
+único visitante.
 
-Outros dois cobrem o risco da coexistência: que o middleware do módulo está na
-pilha **depois** do middleware do SDK, e que sai **um único** `Set-Cookie` de
+Dois cobrem o risco da coexistência com o SDK: que o middleware do módulo está
+na pilha **depois** do middleware do SDK, e que sai **um único** `Set-Cookie` de
 cada nome.
 
+Dois cobrem a resiliência do fluxo de compra: com o módulo lançando exceção, o
+item ainda entra no carrinho e o pedido ainda é criado.
+
+Todos os testes do painel bloqueiam a rede com `Http::preventStrayRequests()`:
+se algum componente voltasse a chamar a plataforma externa, o teste falharia.
+
 Os testes rodam em **SQLite em memória** (`phpunit.xml`). O banco MySQL de
-desenvolvimento não é tocado.
+desenvolvimento não é tocado, e a massa sintética do benchmark vive apenas ali.

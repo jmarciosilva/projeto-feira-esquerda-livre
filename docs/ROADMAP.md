@@ -45,7 +45,7 @@
            ↓
 [TRILHA CI 🔄 EM ANDAMENTO]
   Internalização do Customer Intelligence
-  CI-01 a CI-05 ✅ · CI-06 a CI-09 pendentes
+  CI-01 a CI-06 ✅ · CI-07 a CI-09 pendentes
   Deixa de depender do SDK externo em ../jmf-ci-sdk
 ```
 
@@ -1181,7 +1181,7 @@ order_messages
 | Trilha | Período | Situação | Entregável Principal |
 |---|---|---|---|
 | ✅ **Infraestrutura — Ambiente Docker** | Agosto 2026 | Concluída | 8 serviços (PHP 8.3, Nginx, MySQL 8.4, phpMyAdmin, Redis 7, Node 22/Vite, queue, Mailpit); dispensa Laragon, XAMPP, PHP, MySQL, Composer e Node no Windows — ver `docs/DOCKER_DEVELOPMENT.md` |
-| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 5 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
+| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 6 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
 
 ---
 
@@ -1466,7 +1466,7 @@ A decisão arquitetural é que **comportamento gerado na Feira Esquerda Livre pe
 | **CI-03** | Coleta: visitante e sessão (middleware, cookies, ServiceProvider) | ✅ Concluída | 25/08/2026 |
 | **CI-04** | Escrita de eventos pela fila dedicada | ✅ Concluída | 25/08/2026 |
 | **CI-05** | Migração das 7 chamadas de rastreamento | ✅ Concluída | 25/08/2026 |
-| CI-06 | Dashboard lendo do banco local | ⬜ Não iniciada | — |
+| **CI-06** | Painel e agregação local | ✅ Concluída | 25/08/2026 |
 | CI-07 | Desativação do SDK externo | ⬜ Não iniciada | — |
 | CI-08 | Limpeza de Composer, Docker e `.env` | ⬜ Não iniciada | — |
 | CI-09 | Retenção, LGPD e documentação final | ⬜ Não iniciada | — |
@@ -1484,7 +1484,8 @@ Nenhuma fase é considerada concluída com teste vermelho. O número nunca deve 
 | Fim da CI-02 | 273 | 744 |
 | Fim da CI-03 | 290 | 798 |
 | Fim da CI-04 | 302 | 819 |
-| Fim da CI-05 | **304** | **837** |
+| Fim da CI-05 | 304 | 837 |
+| Fim da CI-06 | **327** | **907** |
 
 ---
 
@@ -1657,11 +1658,63 @@ Esta era a fase de risco **ALTO** da trilha: as chamadas vivem em `CartService`,
 
 ---
 
+### ✅ CI-06 — Painel e agregação local (Concluída)
+
+**Objetivo:** o painel administrativo deixa de consultar a API externa e passa a ler o banco local. Tanto a escrita quanto a leitura do Customer Intelligence passam a pertencer ao próprio projeto.
+
+**Superfície migrada — cinco endpoints remotos eliminados:**
+
+| Endpoint que sumiu | Quem usava | Fonte agora |
+|---|---|---|
+| `GET /api/v1/metrics` | Dashboard | `ci_daily_metrics` |
+| `GET /api/v1/events` | Dashboard, EventIndex | `ci_events` |
+| `GET /api/v1/contacts` | Dashboard, ContactIndex | `ci_visitors` + `users` |
+| `GET /api/v1/contacts/{id}` | ContactShow | `ci_visitors` |
+| `GET /api/v1/contacts/{id}/events` | ContactShow | `ci_events` |
+
+O `GET /api/v1/ping` do card "Validar Conexão" também saiu: sem servidor externo, não há conexão a validar.
+
+**Entregue:**
+
+| Componente | Status |
+|---|---|
+| Camada `Queries/` — Dashboard, Event, Visitor | ✅ Concluído |
+| 4 componentes Livewire internos em `App\Livewire\Admin\CustomerIntelligence` | ✅ Concluído |
+| Agregação diária incremental e concorrente | ✅ Concluído |
+| Comando `customer-intelligence:rebuild-daily-metrics` | ✅ Concluído |
+| Rota e tela de detalhe do visitante | ✅ Concluído |
+| Índice `ci_events (visitor_id, occurred_at)` | ✅ Concluído |
+| 23 testes novos, incluindo benchmark de volume | ✅ Concluído |
+
+**Agregação.** `ci_daily_metrics` passou a ser usada de verdade, guardando cinco métricas: `eventos` (total e por tipo), `sessoes`, `visitantes` e `conversoes`. O incremento é feito no momento da gravação do evento — dentro do job da fila, fora do caminho da requisição —, e a soma acontece no banco (`metric_value = metric_value + ?`), atômica em MySQL e SQLite. Se a linha ainda não existe, tentamos inserir; se outra conexão inserir primeiro, a chave única rejeita e caímos de volta no incremento. Nada se perde, nada duplica.
+
+Visitantes distintos é a única métrica não aditiva: contamos apenas na primeira sessão do visitante no dia.
+
+**Reconstrução.** `customer-intelligence:rebuild-daily-metrics` recalcula os agregados a partir de `ci_events` e `ci_sessions`. Idempotente — apaga o intervalo antes de recalcular — e nunca toca os eventos brutos.
+
+**Performance.** Com massa sintética, a contagem de queries não muda com o volume:
+
+| Tela | 10.000 eventos | 100.000 eventos |
+|---|---|---|
+| Dashboard | 5 queries · 375 ms | 5 queries · 699 ms |
+| Eventos | 3 queries · 211 ms | 3 queries · 167 ms |
+| Visitantes | 2 queries · 159 ms | 2 queries · 121 ms |
+| Detalhe | 5 queries · 135 ms | 5 queries · 119 ms |
+
+O benchmark encontrou um N+1 real durante a implementação: a timeline do detalhe fazia 29 queries porque carregava visitante e usuário evento a evento. Corrigido com eager loading.
+
+**O que mudou na interface, e por quê.** O layout foi preservado, com duas exceções honestas. O `lead_score` vinha do CRM da plataforma remota, que nunca recebeu um `identify()` — a coluna passou a mostrar a contagem de eventos do visitante, que é um dado real. E o card "Validar Conexão" saiu do dashboard. A tela de detalhe do visitante, que existia como view mas nunca teve rota, passou a ser alcançável.
+
+**Nenhum cache foi introduzido.** Modelagem, índices e agregação resolveram o problema; cache serviria apenas para esconder query ruim.
+
+**Validado no ambiente real:** três visitas a um produto geraram três eventos, um visitante, uma sessão e os agregados correspondentes. Consultando o MySQL de desenvolvimento, as quatro telas enxergam esses dados. Todos os testes do painel bloqueiam a rede com `Http::preventStrayRequests()`.
+
+---
+
 ### Fases pendentes
 
 | Fase | Objetivo | Risco previsto |
 |---|---|---|
-| **CI-06** | Componentes Livewire próprios consultando Eloquent no lugar do `JmfCiApiClient`; agregadores diários. | MÉDIO — agregação sem índice adequado trava o painel |
 | **CI-07** | Cortar o envio remoto; remover registro Livewire duplicado e código morto. | MÉDIO — ponto sem volta para novos dados na VPS |
 | **CI-08** | Remover pacote Composer, bloco `repositories` do tipo `path`, as 2 linhas do `compose.yaml` e as variáveis `JMF_CI_*`. | MÉDIO — `composer update` mexe no lock; conferir o diff |
 | **CI-09** | Expurgo agendado dos 180 dias, comando de exclusão por titular, documentação final. Aposentar `docs/JMF_CI_INTEGRATION.md`. | BAIXO — mas exclusão é irreversível |
@@ -1892,6 +1945,6 @@ Cortes conscientes para manter a v1 da API enxuta e testável — candidatos a u
 ---
 
 *Documento atualizado em: 25 de agosto de 2026 — Versão 2.8*
-*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 5 de 9 fases. Os 7 eventos de negócio já são gravados pelo módulo interno; nenhum sai mais por HTTP.*
-*Próxima revisão: após a CI-06 (dashboard lendo do banco local)*
+*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 6 de 9 fases. Escrita e leitura do Customer Intelligence já pertencem ao projeto: os 7 eventos são gravados localmente e o painel lê o próprio banco, sem nenhuma chamada à plataforma externa.*
+*Próxima revisão: após a CI-07 (desativação do SDK externo)*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e publicação no feed pelo app.*

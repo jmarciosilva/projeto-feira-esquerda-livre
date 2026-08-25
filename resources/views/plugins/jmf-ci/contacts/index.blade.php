@@ -45,7 +45,7 @@
     {{-- Tabela --}}
     <x-jmf-ci-event-table
         title="Contatos"
-        :headers="['Email', 'Nome', 'Lead Score', 'Último Evento', 'Ação']"
+        :headers="['E-mail', 'Nome', 'Eventos', 'Última visita', 'Ação']"
         :items="$contacts"
         :paginator="null"
         emptyMessage="Nenhum contato encontrado"
@@ -58,19 +58,14 @@
                 <td class="px-6 py-4 text-sm text-gray-600">
                     {{ $contact['name'] ?? '-' }}
                 </td>
-                <td class="px-6 py-4 text-sm">
-                    <div class="flex items-center">
-                        <div class="w-16 bg-gray-200 rounded-full h-2">
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: {{ ($contact['lead_score'] ?? 0) * 1 }}%"></div>
-                        </div>
-                        <span class="ml-2 text-sm font-medium">{{ $contact['lead_score'] ?? 0 }}</span>
-                    </div>
+                <td class="px-6 py-4 text-sm text-gray-600">
+                    {{ $contact['events_count'] ?? 0 }}
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600">
                     {{ $contact['last_event_at'] ?? 'Nunca' }}
                 </td>
                 <td class="px-6 py-4 text-sm">
-                    <a href="#" class="text-blue-600 hover:text-blue-700 font-medium">
+                    <a href="{{ route('admin.customer-intelligence.visitante', $contact['visitor_uuid']) }}" class="text-blue-600 hover:text-blue-700 font-medium">
                         Ver detalhes
                     </a>
                 </td>
