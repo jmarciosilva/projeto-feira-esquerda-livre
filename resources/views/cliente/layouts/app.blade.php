@@ -138,5 +138,6 @@ function toggleClienteSidebar() {
 }
 </script>
 
+@include('partials.consent-banner')
 </body>
 </html>

@@ -22,6 +22,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use RuntimeException;
+use Tests\Concerns\InteractsWithConsent;
 use Tests\TestCase;
 
 /**
@@ -37,7 +38,19 @@ use Tests\TestCase;
  */
 class EventTrackingTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithConsent, RefreshDatabase;
+
+    /**
+     * Analytics e opt-in desde a GOV-01. Esta suite descreve o comportamento da
+     * COLETA, que so existe sob aceite — entao o aceite e a precondicao dela.
+     * O que acontece sem aceite tem suite propria: ConsentPolicyTest.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->acceptingAnalytics();
+    }
 
     private function makeExpositor(): Expositor
     {

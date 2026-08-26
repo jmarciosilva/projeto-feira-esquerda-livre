@@ -1893,6 +1893,70 @@ funcionando sem nenhum repositório JMF ao lado, com o painel de Inteligência d
 
 ---
 
+## 🔐 GOV-01 — Consentimento e auditoria do Customer Intelligence
+
+**Período:** Agosto de 2026
+**Objetivo estratégico:** dar à pessoa que navega o controle sobre ser ou não medida, e à operação um registro de quem olhou os dados comportamentais.
+**Documentação técnica:** `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md`
+
+A trilha CI trouxe o rastreamento para dentro de casa. GOV-01 responde à pergunta seguinte: **sob qual autorização ele funciona, e quem responde pelo que é consultado.** Nada aqui reabre CI-01 a CI-09.
+
+### Decisões tomadas antes da implementação
+
+A auditoria inicial levantou cinco pontos que não eram escolha técnica. Ficam registrados aqui porque toda a arquitetura desta fase decorre deles.
+
+**1. Modelo de consentimento — OPT-IN.** O estado inicial é `UNKNOWN` e não autoriza nada. Enquanto ele durar não há cookie de analytics, não há `Visitor`, não há `VisitorSession` e não há evento. Só `ACCEPTED` libera a coleta; `REJECTED` a mantém desligada. Cookies essenciais e todas as funcionalidades do site seguem funcionando em qualquer um dos três estados.
+
+**2. Eventos transacionais seguem a mesma regra.** Os sete eventos — inclusive `pedido.criado`, `pedido.pagamento_confirmado` e `pedido.enviado` — só são coletados sob `ACCEPTED`. A auditoria provou que `ci_events` não é lida por nenhuma funcionalidade operacional: os fatos de negócio continuam vivendo em `orders`, `order_splits` e nas demais estruturas. Perder o evento analítico não perde o fato.
+
+**3. Duração — 12 meses.** Passado esse prazo o estado volta a `UNKNOWN` e a escolha é perguntada de novo. Antes disso a pessoa pode mudar de ideia a qualquer momento por uma opção permanente de privacidade. A preferência mora num cookie first-party essencial próprio, `fel_privacy_consent`, sem herança do prefixo legado — ele guarda a escolha de privacidade e mais nada.
+
+**4. Retenção do audit log — 730 dias**, configurável por `CI_AUDIT_RETENTION_DAYS`. Nada de retenção permanente. O expurgo tem comando próprio e agendamento próprio, **sem nenhum acoplamento com o expurgo de `ci_events`** — são dados de naturezas diferentes, com prazos diferentes, e um nunca deve arrastar o outro.
+
+**5. Tela de auditoria — sim, com permissão mais restrita.** A auditoria não fica atrás de `customer_intelligence.visualizar`: quem pode ver métricas não passa a ver quem olhou o quê. A permissão nova é `customer_intelligence.auditoria`, concedida apenas ao **administrador**. Gerente, supervisor, editor e lojista não a recebem.
+
+### Arquitetura
+
+O consentimento é decidido **em um lugar só**. Um `TrackingPolicy` central responde `allowsAnalytics()`, e apenas dois pontos o consultam: o middleware de coleta e o `track()` do serviço. Os sete pontos de negócio não ganharam nenhum `if` — continuam chamando `track()` como sempre chamaram, e quem decide se aquilo vira dado é a política.
+
+O estado vem de um `ConsentContext` com escopo de requisição, alimentado pelo cookie de preferência. Três estados explícitos num enum, e não um booleano: "nunca respondeu" é diferente de "recusou", e tratar os dois como `false` esconderia justamente a distinção que decide se o banner aparece.
+
+A auditoria é uma tabela enxuta — `user_id`, `action`, `resource_type`, `resource_id`, `created_at` — **sem campo de metadata livre**, que é por onde dado pessoal costuma vazar sem ninguém pedir. Ela é append-only, não tem CRUD administrativo e **nunca passa pelo `CustomerIntelligence::track()`**: caminho separado, tabela separada, sem risco de a auditoria virar o analytics que ela audita. Por isso também ela funciona normalmente mesmo quando a pessoa administrativa recusou analytics no próprio navegador — são coisas distintas.
+
+### Entregas
+
+- **GOV-01A** — `ConsentState`, `ConsentContext`, `ConsentCookie`, `TrackingPolicy` e `RecordConsentDecision`; middleware e serviço passam a consultar a política.
+- **GOV-01B** — banner com "Aceitar" e "Recusar" no mesmo peso visual, página permanente de preferências e link no rodapé.
+- **GOV-01C** — `ci_audit_logs`, `AuditAction`, `RecordAuditLog`, permissão `customer_intelligence.auditoria` e instrumentação dos pontos administrativos.
+- **GOV-01D** — tela administrativa de auditoria e `customer-intelligence:prune-audit-logs`, agendado separadamente.
+- **GOV-01E** — testes, documentação e validação.
+
+### Transições de estado
+
+Sair de `ACCEPTED` para `REJECTED` para a coleta na hora, expira `jmf_ci_visitor_id` e `jmf_ci_session_id` e limpa o contexto da requisição. **Não apaga histórico** — desvincular rastro histórico continua sendo ato explícito, pelo `customer-intelligence:forget-user`. Voltar de `REJECTED` para `ACCEPTED` gera identidade nova, sem tentativa de religar ao que veio antes.
+
+---
+
+## 🕗 GOV-02 — Propagação de consentimento em eventos assíncronos (pendência de produto)
+
+**Status:** registrada, **não implementada**. Levantada durante a GOV-01 e deixada de fora do escopo dela por decisão.
+
+A GOV-01 avalia o consentimento **na requisição em que o evento nasce**. Isso resolve com precisão os cinco eventos que nascem no próprio navegador de quem está navegando ou comprando. Dois não nascem ali:
+
+| Evento | Onde nasce | Consequência hoje |
+|---|---|---|
+| `pedido.pagamento_confirmado` | webhook do Mercado Pago, servidor para servidor | não há cookie na requisição, então o evento não é coletado em nenhum cenário |
+| `pedido.enviado` | sessão do **lojista**, no painel dele | passa a depender da preferência do lojista, e não da pessoa que comprou |
+
+Nenhum dos dois carrega a decisão de analytics da jornada original do comprador. Não é defeito de implementação: é consequência direta da regra escolhida na GOV-01, de que a autorização vale onde o evento nasce.
+
+**O que não é afetado:** as conversões do painel continuam corretas — quem as alimenta é `pedido.criado`, que nasce no checkout da própria pessoa. E os fatos de negócio seguem inteiros em `orders` e `order_splits`; o que se perde é o registro analítico, não o pedido.
+
+**Direção provável, quando for a hora:** persistir a decisão no próprio `Visitor` e consultá-la pelo pedido, em vez de depender da requisição. Isso muda o modelo de dados e o significado da revogação — por isso é fase própria, com decisão de produto antes do código, no mesmo protocolo da GOV-01.
+
+---
+
+
 ## 🎯 Princípios Transversais de Desenvolvimento
 
 Estes princípios se aplicam a todas as fases e devem guiar cada decisão de UX e arquitetura:

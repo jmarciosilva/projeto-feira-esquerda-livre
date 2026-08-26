@@ -37,6 +37,27 @@ return [
     ],
 
     /*
+    | Consentimento.
+    |
+    | O modelo e opt-in: sem ACCEPTED nao ha coleta, nao ha visitante e nao ha
+    | cookie de analytics.
+    |
+    | O cookie de preferencia e first-party e essencial por natureza — ele
+    | guarda a escolha da pessoa, e nada mais. Nome novo e neutro de proposito:
+    | o prefixo `jmf_ci_` dos cookies de analytics e historico, e nao faria
+    | sentido carrega-lo justamente no cookie que decide se aqueles existem.
+    |
+    | Os 12 meses SAO a validade do consentimento: quando o navegador descarta
+    | o cookie, o estado volta a `unknown` e a pergunta pode ser feita de novo.
+    */
+    'consent' => [
+        'cookie' => [
+            'name' => env('CI_CONSENT_COOKIE_NAME', 'fel_privacy_consent'),
+            'minutes' => (int) env('CI_CONSENT_COOKIE_MINUTES', 60 * 24 * 365),
+        ],
+    ],
+
+    /*
     | Fila de gravacao dos eventos.
     |
     | `connection` vazio usa a conexao padrao da aplicacao (QUEUE_CONNECTION).
@@ -60,9 +81,14 @@ return [
     |
     | O expurgo roda pelo comando customer-intelligence:prune-events, agendado
     | diariamente em routes/console.php.
+    |
+    | O audit log administrativo tem prazo proprio, mais longo, e comando de
+    | expurgo proprio: sao dados de naturezas diferentes e um nunca deve
+    | arrastar o outro.
     */
     'retention' => [
         'event_days' => (int) env('CI_RETENTION_DAYS', 180),
+        'audit_days' => (int) env('CI_AUDIT_RETENTION_DAYS', 730),
     ],
 
 ];

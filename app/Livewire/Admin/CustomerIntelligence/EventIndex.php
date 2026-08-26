@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Admin\CustomerIntelligence;
 
+use App\CustomerIntelligence\Actions\RecordAuditLog;
+use App\CustomerIntelligence\Enums\AuditAction;
 use App\CustomerIntelligence\Queries\EventQuery;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
@@ -23,6 +25,21 @@ class EventIndex extends Component
     public string $period = '30';
 
     private const PER_PAGE = 50;
+
+    /**
+     * Uma linha por abertura de tela. Filtrar e paginar passam por
+     * `updating*`/`render`, nunca por `mount()` — a trilha registra o acesso,
+     * nao cada movimento dentro dele.
+     */
+    public function mount(RecordAuditLog $auditar): void
+    {
+        // A tela sempre foi embutida no painel, que ja autoriza. A checagem
+        // propria entrou junto com a auditoria: agora montar o componente
+        // GRAVA — e um registro so vale se corresponder a um acesso legitimo.
+        $this->authorize('customer_intelligence.visualizar');
+
+        $auditar(AuditAction::EventsView);
+    }
 
     public function updatingSearch(): void
     {

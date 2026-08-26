@@ -3,6 +3,7 @@
 namespace App\CustomerIntelligence\Http\Middleware;
 
 use App\CustomerIntelligence\Actions\ResolveVisitorSession;
+use App\CustomerIntelligence\Support\TrackingPolicy;
 use App\CustomerIntelligence\Support\VisitorContext;
 use Closure;
 use Illuminate\Http\Request;
@@ -16,6 +17,11 @@ use Symfony\Component\HttpFoundation\Response;
  * `ci_visitors` / `ci_sessions`.
  *
  * Roda no grupo `web` e e o unico coletor da aplicacao.
+ *
+ * Nada acontece sem consentimento. Enquanto a pessoa nao aceitar, o middleware
+ * apenas passa adiante: sem visitante, sem sessao, sem cookie de analytics. O
+ * site inteiro continua funcionando — a coleta e o que fica de fora, nao a
+ * navegacao.
  *
  * Antes de gerar um identificador novo, o middleware olha se algum outro ja
  * enfileirou o cookie nesta resposta (`Cookie::queued()`). Hoje nao ha ninguem
@@ -32,11 +38,14 @@ class TrackVisitorSession
     public function __construct(
         private readonly VisitorContext $context,
         private readonly ResolveVisitorSession $resolve,
+        private readonly TrackingPolicy $policy,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
-        if (! config('customer-intelligence-internal.enabled', true)) {
+        // Ponto unico de decisao: a politica ja responde tanto por "o modulo
+        // esta ligado" quanto por "esta pessoa autorizou".
+        if (! $this->policy->allowsAnalytics()) {
             return $next($request);
         }
 

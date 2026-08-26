@@ -1,5 +1,6 @@
 <?php
 
+use App\CustomerIntelligence\Http\Controllers\ConsentController;
 use App\Enums\ItemType;
 use App\Enums\MenuLocation;
 use App\Http\Controllers\Admin\MelhorEnvioOAuthController;
@@ -12,6 +13,7 @@ use App\Livewire\Admin\Banners\BannerIndex;
 use App\Livewire\Admin\Categorias\CategoriaForm;
 use App\Livewire\Admin\Categorias\CategoriaIndex;
 use App\Livewire\Admin\Clientes\ClienteIndex;
+use App\Livewire\Admin\CustomerIntelligence\AuditIndex as CIAuditIndex;
 use App\Livewire\Admin\CustomerIntelligence\DashboardShow as CIDashboardShow;
 use App\Livewire\Admin\CustomerIntelligence\DocsShow as CIDocsShow;
 use App\Livewire\Admin\CustomerIntelligence\VisitorShow as CIVisitorShow;
@@ -173,6 +175,14 @@ Route::get('/politica-de-privacidade', function () {
 
     return view('politica-de-privacidade', compact('settings'));
 })->name('politica-privacidade');
+
+// Preferencia de privacidade. Rotas publicas de proposito: a escolha precisa
+// estar ao alcance de quem nunca fez login, que e a maioria de quem navega.
+Route::get('/privacidade/preferencias', [ConsentController::class, 'edit'])
+    ->name('privacidade.preferencias');
+
+Route::post('/privacidade/consentimento', [ConsentController::class, 'store'])
+    ->name('privacidade.consentimento');
 
 Route::get('/termos-de-uso', function () {
     $settings = SiteSetting::instance();
@@ -565,6 +575,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/customer-intelligence/documentacao', CIDocsShow::class)
         ->middleware('can:customer_intelligence.visualizar')
         ->name('customer-intelligence.docs');
+
+    // Permissao propria, mais restrita: ver quem consultou o comportamento nao
+    // acompanha ver o comportamento. Autorizacao no servidor, na rota e
+    // novamente no `mount()` do componente.
+    Route::get('/customer-intelligence/auditoria', CIAuditIndex::class)
+        ->middleware('can:customer_intelligence.auditoria')
+        ->name('customer-intelligence.auditoria');
 
     // Email Marketing
     Route::middleware('can:email-marketing.gerenciar')->prefix('/email-marketing')->name('email-marketing.')->group(function () {

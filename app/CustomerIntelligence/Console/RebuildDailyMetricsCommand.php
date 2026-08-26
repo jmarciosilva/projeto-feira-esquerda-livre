@@ -2,6 +2,8 @@
 
 namespace App\CustomerIntelligence\Console;
 
+use App\CustomerIntelligence\Actions\RecordAuditLog;
+use App\CustomerIntelligence\Enums\AuditAction;
 use App\CustomerIntelligence\Enums\MetricName;
 use App\CustomerIntelligence\Models\DailyMetric;
 use App\CustomerIntelligence\Models\TrackedEvent;
@@ -41,7 +43,7 @@ class RebuildDailyMetricsCommand extends Command
 
     protected $description = 'Recalcula os agregados diários do Customer Intelligence a partir dos eventos';
 
-    public function handle(): int
+    public function handle(RecordAuditLog $auditar): int
     {
         [$from, $to] = $this->range();
 
@@ -77,6 +79,11 @@ class RebuildDailyMetricsCommand extends Command
 
             $this->components->info(count($linhas).' agregados gravados.');
         });
+
+        // So depois da transacao: se a reconstrucao falhar e der rollback, nao
+        // fica registro de uma reconstrucao que nao existiu. A saida antecipada
+        // de "nao ha eventos" tambem nao audita — nada foi alterado la.
+        $auditar(AuditAction::RebuildMetrics);
 
         return self::SUCCESS;
     }

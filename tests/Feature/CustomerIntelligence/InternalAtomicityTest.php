@@ -9,6 +9,7 @@ use App\CustomerIntelligence\Models\DailyMetric;
 use App\CustomerIntelligence\Models\TrackedEvent;
 use App\CustomerIntelligence\Services\CustomerIntelligenceService;
 use App\CustomerIntelligence\Support\PropertySanitizer;
+use App\CustomerIntelligence\Support\TrackingPolicy;
 use App\CustomerIntelligence\Support\VisitorContext;
 use DateTimeInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -69,6 +70,7 @@ class InternalAtomicityTest extends TestCase
             new PropertySanitizer,
             app(VisitorContext::class),
             $incrementador,
+            app(TrackingPolicy::class),
         );
     }
 

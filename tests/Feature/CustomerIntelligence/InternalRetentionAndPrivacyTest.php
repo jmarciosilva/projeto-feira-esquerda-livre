@@ -17,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
+use Tests\Concerns\InteractsWithConsent;
 use Tests\TestCase;
 
 /**
@@ -24,7 +25,19 @@ use Tests\TestCase;
  */
 class InternalRetentionAndPrivacyTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithConsent, RefreshDatabase;
+
+    /**
+     * Analytics e opt-in desde a GOV-01. Esta suite descreve o comportamento da
+     * COLETA, que so existe sob aceite — entao o aceite e a precondicao dela.
+     * O que acontece sem aceite tem suite propria: ConsentPolicyTest.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->acceptingAnalytics();
+    }
 
     private function service(): CustomerIntelligenceService
     {

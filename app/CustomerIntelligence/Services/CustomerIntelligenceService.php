@@ -10,6 +10,7 @@ use App\CustomerIntelligence\Models\TrackedEvent;
 use App\CustomerIntelligence\Models\Visitor;
 use App\CustomerIntelligence\Models\VisitorSession;
 use App\CustomerIntelligence\Support\PropertySanitizer;
+use App\CustomerIntelligence\Support\TrackingPolicy;
 use App\CustomerIntelligence\Support\VisitorContext;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -47,6 +48,7 @@ class CustomerIntelligenceService
         private readonly PropertySanitizer $sanitizer,
         private readonly VisitorContext $context,
         private readonly IncrementDailyMetric $increment,
+        private readonly TrackingPolicy $policy,
     ) {}
 
     /**
@@ -62,6 +64,13 @@ class CustomerIntelligenceService
      * gravado. Se o UUID fosse gerado no Model, cada retentativa produziria um
      * identificador diferente e um evento duplicado.
      *
+     * Sem consentimento nada e enfileirado. A verificacao mora aqui, e nao nos
+     * sete pontos de negocio que chamam este metodo: eles continuam pedindo o
+     * registro do fato como sempre pediram, e a politica decide se aquilo vira
+     * dado. E tambem por isso que a checagem fica no `track()` e nao no
+     * `record()` — o `record()` roda no worker, onde nao ha cookie nenhum para
+     * consultar e a autorizacao ja foi dada aqui.
+     *
      * @param  array<string, mixed>  $properties
      */
     public function track(
@@ -70,6 +79,10 @@ class CustomerIntelligenceService
         ?Model $entity = null,
         ?VisitorSession $session = null,
     ): void {
+        if (! $this->policy->allowsAnalytics()) {
+            return;
+        }
+
         $session ??= $this->context->session();
 
         TrackCustomerEventJob::dispatch(

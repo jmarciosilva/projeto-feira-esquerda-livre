@@ -3,6 +3,8 @@
 namespace App\CustomerIntelligence\Console;
 
 use App\CustomerIntelligence\Actions\ForgetUser;
+use App\CustomerIntelligence\Actions\RecordAuditLog;
+use App\CustomerIntelligence\Enums\AuditAction;
 use App\Models\User;
 use Illuminate\Console\Command;
 
@@ -22,7 +24,7 @@ class ForgetUserCommand extends Command
 
     protected $description = 'Desvincula do Customer Intelligence todo o rastro de um usuário';
 
-    public function handle(ForgetUser $forget): int
+    public function handle(ForgetUser $forget, RecordAuditLog $auditar): int
     {
         $usuario = $this->resolveUser((string) $this->argument('user'));
 
@@ -49,6 +51,11 @@ class ForgetUserCommand extends Command
         }
 
         $resultado = $forget($usuario->id);
+
+        // Depois da execucao, nunca antes: a trilha registra o que aconteceu,
+        // e um cancelamento (ou uma falha) nao deve aparecer como se tivesse
+        // acontecido. Cancelar sai pelo return acima, sem gravar nada.
+        $auditar(AuditAction::ForgetUser, 'user', $usuario->id);
 
         $this->components->info(sprintf(
             '%d visitante(s) e %d evento(s) desvinculados. Agregados diários preservados.',

@@ -2,6 +2,8 @@
 
 namespace App\CustomerIntelligence\Console;
 
+use App\CustomerIntelligence\Actions\RecordAuditLog;
+use App\CustomerIntelligence\Enums\AuditAction;
 use App\CustomerIntelligence\Models\TrackedEvent;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -30,7 +32,7 @@ class PruneEventsCommand extends Command
 
     protected $description = 'Remove eventos de Customer Intelligence fora da janela de retenção';
 
-    public function handle(): int
+    public function handle(RecordAuditLog $auditar): int
     {
         // `?:` cairia no padrao para --days=0, porque '0' e falsy em PHP —
         // o usuario pediria "apagar tudo" e receberia 180 dias em silencio.
@@ -73,6 +75,12 @@ class PruneEventsCommand extends Command
         }
 
         $removidos = $this->pruneInBatches($cutoff, $lote);
+
+        // Auditamos a exclusao efetiva, nao a tentativa: dry-run e execucao sem
+        // nada a expurgar saem antes daqui, e registrar as duas encheria a
+        // trilha de dias em que nada aconteceu. Na execucao agendada o
+        // `user_id` fica nulo — nao ha ninguem por tras dela.
+        $auditar(AuditAction::PruneEvents);
 
         $this->components->info($removidos.' eventos removidos. Os agregados diários foram preservados.');
 

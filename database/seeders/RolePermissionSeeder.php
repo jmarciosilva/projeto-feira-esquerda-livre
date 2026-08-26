@@ -35,6 +35,10 @@ class RolePermissionSeeder extends Seeder
         'email-marketing.gerenciar',
         'expositores.visibilidade',
         'customer_intelligence.visualizar',
+        // Ver quem consultou o comportamento dos visitantes e mais restrito do
+        // que ver o comportamento em si: por isso permissao propria, e nao um
+        // apendice de `customer_intelligence.visualizar`.
+        'customer_intelligence.auditoria',
     ];
 
     /**

@@ -24,6 +24,16 @@ Schedule::command('customer-intelligence:prune-events')
     ->withoutOverlapping()
     ->name('customer-intelligence-prune');
 
+// Expurga a trilha de auditoria administrativa fora da janela de retencao
+// (730 dias). Agendamento PROPRIO, e nao uma etapa do expurgo de eventos: os
+// dois tratam dados de naturezas e prazos diferentes, e acopla-los faria uma
+// mudanca de politica de analytics arrastar a auditoria junto. Vinte minutos
+// depois do outro, para que os dois nunca disputem o banco.
+Schedule::command('customer-intelligence:prune-audit-logs')
+    ->dailyAt('03:40')
+    ->withoutOverlapping()
+    ->name('customer-intelligence-prune-audit');
+
 // Dispara campanhas de email marketing agendadas a cada 5 minutos
 Schedule::call(function () {
     EmailCampaign::where('status', CampaignStatus::Scheduled)

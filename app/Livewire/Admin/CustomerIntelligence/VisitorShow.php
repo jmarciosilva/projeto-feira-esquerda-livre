@@ -2,6 +2,9 @@
 
 namespace App\Livewire\Admin\CustomerIntelligence;
 
+use App\CustomerIntelligence\Actions\RecordAuditLog;
+use App\CustomerIntelligence\Enums\AuditAction;
+use App\CustomerIntelligence\Models\Visitor;
 use App\CustomerIntelligence\Queries\EventQuery;
 use App\CustomerIntelligence\Queries\VisitorQuery;
 use Livewire\Component;
@@ -20,11 +23,23 @@ class VisitorShow extends Component
 
     private const PER_PAGE = 25;
 
-    public function mount(string $visitor): void
+    public function mount(string $visitor, RecordAuditLog $auditar): void
     {
         $this->authorize('customer_intelligence.visualizar');
 
         $this->visitorUuid = $visitor;
+
+        // A chave interna, e nao o `visitor_uuid`: ela identifica o recurso
+        // consultado sem replicar na auditoria o identificador publico do
+        // visitante. Consulta escalar e indexada, um unico valor de volta.
+        //
+        // Visitante inexistente nao gera linha: o `render()` responde 404 e
+        // nao houve acesso a dado nenhum para registrar.
+        $id = Visitor::where('visitor_uuid', $visitor)->value('id');
+
+        if ($id !== null) {
+            $auditar(AuditAction::VisitorView, 'ci_visitor', $id);
+        }
     }
 
     public function render()

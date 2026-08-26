@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Admin\CustomerIntelligence;
 
+use App\CustomerIntelligence\Actions\RecordAuditLog;
+use App\CustomerIntelligence\Enums\AuditAction;
 use App\CustomerIntelligence\Queries\VisitorQuery;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
@@ -22,6 +24,13 @@ class VisitorIndex extends Component
     public string $period = '30';
 
     private const PER_PAGE = 25;
+
+    public function mount(RecordAuditLog $auditar): void
+    {
+        $this->authorize('customer_intelligence.visualizar');
+
+        $auditar(AuditAction::VisitorsView);
+    }
 
     public function updatingSearch(): void
     {

@@ -1535,5 +1535,6 @@
 
 @include('partials.back-to-top')
 @livewireScriptConfig
+@include('partials.consent-banner')
 </body>
 </html>

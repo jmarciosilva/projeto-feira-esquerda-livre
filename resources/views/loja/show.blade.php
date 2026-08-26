@@ -180,5 +180,6 @@
 </footer>
 
 @livewireScriptConfig
+@include('partials.consent-banner')
 </body>
 </html>

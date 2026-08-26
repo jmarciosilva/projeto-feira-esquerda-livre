@@ -144,12 +144,26 @@
             </x-admin.nav-item>
             @endcan
 
-            @can('customer_intelligence.visualizar')
+            {{--
+                Duas permissoes distintas nesta secao: ver o comportamento e ver
+                quem consultou o comportamento. O cabecalho aparece para quem
+                tiver qualquer uma das duas; cada item exige a sua.
+            --}}
+            @canany(['customer_intelligence.visualizar', 'customer_intelligence.auditoria'])
             <div class="pt-4 pb-1 px-3">
                 <p class="text-xs font-bold uppercase tracking-wider" style="color:#F4E294;">Inteligência</p>
             </div>
-            <x-admin.nav-item href="{{ route('admin.customer-intelligence.dashboard') }}" icon="chart-bar" :active="request()->routeIs('admin.customer-intelligence.*')">
+            @endcanany
+
+            @can('customer_intelligence.visualizar')
+            <x-admin.nav-item href="{{ route('admin.customer-intelligence.dashboard') }}" icon="chart-bar" :active="request()->routeIs('admin.customer-intelligence.dashboard') || request()->routeIs('admin.customer-intelligence.visitante') || request()->routeIs('admin.customer-intelligence.docs')">
                 Inteligência de Cliente
+            </x-admin.nav-item>
+            @endcan
+
+            @can('customer_intelligence.auditoria')
+            <x-admin.nav-item href="{{ route('admin.customer-intelligence.auditoria') }}" icon="document" :active="request()->routeIs('admin.customer-intelligence.auditoria')">
+                Auditoria
             </x-admin.nav-item>
             @endcan
 

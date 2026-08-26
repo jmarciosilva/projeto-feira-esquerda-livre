@@ -49,6 +49,7 @@ Consequências assumidas:
 | **CI-07** | Desativação do SDK externo em runtime | **CONCLUÍDA** |
 | **CI-08** | Remoção física do SDK externo | **CONCLUÍDA** |
 | **CI-09** | Confiabilidade, retenção, LGPD e limpeza final | **CONCLUÍDA** |
+| **GOV-01** | Consentimento opt-in e auditoria administrativa | **CONCLUÍDA** |
 
 ### O que a CI-02 entregou
 
@@ -707,18 +708,224 @@ série histórica.
 
 ### Cookies
 
-`jmf_ci_visitor_id` (2 anos) e `jmf_ci_session_id` (30 minutos, rolante). O
-prefixo é histórico e não implica nenhuma dependência externa. `CI_ENABLED=false`
-desliga a coleta por completo: o middleware não grava nada e não emite cookies.
+`jmf_ci_visitor_id` (2 anos) e `jmf_ci_session_id` (30 minutos, rolante), ambos
+de analytics e emitidos **apenas sob consentimento aceito**. O prefixo é
+histórico e não implica nenhuma dependência externa.
 
-### Pontos que dependem de decisão de produto
+`fel_privacy_consent` (12 meses) é de outra natureza: guarda a escolha de
+privacidade, é essencial por isso mesmo, e existe justamente para decidir se os
+outros dois podem existir.
 
-O módulo não implementa **banner de consentimento** nem **registro de
-auditoria de quem consultou o painel**. O acesso já é restrito pela permissão
-`customer_intelligence.visualizar`, mas não há trilha de quem olhou o quê.
-Ambos são decisões de produto, não limitações técnicas.
+`CI_ENABLED=false` desliga a coleta por completo, independentemente da escolha:
+o middleware não grava nada e não emite cookies. As duas condições são
+independentes — a chave é de operação, o consentimento é da pessoa.
+
+### Consentimento (GOV-01)
+
+Desde a GOV-01 a coleta é **opt-in**. Três estados, num enum, e não um booleano
+— "nunca respondeu" e "recusou" têm o mesmo efeito na coleta, mas não na
+interface, e achatar os dois esconderia justamente a diferença que decide se o
+banner aparece.
+
+| Estado | Coleta | Cookies de analytics | Banner |
+|---|---|---|---|
+| `unknown` | não | não emitidos | aparece |
+| `accepted` | sim | emitidos | não aparece |
+| `rejected` | não | expirados | não aparece |
+
+Em `unknown` não há `Visitor`, não há `VisitorSession`, não há cookie de
+analytics e nenhum dos sete eventos é coletado — **inclusive os transacionais**.
+Os fatos de negócio continuam em `orders` e `order_splits`; a auditoria da
+GOV-01 confirmou que `ci_events` não alimenta nenhuma funcionalidade
+operacional. Nada essencial depende do consentimento: sessão, login, carrinho,
+checkout, pagamento e catálogo funcionam igual nos três estados.
+
+**A decisão é tomada em um lugar só.** `TrackingPolicy::allowsAnalytics()` é
+consultado por exatamente dois consumidores:
+
+```
+TrackVisitorSession          antes de criar visitante, sessão e cookies
+CustomerIntelligenceService  no track(), antes de enfileirar o evento
+```
+
+Os sete pontos de negócio **não conhecem consentimento** e não devem passar a
+conhecer — espalhar `if` por eles transformaria cada regra nova de privacidade
+numa varredura pelo código de compra. Um teste guarda essa fronteira
+(`ConsentPolicyTest::test_the_business_call_sites_never_mention_consent`).
+
+`record()` de propósito **não** consulta a política: ele roda dentro do worker,
+onde não existe cookie para consultar. A autorização é verificada onde o evento
+nasce; o job apenas persiste o que já foi autorizado.
+
+#### Cookie de preferência
+
+`fel_privacy_consent` — first-party, essencial por natureza, válido por **12
+meses**. Nome novo e neutro de propósito: não faria sentido o prefixo histórico
+`jmf_ci_` justamente no cookie que decide se aqueles existem.
+
+Os 12 meses **são** a validade do consentimento. Quando o navegador descarta o
+cookie o estado volta a `unknown` e a pergunta pode ser feita de novo — não há
+data de expiração duplicada dentro do valor. O payload guarda o estado e
+`decided_at`, este último só para mostrar à pessoa quando ela decidiu.
+
+Valor ausente, truncado, adulterado ou de um formato antigo **degrada para
+`unknown`**, que é o estado que não autoriza nada.
+
+#### Onde a escolha é feita
+
+Banner com "Aceitar" e "Recusar" no primeiro nível, mesma largura, mesmo peso de
+fonte e mesma área de clique — a diferença é só de cor. Esconder a recusa atrás
+de um submenu seria obter consentimento por cansaço. Formulário HTML comum, sem
+JavaScript: quem bloqueia script costuma ser exatamente quem mais se importa
+com isso.
+
+A mudança posterior fica em `/privacidade/preferencias`, linkada no rodapé de
+todas as páginas públicas. Como só existem duas categorias — essenciais e
+analytics — não há CMP de camadas: essenciais aparecem como informação, e
+analytics como a única escolha real.
+
+#### Transições
+
+Sair de `accepted` para `rejected` para a coleta na mesma requisição, expira
+`jmf_ci_visitor_id` e `jmf_ci_session_id` e limpa o `VisitorContext`. **Não
+apaga histórico** — recusar interrompe a coleta daqui para frente; desvincular o
+rastro que já existe é outro ato, explícito, pelo
+`customer-intelligence:forget-user`. Confundir os dois faria um clique de rodapé
+apagar dado em silêncio.
+
+Voltar de `rejected` para `accepted` gera identidade nova. Não é caso especial:
+os cookies antigos já foram expirados na recusa, então o navegador chega ao novo
+aceite sem identidade — e religá-lo ao visitante anterior seria reidentificar
+quem pediu para não ser seguido.
+
+#### Consequência conhecida: eventos disparados fora do navegador da pessoa
+
+Dois dos sete eventos não nascem na requisição de quem comprou:
+
+- `pedido.pagamento_confirmado` vem do **webhook do Mercado Pago**, uma
+  requisição de servidor para servidor, sem cookie nenhum;
+- `pedido.enviado` é disparado pelo **lojista**, no painel dele.
+
+Como a política é avaliada na requisição em que o evento nasce, o primeiro
+deixa de ser coletado em qualquer cenário, e o segundo passa a depender da
+preferência do lojista — e não da pessoa que comprou. A conversão do painel não
+é afetada: quem alimenta as conversões é `pedido.criado`, que nasce na
+requisição da própria pessoa, no checkout.
+
+Isto é consequência direta da regra escolhida, não um defeito de
+implementação. Resolvê-lo exigiria persistir a preferência no próprio `Visitor`
+e consultá-la pelo pedido — mudança de escopo, para uma fase própria.
 
 ---
+
+## Auditoria administrativa (GOV-01)
+
+`ci_audit_logs` registra quem acessou os dados comportamentais e quem executou
+as operações sensíveis do módulo.
+
+| Coluna | Para quê |
+|---|---|
+| `user_id` | quem. Nulo em execução agendada e se a conta for removida depois |
+| `action` | o quê, pelo enum `AuditAction` |
+| `resource_type` / `resource_id` | sobre o quê, tipado |
+| `created_at` | quando |
+
+O que a tabela **não** tem, por decisão e não por esquecimento: IP, user-agent,
+cookie, e-mail, nome, `visitor_uuid`, `session_uuid`, payload de evento,
+`properties` — e, principalmente, **nenhuma coluna de metadata livre**. É por
+campo livre que dado pessoal entra sem ninguém ter decidido coletá-lo. Se algum
+caso vier a precisar de contexto, ele vira coluna tipada, justificada e
+documentada.
+
+Append-only: sem `updated_at`, sem CRUD administrativo, sem ação de editar,
+apagar ou exportar na tela. A única remoção prevista é o expurgo por retenção.
+
+### Ações registradas
+
+```
+customer_intelligence.dashboard.view    customer_intelligence.forget_user
+customer_intelligence.events.view       customer_intelligence.rebuild_metrics
+customer_intelligence.visitors.view     customer_intelligence.prune_events
+customer_intelligence.visitor.view      customer_intelligence.audit.view
+```
+
+Abrir `/admin/customer-intelligence` gera **três** linhas — o painel embute a
+lista de visitantes e a de eventos, e cada uma é acesso a um conjunto diferente
+de dado.
+
+### Onde a escrita acontece
+
+No `mount()` dos componentes, nunca no `render()`. `render()` reexecuta a cada
+hidratação e a cada interação — filtrar, buscar, paginar, trocar período —, e
+auditar ali transformaria uma visita em dezenas de linhas, tornando a trilha
+ilegível justamente quando ela precisasse ser lida. `mount()` roda uma vez por
+abertura de tela, que é exatamente o fato que se quer registrar. Dois testes
+guardam isso nos dois sentidos: interagir não multiplica, e duas aberturas são
+duas linhas.
+
+Nos comandos, a auditoria vem **depois** da execução: um cancelamento ou um
+rollback não pode aparecer na trilha como se tivesse acontecido. `prune-events`
+audita só quando algo é de fato removido — dry-run e execução sem nada a
+expurgar não geram linha.
+
+`VisitorShow` registra a **chave interna** do visitante, e não o `visitor_uuid`:
+identifica o recurso consultado sem replicar na auditoria o identificador
+público. Visitante inexistente não gera linha, porque não houve acesso a dado
+nenhum para registrar.
+
+### Auditoria não é analytics
+
+`ci_audit_logs` **nunca** passa pelo `CustomerIntelligence::track()`. Tabela
+separada, caminho separado, gravação síncrona e sem fila — uma trilha que pode
+ficar presa numa fila ou se perder numa retentativa não serve como trilha.
+
+Por isso ela também **não consulta consentimento**: a auditoria registra o que a
+pessoa administrativa fez com dado de terceiros, e a preferência de analytics
+dela no próprio navegador não tem relação com isso. Deixar as duas se tocarem
+permitiria a quem é auditado desligar a própria auditoria.
+
+### Permissão e tela
+
+`/admin/customer-intelligence/auditoria`, atrás da permissão própria
+`customer_intelligence.auditoria` — **não** de `customer_intelligence.visualizar`.
+Quem pode ver métricas não passa por isso a ver quem olhou o quê.
+
+| Papel | Painel | Auditoria |
+|---|---|---|
+| administrador | sim | **sim** |
+| gerente | sim | não |
+| supervisor | sim | não |
+| editor | não | não |
+| lojista | não | não |
+
+A autorização é feita no servidor em dois níveis: `can:` na rota e `authorize()`
+no `mount()` do componente, para que montá-lo por outro caminho também esbarre
+na permissão.
+
+> Instalações existentes precisam rodar `php artisan db:seed --class=RolePermissionSeeder`
+> para que a permissão nova exista no banco. O seeder é idempotente e não remove
+> nada.
+
+### Retenção
+
+**730 dias**, configurável por `CI_AUDIT_RETENTION_DAYS`. Não é permanente.
+
+O expurgo tem comando próprio — `customer-intelligence:prune-audit-logs`, com
+`--days`, `--chunk` e `--dry-run` — e agendamento próprio, às 03:40, com
+`withoutOverlapping`. **Nenhum acoplamento com `prune-events`:** prazos
+diferentes, naturezas diferentes, e acoplá-los faria uma mudança de política de
+analytics arrastar a trilha de auditoria junto, em silêncio.
+
+A idade vem de `created_at`, que aqui é o próprio instante do fato — a gravação
+é síncrona, sem fila no meio, então não existe o descompasso que em `ci_events`
+obriga a usar `occurred_at`. Fronteira igual à do outro expurgo: exatamente 730
+dias fica.
+
+O expurgo **não se audita**. Registrar cada execução criaria exatamente o rastro
+que a retenção existe para limitar — e, no limite, uma trilha que nunca esvazia.
+
+---
+
 
 ---|---|
 | `jmf_ci_visitor_id` | 2 anos | identidade anônima persistente |
@@ -904,6 +1111,11 @@ docker compose exec app php artisan test tests/Feature/CustomerIntelligence
 | `InternalEventQueueTest` | fila dedicada, dados capturados no despacho, gravação ponta a ponta |
 | `InternalPanelTest` | dashboard, filtros, paginação, detalhe, agregação, comando de reconstrução |
 | `InternalPanelPerformanceTest` | volume de 10.000 eventos, contagem de queries, ausência de N+1 |
+| `ConsentPolicyTest` | opt-in, os três estados, fluxos essenciais intactos, cookie de preferência |
+| `ConsentPreferenceTest` | banner, página de preferências, transições entre estados |
+| `AuditLogTest` | uma linha por acesso, minimização, independência do analytics, comandos |
+| `AuditPanelTest` | permissão própria por papel, tela, ausência de CRUD |
+| `AuditRetentionTest` | janela de 730 dias, fronteira, opções, separação dos dois expurgos |
 
 Dois testes guardam a direção da fiação: navegar por um produto e adicionar ao
 carrinho precisa despachar o job do módulo, e o evento precisa cair na fila
@@ -920,6 +1132,16 @@ item ainda entra no carrinho e o pedido ainda é criado.
 
 Todos os testes do painel bloqueiam a rede com `Http::preventStrayRequests()`:
 se algum componente voltasse a chamar a plataforma externa, o teste falharia.
+
+Desde a GOV-01, todo teste que exercita a **coleta** precisa declarar o aceite,
+pelo trait `Tests\Concerns\InteractsWithConsent`. É justamente por precisar
+declarar que o padrão continua verificável: um teste que esqueça de fazê-lo verá
+a coleta desligada — que é o comportamento correto para quem não respondeu.
+
+Três testes guardam fronteiras que nenhuma linha de código sozinha garante: que
+os sete pontos de negócio não mencionam consentimento, que o gravador da
+auditoria não toca a fachada de tracking, e que o expurgo de auditoria não
+alcança `ci_events`.
 
 Os testes rodam em **SQLite em memória** (`phpunit.xml`). O banco MySQL de
 desenvolvimento não é tocado, e a massa sintética do benchmark vive apenas ali.

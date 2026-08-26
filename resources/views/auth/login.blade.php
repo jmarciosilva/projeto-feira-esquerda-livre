@@ -118,5 +118,6 @@
     <p class="text-center text-xs mt-4 font-medium" style="color:#5C3000;">&copy; {{ date('Y') }} Feira Esquerda Livre</p>
 </div>
 
+@include('partials.consent-banner')
 </body>
 </html>
