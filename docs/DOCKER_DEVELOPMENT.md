@@ -299,11 +299,13 @@ MAIL_PASSWORD=null
 O serviço `queue` roda continuamente:
 
 ```bash
-php artisan queue:work --queue=default,email-marketing --tries=3 --sleep=3 --timeout=120 --max-time=3600
+php artisan queue:work --queue=default,email-marketing,customer-intelligence --tries=3 --sleep=3 --timeout=120 --max-time=3600
 ```
 
-Ele usa a mesma imagem do `app`. As duas filas do projeto (`default` e
-`email-marketing`) são atendidas.
+Ele usa a mesma imagem do `app`. As três filas do projeto são atendidas, e a
+ordem em `--queue` é prioridade: o worker só olha `customer-intelligence`
+quando `default` e `email-marketing` estão vazias — um pico de navegação nunca
+deve atrasar um e-mail de pedido.
 
 ```bash
 docker compose logs -f queue
