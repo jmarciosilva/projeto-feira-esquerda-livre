@@ -28,7 +28,7 @@ O projeto já possui um fluxo mínimo viável para apresentação a clientes, di
 | Frontend reativo | Livewire 4 · AlpineJS 3 |
 | Estilização | TailwindCSS 4 |
 | Build | Vite 7 |
-| Banco de dados | MySQL 8.4 em desenvolvimento e produção · SQLite em memória nos testes |
+| Banco de dados | MySQL 8.4 no Docker de desenvolvimento · MySQL 8+ em produção · SQLite em memória nos testes |
 | Cache / sessão / filas | Driver `database` (Redis disponível no Docker, mas desligado por padrão) |
 | E-mail em desenvolvimento | Mailpit (nenhum e-mail real sai da máquina local) |
 | Permissões | spatie/laravel-permission |
@@ -65,7 +65,7 @@ Docker precisa editá-lo (ver [Caminho B](#caminho-b--sem-docker)).
 ### Primeira instalação (passo a passo completo)
 
 ```bash
-git clone <url-do-repositorio> feira-esquerda-livre
+git clone https://github.com/jmarciosilva/projeto-feira-esquerda-livre.git feira-esquerda-livre
 cd feira-esquerda-livre
 
 # 1. Arquivo de ambiente (já vem apontando para os serviços do compose)
@@ -171,7 +171,7 @@ Arquitetura dos volumes, performance no WSL2 e troubleshooting completo em
 ### Instalação
 
 ```bash
-git clone <url-do-repositorio> feira-esquerda-livre
+git clone https://github.com/jmarciosilva/projeto-feira-esquerda-livre.git feira-esquerda-livre
 cd feira-esquerda-livre
 composer run setup
 ```
@@ -287,7 +287,7 @@ Além das chaves padrão do Laravel:
 | `CI_QUEUE` | `customer-intelligence` | Fila de gravação dos eventos |
 | `CI_RETENTION_DAYS` | `180` | Retenção dos eventos brutos |
 | `CI_AUDIT_RETENTION_DAYS` | `730` | Retenção da trilha de auditoria administrativa |
-| `CI_CONSENT_COOKIE_MINUTES` | 1 ano | Validade do consentimento de privacidade |
+| `CI_CONSENT_COOKIE_MINUTES` | `525600` | Validade da preferência de consentimento (12 meses) |
 | `HOME_EXPOSITORES_COUNT` | `9` | Expositores exibidos na home |
 | `HOME_FEATURED_MAX` | `2` | Limite de destaques na home |
 | `HOME_CACHE_TTL_MINUTES` | `5` | Cache da home |
