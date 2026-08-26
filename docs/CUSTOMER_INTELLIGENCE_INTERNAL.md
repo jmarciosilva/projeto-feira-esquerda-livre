@@ -744,6 +744,49 @@ não emite cookies.
 
 ---
 
+## Segurança — credencial legada
+
+Registro do saneamento feito após a internalização (SEC-01).
+
+O módulo nasceu de uma integração com uma plataforma externa, que exigia uma
+credencial de acesso. Essa integração foi removida ao longo das fases CI-07 e
+CI-08, e a credencial correspondente **foi revogada na plataforma de origem**.
+
+Estado atual:
+
+- **a credencial antiga está revogada** e não tem mais efeito em lugar nenhum;
+- a integração externa foi removida: sem pacote Composer, sem cliente HTTP, sem
+  variáveis de ambiente e sem volume no Docker;
+- **a Feira Esquerda Livre não depende da plataforma antiga** para nada — nem
+  para coletar eventos, nem para alimentar o painel;
+- **nenhuma credencial dessa plataforma é necessária** para o funcionamento
+  atual. O Customer Intelligence é inteiramente interno e grava no próprio
+  banco.
+
+A plataforma externa será reescrita separadamente, como projeto independente.
+Isso não cria nenhum requisito para a Feira: **nenhuma credencial nova deve ser
+gerada nem configurada aqui.**
+
+### Histórico do repositório
+
+A credencial antiga chegou a aparecer em documentação versionada e permanece no
+histórico do Git. O histórico **não foi reescrito**, por decisão consciente:
+reescrevê-lo mudaria todos os hashes, quebraria clones e forks, e não desfaria
+uma exposição que já ocorreu. Como a credencial está revogada, o que resta no
+histórico é uma **string inerte**.
+
+Se algum dia a limpeza do histórico for desejável, ela deve ser tratada como
+tarefa própria, coordenada com quem tenha clones do repositório.
+
+### Prevenção
+
+O `.gitignore` cobre `.env`, suas variantes e agora também `*.backup` e `*.bak`,
+para que cópias de configuração não sejam versionadas por acidente.
+`.env.example` continua versionado e **não deve conter valores reais** — apenas
+chaves vazias ou exemplos.
+
+---
+
 ## Eventos
 
 Os sete eventos que o projeto rastreia hoje estão tipados em

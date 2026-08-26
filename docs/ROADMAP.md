@@ -1852,6 +1852,36 @@ No ambiente real: três execuções do mesmo job produziram **um** evento e **um
 
 ---
 
+### ✅ SEC-01 — Revogação e saneamento de credencial legada (Concluída)
+
+Tarefa de segurança pós-migração, fora da trilha CI.
+
+A integração externa exigia uma credencial de acesso, que chegou a aparecer em
+documentação versionada. **A credencial foi revogada na plataforma de origem** —
+é a única mitigação que realmente invalida um segredo exposto, já que remover do
+HEAD não o remove do histórico.
+
+Auditoria: o HEAD atual e a árvore publicada estão limpos; a exposição ficou
+restrita a **um único arquivo de documentação**, ao longo de 9 commits. Havia
+apenas **uma** credencial real — as demais ocorrências eram placeholders,
+confirmados por fingerprint. Nenhuma tag afetada; nenhuma branch remota além da
+`main`.
+
+O **histórico não foi reescrito**, por decisão: reescrevê-lo mudaria todos os
+hashes, quebraria clones e forks, e não desfaria uma exposição já ocorrida. Com
+a credencial revogada, o que resta é uma string inerte. Se a limpeza vier a ser
+desejável, será tarefa própria e coordenada.
+
+Saneamento aplicado: o último portador local do segredo foi removido, e o
+`.gitignore` passou a cobrir `*.backup` e `*.bak` — com `.env.example`
+permanecendo versionado.
+
+A plataforma externa será reescrita como projeto independente. **Isso não cria
+nenhum requisito para a Feira:** o Customer Intelligence é interno e não precisa
+de credencial nenhuma.
+
+---
+
 ### Critério de conclusão da trilha
 
 ```bash
