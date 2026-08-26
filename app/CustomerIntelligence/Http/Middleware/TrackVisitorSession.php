@@ -15,29 +15,17 @@ use Symfony\Component\HttpFoundation\Response;
  * Resolve o visitante e a sessao da requisicao atual e os grava em
  * `ci_visitors` / `ci_sessions`.
  *
- * ── Convivencia com o middleware do SDK externo ─────────────────────────────
+ * Roda no grupo `web` e e o unico coletor da aplicacao.
  *
- * Enquanto a migracao nao termina, o middleware `ResolveVisitorAndSession` do
- * SDK continua ativo no mesmo grupo `web` e emite os MESMOS cookies. Duas
- * medidas evitam que os dois briguem:
- *
- * 1. Ordem deterministica. Este middleware e anexado ao grupo pelo `boot()` do
- *    CustomerIntelligenceServiceProvider, que roda depois do provider do SDK
- *    (providers da aplicacao inicializam depois dos descobertos por pacote).
- *    Como cada um faz `appendMiddlewareToGroup`, este fica por ultimo na
- *    pilha e enxerga o que o SDK ja decidiu.
- *
- * 2. Adocao do valor ja enfileirado. Numa primeira visita nao existe cookie na
- *    requisicao, e o SDK acabou de gerar um identificador proprio. Em vez de
- *    gerar outro — o que faria o servidor remoto e o banco local conhecerem o
- *    mesmo visitante por dois nomes —, lemos o valor que ele enfileirou.
+ * Antes de gerar um identificador novo, o middleware olha se algum outro ja
+ * enfileirou o cookie nesta resposta (`Cookie::queued()`). Hoje nao ha ninguem
+ * mais emitindo esses cookies, entao o caminho e inofensivo — mas e o que
+ * garante que, se um dia outro middleware passar a emiti-los, os dois nao
+ * conhecam o mesmo visitante por dois nomes diferentes.
  *
  * Reenfileirar o cookie com o mesmo nome e seguro: o CookieJar do Laravel
  * indexa a fila por nome e caminho, entao a segunda chamada substitui a
  * primeira e apenas um `Set-Cookie` sai na resposta.
- *
- * Quando o SDK for removido (CI-07), nada aqui precisa mudar: sem ninguem
- * para adotar, este middleware passa a gerar os proprios identificadores.
  */
 class TrackVisitorSession
 {

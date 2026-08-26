@@ -25,9 +25,10 @@ use Illuminate\Support\Carbon;
  * do fato — e capturado no despacho e viaja com o job. Dentro do worker nao ha
  * cookie nem usuario logado para consultar.
  *
- * Estado na fase CI-04: o caminho funciona ponta a ponta e esta testado, mas
- * NENHUMA chamada da aplicacao o utiliza. Os sete eventos atuais continuam indo
- * para o SDK externo, sem escrita dupla. A ligacao e a CI-05.
+ * Idempotente: o `event_uuid` vem pronto do despacho e nao muda entre
+ * tentativas. Se a primeira execucao gravou o evento e falhou depois, a
+ * retentativa reconhece o registro existente pela chave unica de `ci_events`
+ * e nao duplica nem o evento nem os agregados.
  */
 class TrackCustomerEventJob implements ShouldQueue
 {
@@ -47,6 +48,7 @@ class TrackCustomerEventJob implements ShouldQueue
         public readonly ?VisitorSession $session = null,
         public readonly ?int $userId = null,
         ?DateTimeInterface $occurredAt = null,
+        public readonly ?string $eventUuid = null,
     ) {
         // Congelado no despacho, nao no processamento: o atraso da fila nao
         // deve deslocar o instante em que o fato de negocio aconteceu.
@@ -65,6 +67,7 @@ class TrackCustomerEventJob implements ShouldQueue
             session: $this->session,
             userId: $this->userId,
             occurredAt: $this->occurredAt,
+            eventUuid: $this->eventUuid,
         );
     }
 }

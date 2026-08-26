@@ -48,7 +48,7 @@ Consequências assumidas:
 | **CI-06** | Painel e agregação local | **CONCLUÍDA** |
 | **CI-07** | Desativação do SDK externo em runtime | **CONCLUÍDA** |
 | **CI-08** | Remoção física do SDK externo | **CONCLUÍDA** |
-| CI-09 | Retenção, LGPD e documentação final | não iniciada |
+| **CI-09** | Confiabilidade, retenção, LGPD e limpeza final | **CONCLUÍDA** |
 
 ### O que a CI-02 entregou
 
@@ -120,14 +120,34 @@ Provado com instalação limpa: volume `vendor` destruído e recriado do zero,
 `composer install` com `/var/www/jmf-ci-sdk` inexistente dentro do container —
 123 pacotes instalados, nenhum erro, `vendor/jmf-system` não recriado.
 
-### O que ainda **não** foi feito
+### O que a CI-09 entregou
 
-- as views em `resources/views/plugins/jmf-ci/` e os componentes blade
-  `x-jmf-ci-*` continuam com os nomes antigos. São arquivos do projeto e estão
-  em uso; renomeá-los é cosmética, prevista para a CI-09;
-- os cookies continuam `jmf_ci_*` — e vão continuar, para não zerar a
-  identidade dos visitantes já conhecidos;
-- não há rotina de expurgo dos 180 dias — é a CI-09.
+**Idempotência.** O `event_uuid` passou a nascer no despacho e a viajar com o
+job. Uma retentativa reconhece o evento já gravado pela chave única de
+`ci_events` e não duplica nem o evento nem os agregados. A proteção é do banco,
+não de um `if` em PHP — resiste a corrida.
+
+**Retenção operacional.** `customer-intelligence:prune-events`, com `--dry-run`,
+processamento em lotes e agendamento diário às 03:20. Os agregados são
+preservados.
+
+**LGPD.** Política documentada e testada: minimização, pseudonimização,
+desvínculo na exclusão de conta e `customer-intelligence:forget-user` para
+pedidos de eliminação sem encerrar a conta.
+
+**Limpeza.** Comentários que narravam a migração deram lugar a comentários que
+descrevem o sistema atual. Oito arquivos órfãos removidos.
+
+### O que ficou de fora, por decisão de produto
+
+- **banner de consentimento** para rastreamento comportamental;
+- **auditoria de quem consulta o painel** — o acesso é restrito pela permissão
+  `customer_intelligence.visualizar`, mas não há trilha de quem olhou o quê;
+- as views em `resources/views/plugins/jmf-ci/` e os três componentes
+  `x-jmf-ci-*` restantes continuam com os nomes antigos. Estão em uso e o
+  prefixo é apenas nominal; renomear seria cosmética com risco desnecessário;
+- os cookies continuam `jmf_ci_*`, para não zerar a identidade dos visitantes
+  já conhecidos.
 
 ---
 
@@ -346,6 +366,14 @@ funcionar de verdade. `DailyMetric::record()` já usa `''` como padrão.
 Esta tabela é o que torna a retenção curta de `ci_events` viável: o painel lê
 daqui, então o evento bruto pode ser expurgado sem apagar a série histórica.
 
+**`metric_date` é sempre canônico (`Y-m-d`).** Os três caminhos de escrita —
+`IncrementDailyMetric`, o comando de reconstrução e `DailyMetric::record()` —
+gravam pelo query builder justamente por isso: o cast `date` do Eloquent
+reformataria a data com o formato do grammar (`Y-m-d H:i:s`) na escrita, e o
+valor gravado divergiria do usado na busca. O MySQL disfarçaria, porque a coluna
+é `DATE` e normaliza; o SQLite não. Sem essa garantia, a chave única composta
+poderia tratar o mesmo dia como dois.
+
 ---
 
 ## Models
@@ -500,12 +528,22 @@ docker compose exec app php artisan customer-intelligence:rebuild-daily-metrics 
 ```
 
 Recalcula os agregados a partir de `ci_events` e `ci_sessions`. Existe para os
-casos em que o incremento não aconteceu: eventos anteriores à CI-06, uma falha de
-job, ou uma correção de métrica.
+casos em que o incremento não aconteceu: uma falha de job, uma importação, ou
+uma correção de métrica.
 
 **Idempotente:** apaga os agregados do intervalo antes de recalcular, então rodar
 duas vezes produz o mesmo resultado. **Nunca toca os eventos brutos** — só
-`ci_daily_metrics`. Há teste para as duas garantias.
+`ci_daily_metrics`.
+
+**Nunca vai além do que pode reconstruir.** Como os eventos brutos são expurgados
+aos 180 dias e os agregados são permanentes, reconstruir um período cujo evento
+já saiu zeraria a série histórica. Duas proteções:
+
+- um `--from` anterior ao evento mais antigo disponível é ajustado, com aviso;
+- sem nenhum evento em `ci_events`, o comando **não apaga nada** e informa.
+
+`ci_sessions` não serve como fonte substituta para decidir o que apagar — as
+sessões não são expurgadas junto com os eventos e sobreviveriam a eles.
 
 ---
 
@@ -549,67 +587,140 @@ algum dia houver benefício claro.
 
 ---
 
-## Política de retenção
+## LGPD e privacidade
 
-| Dado | Retenção |
-|---|---|
-| `ci_events` (evento bruto) | **180 dias** |
-| `ci_sessions` | acompanha os eventos |
-| `ci_visitors` | longa; anonimizar após inatividade prolongada |
-| `ci_daily_metrics` (agregado) | **permanente** |
+Esta seção descreve o **comportamento técnico do sistema**. Não é parecer
+jurídico: a adequação legal depende da política de privacidade da plataforma e
+da avaliação de quem responde por ela.
 
-**Nenhuma rotina automática de exclusão foi criada nesta fase.** Não existe
-comando de expurgo nem tarefa no scheduler. A implementação virá em fase
-própria, com testes e aprovação explícita — apagar dado é irreversível e não
-deve entrar de carona numa fase de fundação.
+### Finalidade
 
----
+Entender o comportamento de navegação e compra para melhorar a plataforma:
+quais produtos são vistos, o que entra no carrinho, onde o checkout é
+abandonado, quais lojistas convertem.
 
-## LGPD e minimização
+### O que é coletado
 
-O que o módulo **não** armazena, por decisão:
+| Dado | Onde | Observação |
+|---|---|---|
+| `visitor_uuid` | `ci_visitors` | pseudônimo técnico, gerado pelo sistema |
+| `session_uuid` | `ci_sessions` | janela de navegação de 30 minutos |
+| `user_id` | `ci_visitors`, `ci_events` | referência a `users`, quando autenticado |
+| nome do evento e instante | `ci_events` | um dos sete eventos de negócio |
+| entidade do evento | `ci_events` | referência a `Product`, `Order`, `OrderSplit` |
+| `properties` | `ci_events` | payload do evento, já sanitizado |
+| caminho de entrada, referrer, UTMs | `ci_sessions` | só na abertura da sessão |
 
-- endereço IP, completo ou parcial;
-- user-agent;
-- nome, e-mail, telefone, CPF, CNPJ ou endereço;
-- qualquer cópia de dado pessoal que já viva em `users`.
+### O que **não** é coletado
+
+Endereço IP, completo ou parcial. User-agent. Nome, e-mail, telefone, CPF,
+CNPJ, endereço. Query strings — nem da landing, nem do referrer, que é reduzido
+a esquema, host e caminho.
 
 Onde há dado pessoal, o módulo **referencia** em vez de copiar: `user_id`
-aponta para `users`, e nome e e-mail são alcançados pela relação. Se algum dado
-pessoal precisar ser adicionado no futuro, a justificativa deve ser registrada
-aqui antes da implementação.
+aponta para `users`, e nome e e-mail chegam pela relação. Nada é duplicado.
 
-### Sanitização na escrita
+### Minimização na escrita
 
-`PropertySanitizer` percorre as propriedades do evento antes da gravação e
-**redige** valores cujas chaves aparentem carregar dado sensível — senha, token,
-cartão, CPF, CNPJ, documento e afins, sem diferenciar maiúsculas, recursivamente
-até cinco níveis.
+`PropertySanitizer` percorre as propriedades antes da gravação e **redige**
+valores cujas chaves aparentem carregar dado sensível — senha, token, cartão,
+CPF, CNPJ, documento e afins, sem diferenciar maiúsculas, recursivamente até
+cinco níveis. Ele redige em vez de lançar exceção: rastreamento não pode
+derrubar um fluxo de compra por causa de uma chave mal escolhida, mas também
+não deve gravar o dado.
 
-A diferença deliberada em relação ao `PayloadValidator` do SDK: o SDK lançava
-exceção, o módulo interno apenas substitui o valor por `[redigido]`.
-Rastreamento nunca deve derrubar um fluxo de compra por causa de uma chave mal
-escolhida — mas também não deve gravar o dado.
+### Pseudonimização, não anonimização
 
-### Pontos ainda em aberto
+O `visitor_uuid` **não é dado anônimo**. É um identificador persistente, com
+cookie de dois anos, que liga todas as visitas de um mesmo navegador. Somado ao
+histórico de eventos, constitui **dado pseudonimizado**: sozinho não nomeia
+ninguém, mas permite reidentificação se cruzado com outra fonte — por exemplo,
+o `user_id` quando o visitante se autentica.
 
-Serão tratados na fase de LGPD, não agora:
+Tratá-lo como anônimo seria incorreto. O tratamento adequado é o de dado
+pessoal pseudonimizado.
 
-- consentimento e eventual banner de rastreamento;
-- comando de exclusão por titular (`visitor_uuid` ou `user_id`);
-- anonimização ao excluir a conta — hoje o `nullOnDelete` já preserva o
-  histórico agregado e desliga o vínculo pessoal;
-- auditoria de quem consulta o painel (a permissão
-  `customer_intelligence.visualizar` já isola o acesso).
+### Visitante autenticado
+
+Quando o visitante faz login, o `user_id` é gravado **uma única vez**, no
+primeiro acesso autenticado, e não é sobrescrito por outro usuário no mesmo
+navegador — duas pessoas no mesmo computador permanecem dois visitantes assim
+que a segunda receber seu próprio cookie.
+
+### Exclusão
+
+Dois caminhos, ambos cobertos por teste:
+
+**Conta excluída.** As foreign keys são `nullOnDelete`. Ao apagar o `User`,
+`ci_visitors.user_id` e `ci_events.user_id` viram `null` automaticamente. Os
+eventos permanecem, agora sem apontar para ninguém.
+
+**Pedido de eliminação sem excluir a conta** (LGPD art. 18):
+
+```bash
+docker compose exec app php artisan customer-intelligence:forget-user maria@exemplo.com
+```
+
+Desvincula visitantes e eventos da conta **e rotaciona o `visitor_uuid`**,
+quebrando a ponte entre o cookie que ainda está no navegador e o histórico
+gravado. A conta continua existindo. A operação é irreversível e pede
+confirmação.
+
+### Por que os eventos não são apagados
+
+Depois da desvinculação os registros não identificam mais a pessoa: são
+contagens sob um pseudônimo que ninguém consegue relacionar a ela. Apagá-los
+destruiria a base analítica sem ganho de privacidade correspondente.
+
+Os **agregados de `ci_daily_metrics` nunca são apagados** por pedido
+individual, e não poderiam ser com precisão: eles não têm granularidade
+individual — são somas por dia, sem nenhuma coluna de identidade. Um teste
+verifica exatamente isso.
+
+### Sessões
+
+`ci_sessions` guarda apenas origem de tráfego e janelas de tempo, sem nada que
+identifique a pessoa além do vínculo com o visitante. Após a rotação do
+`visitor_uuid`, elas seguem o mesmo destino do visitante: continuam existindo
+sob um pseudônimo que já não corresponde a ninguém.
+
+### Retenção
+
+| Dado | Prazo |
+|---|---|
+| `ci_events` | **180 dias**, expurgo automático |
+| `ci_daily_metrics` | **permanente** |
+| `ci_sessions`, `ci_visitors` | **sem rotina automática de expurgo nesta versão** |
+
+`ci_sessions` e `ci_visitors` crescem sem expurgo. É decisão atual, não
+esquecimento: apagá-las exige decidir antes o que fazer com cookies de dois anos
+ainda vivos no navegador, com sessões órfãs e com o ciclo de vida do visitante —
+apagar um visitante cujo cookie continua ativo apenas o recria na visita
+seguinte, com identidade nova e histórico perdido. Fica como decisão de produto.
+
+As duas tabelas são pequenas em comparação com `ci_events`: uma linha por
+navegador e uma por janela de 30 minutos, contra uma por ação.
+
+O expurgo roda diariamente às 03:20 pelo scheduler. É o agregado que torna a
+retenção curta viável: o painel lê dele, então apagar o evento bruto não apaga a
+série histórica.
+
+### Cookies
+
+`jmf_ci_visitor_id` (2 anos) e `jmf_ci_session_id` (30 minutos, rolante). O
+prefixo é histórico e não implica nenhuma dependência externa. `CI_ENABLED=false`
+desliga a coleta por completo: o middleware não grava nada e não emite cookies.
+
+### Pontos que dependem de decisão de produto
+
+O módulo não implementa **banner de consentimento** nem **registro de
+auditoria de quem consultou o painel**. O acesso já é restrito pela permissão
+`customer_intelligence.visualizar`, mas não há trilha de quem olhou o quê.
+Ambos são decisões de produto, não limitações técnicas.
 
 ---
 
-## Cookies
-
-O middleware do módulo emite dois cookies, com os nomes **preservados** do SDK:
-
-| Cookie | Validade | Papel |
-|---|---|---|
+---|---|
 | `jmf_ci_visitor_id` | 2 anos | identidade anônima persistente |
 | `jmf_ci_session_id` | 30 minutos, rolante | janela de navegação |
 
@@ -684,6 +795,24 @@ closures de rota e componentes Livewire.
 `track()` enfileira e devolve o controle na hora — é o que a aplicação deve
 usar, para não pagar a gravação dentro da requisição. A sessão vem do
 `VisitorContext` sozinha; passá-la explicitamente é opcional.
+
+### Atomicidade e idempotência
+
+O evento e **todos** os seus agregados diários são gravados na mesma transação.
+O estado válido é sempre um dos dois:
+
+```
+nada gravado          ou    evento + todas as suas métricas
+```
+
+Nunca evento sem métrica, nunca métrica parcial. As duas propriedades se
+sustentam juntas: é por a agregação estar dentro da transação que "o evento
+existe" pode ser lido como "as métricas dele também" — e é isso que autoriza a
+retentativa a simplesmente devolver o registro existente.
+
+Se qualquer incremento falhar, a transação inteira volta atrás e o job vai para
+retry. Deadlock, timeout e conexão perdida seguem esse caminho: **só a colisão
+de `event_uuid`** é sinal de evento já persistido.
 
 Quando o registro gravado for necessário de volta, `record()` escreve na hora e
 devolve o `TrackedEvent`. É o que o job usa por dentro.

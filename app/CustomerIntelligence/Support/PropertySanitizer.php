@@ -5,10 +5,9 @@ namespace App\CustomerIntelligence\Support;
 /**
  * Remove dados sensiveis das propriedades de um evento antes da gravacao.
  *
- * Herda a ideia do PayloadValidator do SDK externo, com uma diferenca
- * deliberada: o SDK lancava excecao, o modulo interno apenas redige o valor.
- * Rastreamento nunca deve derrubar um fluxo de compra por causa de uma chave
- * mal escolhida — mas tambem nao deve gravar o dado.
+ * Redige em vez de lancar excecao, de proposito: rastreamento nunca deve
+ * derrubar um fluxo de compra por causa de uma chave mal escolhida — mas
+ * tambem nao deve gravar o dado.
  */
 class PropertySanitizer
 {

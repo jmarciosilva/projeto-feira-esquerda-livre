@@ -2,14 +2,10 @@
 
 /*
 |--------------------------------------------------------------------------
-| Customer Intelligence — modulo interno
+| Customer Intelligence
 |--------------------------------------------------------------------------
 |
-| Configuracao do modulo NATIVO do projeto (app/CustomerIntelligence).
-|
-| Nao confundir com config/customer-intelligence.php, que pertence ao SDK
-| externo e continua ativo enquanto a migracao nao termina. Os dois coexistem
-| de proposito; o arquivo do SDK sai na fase CI-08.
+| Configuracao do modulo de inteligencia de cliente (app/CustomerIntelligence).
 |
 */
 
@@ -25,14 +21,10 @@ return [
     /*
     | Cookies de identificacao.
     |
-    | Os nomes sao mantidos identicos aos que o SDK externo ja emite (decisao 3
-    | da auditoria CI-01): renomea-los zeraria a identidade de todos os
-    | visitantes ja conhecidos, cujos cookies tem validade de dois anos. O
-    | prefixo `jmf_ci_` passa a ser um nome historico, sem vinculo com o
-    | servico externo.
-    |
-    | Os TTLs tambem espelham os do SDK, para que os dois middlewares nao
-    | disputem a validade do mesmo cookie durante a coexistencia.
+    | O prefixo `jmf_ci_` e historico: veio da integracao externa que deu origem
+    | ao modulo. Renomear zeraria a identidade de todos os visitantes ja
+    | conhecidos, cujos cookies valem dois anos — por isso os nomes ficaram.
+    | Hoje nao ha nenhuma dependencia externa por tras deles.
     */
     'visitor_cookie' => [
         'name' => env('CI_VISITOR_COOKIE_NAME', 'jmf_ci_visitor_id'),
@@ -57,6 +49,20 @@ return [
     'queue' => [
         'connection' => env('CI_QUEUE_CONNECTION'),
         'name' => env('CI_QUEUE', 'customer-intelligence'),
+    ],
+
+    /*
+    | Retencao.
+    |
+    | Eventos brutos vivem 180 dias; os agregados de `ci_daily_metrics` sao
+    | permanentes. E o agregado que torna o expurgo viavel — o painel le dele,
+    | entao apagar o evento bruto nao apaga a serie historica.
+    |
+    | O expurgo roda pelo comando customer-intelligence:prune-events, agendado
+    | diariamente em routes/console.php.
+    */
+    'retention' => [
+        'event_days' => (int) env('CI_RETENTION_DAYS', 180),
     ],
 
 ];

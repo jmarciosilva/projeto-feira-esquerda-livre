@@ -11,9 +11,6 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 /**
  * Detalhe de um visitante: identificacao, primeira e ultima visita, contagem de
  * sessoes e a timeline de eventos.
- *
- * Ate a CI-05 esta tela existia como view mas nao era alcancavel — as rotas do
- * plugin do SDK nunca chegaram a ser registradas. Agora tem rota propria.
  */
 class VisitorShow extends Component
 {

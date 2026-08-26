@@ -5,12 +5,11 @@ namespace App\CustomerIntelligence\Enums;
 /**
  * Eventos comportamentais reconhecidos pelo modulo interno.
  *
- * Os sete casos abaixo sao exatamente os que o projeto ja rastreia hoje pelo
- * SDK externo. Eles estao aqui para tipar a fundacao — as chamadas existentes
- * continuam intactas e NAO foram migradas nesta fase (isso e a CI-06).
+ * Sao os sete eventos de negocio que a plataforma rastreia. Tipa-los evita a
+ * classe inteira de erro de digitacao silenciosa que strings soltas permitem.
  *
- * O formato `entidade.acao` e o mesmo do SDK, de proposito: preserva o
- * historico ja coletado e mantem a migracao da CI-06 mecanica.
+ * O formato `entidade.acao` e historico e foi preservado para nao quebrar a
+ * continuidade dos dados ja coletados.
  */
 enum EventName: string
 {

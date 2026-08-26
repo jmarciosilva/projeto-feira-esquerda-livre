@@ -2,6 +2,8 @@
 
 namespace App\CustomerIntelligence;
 
+use App\CustomerIntelligence\Console\ForgetUserCommand;
+use App\CustomerIntelligence\Console\PruneEventsCommand;
 use App\CustomerIntelligence\Console\RebuildDailyMetricsCommand;
 use App\CustomerIntelligence\Http\Middleware\TrackVisitorSession;
 use App\CustomerIntelligence\Services\CustomerIntelligenceService;
@@ -13,10 +15,8 @@ use Illuminate\Support\ServiceProvider;
 /**
  * Provider do modulo interno de Customer Intelligence.
  *
- * Nasce na fase CI-03, quando passou a existir algo real para registrar: o
- * binding por requisicao do VisitorContext e o middleware de coleta. Ate a
- * CI-02 o container resolvia tudo por autowiring e um provider seria camada
- * vazia.
+ * Registra a configuracao, o binding por requisicao do VisitorContext, o
+ * middleware de coleta e os comandos do modulo.
  */
 class CustomerIntelligenceServiceProvider extends ServiceProvider
 {
@@ -39,7 +39,11 @@ class CustomerIntelligenceServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
-            $this->commands([RebuildDailyMetricsCommand::class]);
+            $this->commands([
+                RebuildDailyMetricsCommand::class,
+                PruneEventsCommand::class,
+                ForgetUserCommand::class,
+            ]);
         }
 
         if (! config('customer-intelligence-internal.enabled', true)) {
@@ -55,11 +59,6 @@ class CustomerIntelligenceServiceProvider extends ServiceProvider
      * Router a cada requisicao, entao um push feito direto no Router seria
      * silenciosamente sobrescrito.
      *
-     * Registrar aqui — e nao em bootstrap/app.php — garante que este middleware
-     * entre DEPOIS do middleware do SDK externo: providers da aplicacao
-     * inicializam depois dos descobertos por pacote, enquanto a configuracao de
-     * bootstrap/app.php e aplicada antes de qualquer boot. A ordem importa
-     * porque o middleware adota o cookie que o SDK ja tenha enfileirado.
      */
     private function registerWebMiddleware(): void
     {

@@ -12,10 +12,9 @@ use Illuminate\Support\Facades\Facade;
 /**
  * Fachada do modulo interno de Customer Intelligence.
  *
- * Existe para que as chamadas de rastreamento espalhadas pela aplicacao
- * continuem se lendo como sempre se leram — a decisao 6 da auditoria CI-01 foi
- * preservar a forma da chamada, o que tornou a migracao da CI-05 uma troca de
- * `use` mais a substituicao da string pelo enum.
+ * Acucar para os pontos onde nao ha construtor para injetar o service —
+ * closures de rota, componentes Livewire, listeners. Quem tem construtor pode
+ * resolver CustomerIntelligenceService diretamente.
  *
  * @method static void track(EventName $event, array $properties = [], ?Model $entity = null, ?VisitorSession $session = null)
  * @method static TrackedEvent record(EventName $event, array $properties = [], ?Model $entity = null, ?VisitorSession $session = null, ?\App\CustomerIntelligence\Models\Visitor $visitor = null, ?int $userId = null, ?\DateTimeInterface $occurredAt = null)

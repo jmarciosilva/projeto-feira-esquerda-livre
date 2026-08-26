@@ -15,12 +15,23 @@ use Illuminate\Support\Facades\DB;
  * Reconstroi `ci_daily_metrics` a partir de `ci_events` e `ci_sessions`.
  *
  * A agregacao normal e incremental, feita quando o evento e gravado. Este
- * comando existe para os casos em que o incremento nao aconteceu: eventos
- * anteriores a CI-06, uma falha de job, ou uma correcao de metrica.
+ * comando existe para os casos em que o incremento nao aconteceu: uma falha de
+ * job, uma importacao, ou uma correcao de metrica.
  *
  * Idempotente: apaga os agregados do intervalo antes de recalcular, entao rodar
  * duas vezes produz o mesmo resultado. So toca `ci_daily_metrics` — os eventos
  * brutos nunca sao alterados.
+ *
+ * Convivencia com a retencao: eventos com mais de 180 dias sao expurgados, mas
+ * seus agregados sao permanentes. Reconstruir um intervalo cujo evento bruto ja
+ * nao existe zeraria a serie historica, entao o comando nunca vai antes do
+ * evento mais antigo ainda disponivel — um `--from` anterior a ele e ajustado,
+ * com aviso.
+ *
+ * Sem nenhum evento em `ci_events`, o comando nao apaga nada: preserva os
+ * agregados e informa. `ci_sessions` nao serve como fonte substituta para
+ * decidir o que apagar, justamente porque sessoes nao sao expurgadas junto com
+ * os eventos e sobreviveriam a eles.
  */
 class RebuildDailyMetricsCommand extends Command
 {
@@ -35,7 +46,9 @@ class RebuildDailyMetricsCommand extends Command
         [$from, $to] = $this->range();
 
         if ($from === null) {
-            $this->components->info('Nenhum evento encontrado. Nada a reconstruir.');
+            $this->components->info(
+                'Não há eventos brutos para reconstruir. Os agregados existentes foram preservados.'
+            );
 
             return self::SUCCESS;
         }
@@ -75,13 +88,31 @@ class RebuildDailyMetricsCommand extends Command
     {
         $to = $this->option('to') ? Carbon::parse($this->option('to')) : Carbon::now();
 
-        if ($this->option('from')) {
-            return [Carbon::parse($this->option('from')), $to];
+        // A fonte da verdade e `ci_events`, e so ela. Usar `ci_sessions` como
+        // substituto faria o comando apagar agregados de dias cujos eventos
+        // brutos ja foram expurgados — e nao havia como reconstrui-los.
+        $bruto = TrackedEvent::min('occurred_at');
+        $maisAntigo = $bruto ? Carbon::parse($bruto)->startOfDay() : null;
+
+        if (! $this->option('from')) {
+            return [$maisAntigo, $to];
         }
 
-        $primeiro = TrackedEvent::min('occurred_at') ?? VisitorSession::min('started_at');
+        $from = Carbon::parse($this->option('from'));
 
-        return [$primeiro ? Carbon::parse($primeiro) : null, $to];
+        // Antes do evento mais antigo nao ha o que recalcular: apagar os
+        // agregados desse trecho destruiria historico que a retencao preservou.
+        if ($maisAntigo !== null && $from->lt($maisAntigo)) {
+            $this->components->warn(sprintf(
+                'Início ajustado de %s para %s: não há eventos brutos anteriores, e os agregados desse período são preservados.',
+                $from->toDateString(),
+                $maisAntigo->toDateString()
+            ));
+
+            return [$maisAntigo, $to];
+        }
+
+        return [$from, $to];
     }
 
     /**

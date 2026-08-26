@@ -43,9 +43,9 @@
   Inteligência de Cliente (JMF CI) - Sprint 3
   Dashboard · Rastreamento · E2E Tests
            ↓
-[TRILHA CI 🔄 EM ANDAMENTO]
+[TRILHA CI ✅ CONCLUÍDA]
   Internalização do Customer Intelligence
-  CI-01 a CI-08 ✅ · CI-09 pendente
+  CI-01 a CI-09 ✅ — trilha concluída
   Dependência do SDK externo eliminada
 ```
 
@@ -1181,7 +1181,7 @@ order_messages
 | Trilha | Período | Situação | Entregável Principal |
 |---|---|---|---|
 | ✅ **Infraestrutura — Ambiente Docker** | Agosto 2026 | Concluída | 8 serviços (PHP 8.3, Nginx, MySQL 8.4, phpMyAdmin, Redis 7, Node 22/Vite, queue, Mailpit); dispensa Laragon, XAMPP, PHP, MySQL, Composer e Node no Windows — ver `docs/DOCKER_DEVELOPMENT.md` |
-| 🔄 **Trilha CI — Customer Intelligence interno** | Agosto 2026 — | 8 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
+| ✅ **Trilha CI — Customer Intelligence interno** | Agosto 2026 | Concluída — 9 de 9 fases | Transformar o Customer Intelligence em módulo nativo, sem dependência de `../jmf-ci-sdk` — ver `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md` |
 
 ---
 
@@ -1437,9 +1437,9 @@ JMF_CI_TIMEOUT=2                 # timeout de 2 segundos para requisições
 
 ---
 
-## 🧩 Trilha CI — Internalização do Customer Intelligence (em andamento)
+## 🧩 Trilha CI — Internalização do Customer Intelligence (concluída)
 
-**Período:** Agosto de 2026 — em curso
+**Período:** Agosto de 2026 — concluída
 **Objetivo estratégico:** transformar o Customer Intelligence de integração externa em módulo nativo da Feira Esquerda Livre, preservando todas as funcionalidades já entregues na Fase 10.
 **Documentação técnica:** `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md`
 
@@ -1469,7 +1469,7 @@ A decisão arquitetural é que **comportamento gerado na Feira Esquerda Livre pe
 | **CI-06** | Painel e agregação local | ✅ Concluída | 25/08/2026 |
 | **CI-07** | Desativação do SDK externo em runtime | ✅ Concluída | 25/08/2026 |
 | **CI-08** | Remoção física do SDK externo | ✅ Concluída | 25/08/2026 |
-| CI-09 | Retenção, LGPD e documentação final | ⬜ Não iniciada | — |
+| **CI-09** | Confiabilidade, retenção, LGPD e limpeza final | ✅ Concluída | 25/08/2026 |
 
 > **Nota de numeração:** a auditoria CI-01 propôs originalmente 10 fases. Como a CI-02 acabou absorvendo a persistência e os Models — que estavam previstos numa fase própria —, o roteiro foi consolidado em 9. Esta tabela é a numeração válida.
 
@@ -1487,7 +1487,8 @@ Nenhuma fase é considerada concluída com teste vermelho. O número nunca deve 
 | Fim da CI-05 | 304 | 837 |
 | Fim da CI-06 | 327 | 907 |
 | Fim da CI-07 | 327 | 907 |
-| Fim da CI-08 | **327** | **907** |
+| Fim da CI-08 | 327 | 907 |
+| Fim da CI-09 | **355** | **1.029** |
 
 ---
 
@@ -1795,11 +1796,61 @@ Antes eram 124 pacotes. Se o repositório vizinho ainda fosse necessário, o `co
 
 ---
 
-### Fases pendentes
+### ✅ CI-09 — Confiabilidade, retenção, LGPD e limpeza final (Concluída)
 
-| Fase | Objetivo | Risco previsto |
-|---|---|---|
-| **CI-09** | Expurgo agendado dos 180 dias, comando de exclusão por titular, consentimento e auditoria de acesso ao painel. Opcionalmente, renomear as views `plugins/jmf-ci/` e os componentes `x-jmf-ci-*`, que hoje são o último nome legado além dos cookies. | BAIXO — mas exclusão é irreversível |
+**Objetivo:** fechar a trilha deixando o módulo preparado para uso contínuo — sem duplicar dados em retentativa, com retenção operacional e com comportamento de privacidade documentado e testado.
+
+#### Idempotência
+
+O risco: o job tem três tentativas. Se a primeira gravasse o evento e falhasse depois, a retentativa criaria um segundo evento e somaria a métrica de novo.
+
+O `event_uuid` passou a nascer no **despacho**, não no `INSERT`, e viaja com o job. Uma retentativa carrega o mesmo identificador, colide com a chave única de `ci_events` e o serviço reconhece o registro existente em vez de duplicá-lo. A agregação só acontece quando a linha é realmente criada.
+
+A proteção é do banco, não de um `if (! exists())` em PHP — que sofreria corrida entre dois workers. E é seletiva: só a colisão de `event_uuid` correspondente a um evento existente é tratada como retentativa. Qualquer outra falha continua subindo, para o job falhar e ir para retry. Dois testes cobrem esse limite.
+
+#### Retenção
+
+| | |
+|---|---|
+| Comando | `customer-intelligence:prune-events` |
+| Opções | `--days`, `--chunk`, `--dry-run` |
+| Fronteira | `occurred_at < agora − 180 dias`. Exatamente 180 dias **fica**; só o estritamente mais velho sai |
+| Base | `occurred_at`, não `created_at` — o fato pode ter sido gravado bem depois de acontecer |
+| Lotes | seleciona chaves e apaga por `whereIn`, sem materializar modelos |
+| Agendamento | diário às 03:20, `withoutOverlapping` |
+
+`ci_daily_metrics` é permanente e nunca é tocada pelo expurgo. É o agregado que torna a retenção curta viável: o painel lê dele.
+
+**Correção encontrada durante a fase:** o `rebuild-daily-metrics` apagava os agregados do intervalo antes de recalcular. Reconstruir um período cujo evento bruto já tinha sido expurgado zeraria a série histórica. O início do intervalo passou a ser limitado ao evento mais antigo disponível, com aviso.
+
+#### LGPD
+
+Política documentada em `docs/CUSTOMER_INTELLIGENCE_INTERNAL.md`, descrevendo o comportamento técnico — não é parecer jurídico.
+
+O ponto mais importante do registro: **`visitor_uuid` não é dado anônimo.** É um identificador persistente, com cookie de dois anos, que liga todas as visitas de um navegador. Somado ao histórico, constitui dado **pseudonimizado** — tratá-lo como anônimo seria incorreto.
+
+Dois caminhos de exclusão, ambos testados:
+
+- **conta excluída** → as foreign keys `nullOnDelete` desvinculam `ci_visitors.user_id` e `ci_events.user_id` automaticamente;
+- **pedido de eliminação sem encerrar a conta** → `customer-intelligence:forget-user`, que desvincula e **rotaciona o `visitor_uuid`**, quebrando a ponte entre o cookie ainda no navegador e o histórico gravado.
+
+Os eventos não são apagados: depois da desvinculação não identificam mais ninguém. Os agregados nunca são apagados por pedido individual — não têm granularidade individual, e um teste verifica que nenhuma coluna carrega identidade.
+
+#### Limpeza
+
+Comentários que narravam a migração deram lugar a comentários que descrevem o sistema como ele é hoje, em oito arquivos do módulo.
+
+Oito arquivos órfãos removidos, todos com ausência de consumidor comprovada por busca: `plugins/jmf-ci/configuration.blade.php`, os componentes `x-jmf-ci-connection-status` e `x-jmf-ci-metrics-row`, e as cinco cópias mortas em `plugins/jmf-ci/components/` — que o Blade nunca resolvia, porque componentes com hífen só são encontrados como arquivos planos em `views/components/`.
+
+**Mantidos**: as quatro views em uso e os três componentes ativos, com o prefixo `jmf-ci` nominal, e os cookies `jmf_ci_*`. Renomear seria cosmética com risco desnecessário — e renomear cookie zeraria a identidade de todos os visitantes conhecidos.
+
+#### Validação
+
+Testes: **355 passed · 1029 assertions · 0 failures** (327 → 355, +28).
+
+No ambiente real: três execuções do mesmo job produziram **um** evento e **uma** conversão agregada; navegação gerou evento, fila, gravação e agregado com zero jobs falhos; o dry-run do expurgo reportou sem apagar.
+
+---
 
 ### Critério de conclusão da trilha
 
@@ -2027,6 +2078,6 @@ Cortes conscientes para manter a v1 da API enxuta e testável — candidatos a u
 ---
 
 *Documento atualizado em: 25 de agosto de 2026 — Versão 2.8*
-*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI em andamento — 8 de 9 fases. O SDK externo foi removido: o Customer Intelligence é 100% interno e o projeto roda com um único git clone.*
-*Próxima revisão: após a CI-09 (retenção de 180 dias, LGPD e limpeza final)*
+*Status: Fases 1 a 10 concluídas. Ambiente de desenvolvimento em Docker concluído. Trilha CI concluída — 9 de 9 fases. O Customer Intelligence é 100% interno, idempotente, com retenção de 180 dias e política de privacidade documentada.*
+*Próxima revisão: conforme novas fases de produto*
 *Itens pós-MVP planejados: OAuth por lojista, compra e geração de etiquetas, split automático completo via Mercado Pago, auditoria administrativa, recuperação de carrinho abandonado, integração SendGrid/SES para campanhas em larga escala, melhorias de escala operacional, construtor de curso AVA e publicação no feed pelo app.*

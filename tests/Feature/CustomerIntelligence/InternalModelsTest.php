@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\CustomerIntelligence;
 
+use App\CustomerIntelligence\Actions\IncrementDailyMetric;
 use App\CustomerIntelligence\Enums\EventName;
+use App\CustomerIntelligence\Enums\MetricName;
 use App\CustomerIntelligence\Models\DailyMetric;
 use App\CustomerIntelligence\Models\TrackedEvent;
 use App\CustomerIntelligence\Models\Visitor;
@@ -130,6 +132,68 @@ class InternalModelsTest extends TestCase
 
         $this->assertSame('2026-08-25', $metric->metric_date->toDateString());
         $this->assertSame('42.5000', $metric->metric_value);
+    }
+
+    // ─── metric_date canônico ─────────────────────────────────────────────
+
+    /**
+     * Os tres caminhos de escrita de `ci_daily_metrics` — record(),
+     * IncrementDailyMetric e o comando de reconstrucao — precisam representar
+     * um dia da mesma forma. Se um gravasse `2026-08-25 00:00:00` e outro
+     * `2026-08-25`, a chave unica composta trataria o mesmo dia como dois.
+     */
+    public function test_record_and_increment_converge_on_the_same_logical_day(): void
+    {
+        // Um caminho recebe a data com horario embutido...
+        DailyMetric::record('2026-08-25 08:30:00', MetricName::Eventos->value, 10);
+
+        // ...e o outro incrementa o mesmo dia, em outro horario.
+        app(IncrementDailyMetric::class)(MetricName::Eventos, Carbon::parse('2026-08-25 21:45:00'));
+
+        $linhas = DailyMetric::where('metric_name', MetricName::Eventos->value)
+            ->where('dimension_type', '')
+            ->get();
+
+        $this->assertCount(1, $linhas, 'Um dia lógico precisa ser uma única linha.');
+        $this->assertSame('11.0000', $linhas->first()->metric_value, 'O valor acumulou nos dois caminhos.');
+        $this->assertSame('2026-08-25', $linhas->first()->metric_date->toDateString());
+    }
+
+    /**
+     * Antes da normalizacao isto quebrava no SQLite: record() buscava por
+     * `2026-08-25` mas gravava `2026-08-25 00:00:00`, entao a segunda chamada
+     * nao encontrava a linha e tentava inserir de novo.
+     */
+    public function test_record_updates_instead_of_duplicating_the_same_day(): void
+    {
+        DailyMetric::record('2026-08-25 08:30:00', MetricName::Visitantes->value, 10);
+        DailyMetric::record('2026-08-25', MetricName::Visitantes->value, 25);
+
+        $linhas = DailyMetric::where('metric_name', MetricName::Visitantes->value)->get();
+
+        $this->assertCount(1, $linhas, 'A segunda chamada atualiza, não duplica.');
+        $this->assertSame('25.0000', $linhas->first()->metric_value);
+    }
+
+    /**
+     * Comportamento, nao representacao interna: consultar pelo dia canonico
+     * precisa encontrar o registro, seja qual for o caminho que o gravou.
+     */
+    public function test_a_metric_is_found_by_its_canonical_day(): void
+    {
+        DailyMetric::record('2026-08-25 23:59:59', MetricName::Sessoes->value, 7);
+        app(IncrementDailyMetric::class)(MetricName::Conversoes, Carbon::parse('2026-08-25 01:00:00'));
+
+        $this->assertNotNull(
+            DailyMetric::where('metric_date', '2026-08-25')
+                ->where('metric_name', MetricName::Sessoes->value)->first(),
+            'Gravado por record() e encontrável pelo dia canônico.'
+        );
+        $this->assertNotNull(
+            DailyMetric::where('metric_date', '2026-08-25')
+                ->where('metric_name', MetricName::Conversoes->value)->first(),
+            'Gravado pelo incremento e encontrável pelo mesmo dia.'
+        );
     }
 
     // ─── Relacionamentos ──────────────────────────────────────────────────
