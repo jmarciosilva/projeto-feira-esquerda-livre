@@ -18,6 +18,7 @@ class ProdutoRequest extends FormRequest
         return [
             'item_type' => ['required', 'in:produto,servico,cuidado'],
             'name' => ['required', 'string', 'max:255'],
+            'short_description' => ['nullable', 'string', 'max:500'],
             'description' => ['nullable', 'string'],
             'price' => ['nullable', 'numeric', 'min:0'],
             'weight' => $isProduto ? ['nullable', 'numeric', 'min:0.001'] : ['prohibited'],

@@ -113,10 +113,12 @@ Migrations que formam essa tabela:
 - `2026_07_01_000002_add_shipping_dimensions_to_products_table.php`
 - `2026_07_01_800001_add_is_digital_to_products_table.php`
 
-**Achado central para a CAT-02:** existe `description` (`text`, nullable) e
-**não existe `short_description`**. Também não existe nenhuma coluna de
-palavras-chave, tags ou atributos estruturados. Hoje um card, um resultado de
-busca e um compartilhamento têm que truncar a descrição longa.
+**Achado central para a CAT-02:** existia `description` (`text`, nullable) e
+**não existia `short_description`** — um card, uma busca e um compartilhamento
+tinham que truncar a descrição longa. **A CAT-02 acrescentou
+`short_description`** (`varchar(500)`, nullable, antes de `description`).
+Palavras-chave, tags e atributos estruturados continuam **fora** de `products`,
+de propósito: são multivalorados e pertencem às estruturas `catalog_*`.
 
 ### 2.3 Volume disponível como corpus
 
@@ -536,9 +538,9 @@ FULLTEXT em particular **não existe em SQLite**: se a similaridade nível 2 usa
 `MATCH ... AGAINST`, precisa de estratégia declarada (driver alternativo em
 teste, ou teste marcado que só roda em MySQL). Decisão a tomar na CAT-04.
 
-**Pré-requisito prático:** criar `ProductFactory` (e provavelmente
-`ExpositorFactory`/`ContentCategoryFactory`) antes da CAT-04 — hoje montar
-corpus de teste exige `Product::create` à mão.
+**Pré-requisito prático:** `ProductFactory` e `ExpositorFactory` — **criadas na
+CAT-02** e reutilizáveis pela CAT-04. `ContentCategoryFactory` segue inexistente;
+criar quando a similaridade por categoria precisar.
 
 ---
 
@@ -576,7 +578,7 @@ a inteligência estiver indisponível, cadastra manualmente como sempre.
 | 2 | Espelhar a forma do Customer Intelligence | Precedente maduro no próprio projeto; provider próprio, config própria, prefixo de tabela próprio |
 | 3 | Prefixo `catalog_` nas tabelas | Coerente com `ci_`; separa da tabela de domínio `products` |
 | 4 | Dados da inteligência fora de `products` | `products` não vira depósito de IA |
-| 5 | `short_description` como campo real do domínio | Card, busca, compartilhamento, SEO e app mobile precisam dele independentemente de IA (CAT-02) |
+| 5 | `short_description` como campo real do domínio | Card, busca, compartilhamento, SEO e app mobile precisam dele independentemente de IA — **implementado na CAT-02**, `varchar(500)` nullable, sem backfill |
 | 6 | Contratos + Fake + Null desde o início | Escolha comercial de fornecedor não bloqueia CAT-03…CAT-05 |
 | 7 | Similaridade começa sem infraestrutura nova | Níveis 1 e 2 cabem no MySQL existente; embeddings são aceleração |
 | 8 | Integrar primeiro no Livewire do lojista | É o único fluxo de criação com UI; admin não cadastra produto |
@@ -592,3 +594,5 @@ a inteligência estiver indisponível, cadastra manualmente como sempre.
 | Fase | Status | Data | Resumo |
 |---|---|---|---|
 | CAT-01 | Concluída | 2026-08-26 | Auditoria do catálogo, arquitetura proposta, riscos e plano de testes. Nenhum código de módulo criado. |
+| SEC-02 | Concluída | 2026-08-26 | Trilha de segurança própria: corrigiu o IDOR do §2.4 e isolou o catálogo por expositor. Pré-requisito da CAT-02. |
+| CAT-02 | Concluída | 2026-08-26 | `short_description` no domínio, formulário, API e factories. Sem IA, sem tags, sem atributos estruturados. |

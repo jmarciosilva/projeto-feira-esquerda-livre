@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @php
         $productUrl = route('loja.produto', [$expositor->slug, $product->slug]);
-        $productDescription = Str::limit($product->description ?? $product->name, 160);
+        // CAT-02: o resumo curto é escrito para ser lido fora da página; quando
+        // existe, vale mais que a descrição longa cortada no caractere 160.
+        $productDescription = Str::limit($product->short_description ?: ($product->description ?? $product->name), 160);
         $productImages = $product->images ?? [];
         $productOgImage = ! empty($productImages[0]['medium'])
             ? Storage::url($productImages[0]['medium'])

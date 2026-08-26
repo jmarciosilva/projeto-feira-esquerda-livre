@@ -61,7 +61,18 @@
                     </div>
 
                     <div>
-                        <label class="block text-base font-semibold text-gray-700 mb-2">Descrição</label>
+                        <label class="block text-base font-semibold text-gray-700 mb-2">Descrição curta</label>
+                        <p class="text-sm text-gray-500 mb-2">Resumo rápido, que aparece em listagens e ao compartilhar o link.</p>
+                        <textarea wire:model="short_description" rows="2" maxlength="500"
+                                  placeholder="{{ $item_type === 'servico' ? 'Ex.: Atendimento de costura sob medida, com ajuste e prova incluídos.' : ($item_type === 'cuidado' ? 'Ex.: Sessão de massagem relaxante de 60 minutos, em consultório.' : 'Ex.: Peça artesanal em crochê para decoração de abajures.') }}"
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000] resize-none"></textarea>
+                        <p class="mt-1 text-sm text-gray-400">Até 500 caracteres.</p>
+                        @error('short_description')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-base font-semibold text-gray-700 mb-2">Descrição completa</label>
+                        <p class="text-sm text-gray-500 mb-2">Detalhes de {{ $item_type === 'servico' ? 'serviço' : ($item_type === 'cuidado' ? 'cuidado' : 'produto') }}, exibidos na página do item.</p>
                         <textarea wire:model="description" rows="5"
                                   placeholder="{{ $item_type === 'servico' ? 'Descreva o serviço: o que inclui, para quem é indicado, como funciona...' : ($item_type === 'cuidado' ? 'Descreva a prática: benefícios, método, contraindicações, o que esperar...' : 'Descreva seu produto: materiais, tamanho, como foi feito...') }}"
                                   class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000] resize-none"></textarea>

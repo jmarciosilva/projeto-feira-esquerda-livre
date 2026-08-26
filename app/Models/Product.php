@@ -8,6 +8,7 @@ use App\Enums\PriceType;
 use App\Models\Ava\AvaCourse;
 use App\Support\PublicUrl;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,12 +17,15 @@ use Illuminate\Support\Str;
 
 class Product extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'expositor_id',
         'category_id',
         'item_type',
         'name',
         'slug',
+        'short_description',
         'description',
         'image_path',
         'images',

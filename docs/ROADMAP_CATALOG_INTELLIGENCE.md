@@ -12,9 +12,9 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-01 concluída** — auditoria e arquitetura |
-| Próxima | CAT-02 — evolução do modelo de catálogo |
-| Código do módulo | Nenhum arquivo criado ainda |
+| Fase atual | **CAT-02 concluída** — evolução do modelo de catálogo |
+| Próxima | CAT-03 — base de conhecimento |
+| Código do módulo | Nenhum arquivo de `App\CatalogIntelligence` ainda — a CAT-02 mexeu só no domínio de catálogo |
 | Branch | `main` |
 
 ---
@@ -50,8 +50,8 @@ Qualquer regressão em relação a esses números precisa ser justificada.
 | Fase | Status | Entregável |
 |---|---|---|
 | **CAT-01** | ✅ Concluída | Auditoria, arquitetura, riscos, plano de testes, documentação |
-| **CAT-02** | ⬜ Próxima | Evolução do modelo de catálogo (`short_description` e afins) |
-| **CAT-03** | ⬜ | Base de conhecimento |
+| **CAT-02** | ✅ Concluída | `short_description` no domínio, formulário, API e factories |
+| **CAT-03** | ⬜ Próxima | Base de conhecimento |
 | **CAT-04** | ⬜ | Motor de similaridade |
 | **CAT-05** | ⬜ | Assistente de conteúdo |
 | **CAT-06** | ⬜ | Integração opcional com IA externa |
@@ -97,26 +97,39 @@ Entregue:
 
 ---
 
-## CAT-02 — Evolução do modelo de catálogo ⬜
+## CAT-02 — Evolução do modelo de catálogo ✅
 
-Adicionar `short_description` como campo real do domínio — usado por cards,
-busca, compartilhamento, SEO e app mobile, independentemente de IA.
+**Concluída em 2026-08-26.** Baseline 476 → final 498 testes, 0 falhas.
 
-Escopo:
+`short_description` entrou como campo real do domínio — `VARCHAR(500)`, nullable,
+antes de `description` na tabela. Ele existe por si: cards, busca,
+compartilhamento, SEO e app mobile precisavam de um resumo escrito para ser lido
+fora da página, independentemente de qualquer IA. O assistente da CAT-05 vai
+preencher esse campo; não foi ele que criou a necessidade.
 
-- migration aditiva em `products`;
-- `fillable`, validação e formulário (Livewire **e** API, para não divergirem);
-- `ProductResource` da API;
-- exibição onde hoje se trunca `description`;
-- `ProductFactory` (antecipada aqui se convier à CAT-04);
-- testes.
+**500 caracteres** porque o consumidor concreto de hoje — a meta description em
+`loja/produto.blade.php` — corta em 160, e 500 dá folga para um card de duas ou
+três linhas sem o resumo virar um segundo `description`. `VARCHAR` e não `TEXT`
+para manter aberta a porta de um índice com prefixo.
 
-Avaliar — sem decidir agora — se atributos estruturados merecem coluna. Regra:
-**dado da inteligência não entra em `products`**.
+**Nullable, sem backfill.** Os 75 itens existentes seguiram com `NULL`. Copiar
+`description` para o resumo produziria 75 resumos errados de uma vez — texto
+longo cortado não é resumo.
 
-Migrations aditivas autorizadas. Sem `migrate:fresh`, sem `down -v`.
+Entregue: migration aditiva, `Product::$fillable`, `ProdutoForm` (propriedade,
+mount, validação, payload), campo próprio no Blade com rótulos que separam
+resumo de descrição completa, `ProdutoRequest`/`ProdutoController`/`ProductResource`
+na API, `ProductFactory` e `ExpositorFactory`, e a meta SEO do item passando a
+preferir o resumo quando existe.
 
----
+**SEC-02 preservada** — os três `guardOwnership()` seguem no lugar e
+`expositor_id` continua fora do payload de update. Teste dedicado prova que o
+campo novo não abriu brecha lateral.
+
+**Decisões de escopo:** atributos estruturados (`material`, `technique`, `color`,
+`style`, `usage`) e `keywords`/`tags` **não** entraram em `products`. São
+multivalorados e pertencem a estruturas `catalog_*` próprias, nas CAT-03/CAT-04.
+Nenhum botão de IA foi adicionado ao formulário.
 
 ## CAT-03 — Base de conhecimento ⬜
 
@@ -136,7 +149,8 @@ Níveis 1 (categoria + termos + atributos) e 2 (textual) sobre a infraestrutura
 existente. `EmbeddingProvider` como contrato, sem acoplar fornecedor. Funciona
 sem embeddings.
 
-Decidir aqui a estratégia FULLTEXT vs. SQLite. `ProductFactory` é pré-requisito.
+Decidir aqui a estratégia FULLTEXT vs. SQLite. `ProductFactory` já existe, criada
+na CAT-02.
 
 ---
 
@@ -224,7 +238,7 @@ Sem push sem autorização explícita. Sem Pint global. Sem refatoração oportu
 |---|---|---|---|
 | 1 | ~~`ProdutoForm` não verifica propriedade do produto~~ | — | **Resolvido pela SEC-02** |
 | 2 | Regra de cadastro duplicada entre Livewire e API | Média | §2.4 |
-| 3 | Ausência de `ProductFactory` | Média | §2.10 |
+| 3 | ~~Ausência de `ProductFactory`~~ | — | **Resolvido na CAT-02** (com `ExpositorFactory`) |
 | 4 | FULLTEXT indisponível em SQLite | Média | §6 |
 | 5 | `ProdutoForm::save()` assume `auth()->user()->expositor` não nulo | Baixa | §2.5 |
 | 6 | `product_faqs` vazio — sem corpus de FAQ | Baixa | §2.7 |

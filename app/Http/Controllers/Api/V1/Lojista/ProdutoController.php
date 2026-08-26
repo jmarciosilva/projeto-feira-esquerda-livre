@@ -119,6 +119,7 @@ class ProdutoController extends Controller
             'category_id' => $data['category_id'] ?? null,
             'name' => $data['name'],
             'slug' => $product?->slug ?: Str::slug($data['name']),
+            'short_description' => $data['short_description'] ?? null,
             'description' => $data['description'] ?? null,
             'price' => $data['price'] ?? null,
             'weight' => $isProduto ? ($data['weight'] ?? null) : null,

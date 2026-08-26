@@ -2052,8 +2052,8 @@ impede o cadastro manual**.
 | Fase | Status |
 |---|---|
 | CAT-01 — Auditoria e arquitetura | ✅ Concluída |
-| CAT-02 — Evolução do modelo de catálogo | ⬜ Próxima |
-| CAT-03 — Base de conhecimento | ⬜ |
+| CAT-02 — Evolução do modelo de catálogo | ✅ Concluída |
+| CAT-03 — Base de conhecimento | ⬜ Próxima |
 | CAT-04 — Motor de similaridade | ⬜ |
 | CAT-05 — Assistente de conteúdo | ⬜ |
 | CAT-06 — IA externa (opcional) | ⬜ |
@@ -2063,7 +2063,26 @@ impede o cadastro manual**.
 | CAT-10 — Observabilidade, custos e segurança | ⬜ |
 | CAT-11 — Hardening, testes e documentação final | ⬜ |
 
-A CAT-02 depende da conclusão da **SEC-02**, acima — atendida.
+A CAT-02 dependia da conclusão da **SEC-02**, acima — atendida.
+
+**CAT-02 (concluída em 2026-08-26).** Acrescentou `short_description` ao
+catálogo: `varchar(500)`, nullable, posicionada antes de `description`. Campo do
+domínio, não da inteligência — cards, busca, compartilhamento, SEO e app mobile
+precisavam de um resumo próprio antes de qualquer IA existir. Cobriu formulário
+do lojista, API mobile (aditiva, sem quebrar cliente antigo) e a meta SEO do
+item, que passou a preferir o resumo à descrição cortada. Os 75 itens existentes
+ficaram com `NULL`, sem backfill: descrição longa truncada não é resumo.
+`ProductFactory` e `ExpositorFactory` foram criadas e ficam para a CAT-04.
+Nenhum botão de IA, nenhuma tag, nenhum atributo estruturado em `products`.
+
+| Subfase | Status |
+|---|---|
+| CAT-02A — Auditoria do impacto | CONCLUÍDA |
+| CAT-02B — Migration `short_description` | CONCLUÍDA |
+| CAT-02C — Model e formulário | CONCLUÍDA |
+| CAT-02D — API e contratos | CONCLUÍDA |
+| CAT-02E — Factories e testes | CONCLUÍDA |
+| CAT-02F — Hardening e documentação | CONCLUÍDA |
 
 Arquitetura, auditoria e riscos: [`CATALOG_INTELLIGENCE.md`](CATALOG_INTELLIGENCE.md).
 Roadmap executável da trilha: [`ROADMAP_CATALOG_INTELLIGENCE.md`](ROADMAP_CATALOG_INTELLIGENCE.md).

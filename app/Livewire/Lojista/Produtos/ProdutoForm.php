@@ -29,6 +29,8 @@ class ProdutoForm extends Component
 
     public string $slug = '';
 
+    public string $short_description = '';
+
     public string $description = '';
 
     public string $price = '';
@@ -81,6 +83,7 @@ class ProdutoForm extends Component
             $this->item_type = $product->item_type?->value ?? 'produto';
             $this->name = $product->name;
             $this->slug = $product->slug;
+            $this->short_description = $product->short_description ?? '';
             $this->description = $product->description ?? '';
             $this->price = $product->price ? number_format((float) $product->price, 2, '.', '') : '';
             $this->weight = $product->weight ? number_format((float) $product->weight, 3, '.', '') : '';
@@ -184,6 +187,7 @@ class ProdutoForm extends Component
         $this->validate([
             'item_type' => 'required|in:produto,servico,cuidado',
             'name' => 'required|string|max:255',
+            'short_description' => 'nullable|string|max:500',
             'price' => 'nullable|numeric|min:0',
             'weight' => $isProduto ? 'nullable|numeric|min:0.001' : 'nullable',
             'height' => $isProduto ? 'nullable|numeric|min:0.01' : 'nullable',
@@ -222,6 +226,7 @@ class ProdutoForm extends Component
             'category_id' => $this->category_id,
             'name' => $this->name,
             'slug' => $this->slug ?: Str::slug($this->name),
+            'short_description' => $this->short_description !== '' ? $this->short_description : null,
             'description' => $this->description,
             'price' => $this->price !== '' ? $this->price : null,
             'weight' => $isProduto && $this->weight !== '' ? $this->weight : null,
