@@ -1956,6 +1956,38 @@ Nenhum dos dois carrega a decisão de analytics da jornada original do comprador
 
 ---
 
+## 🧶 Trilha CAT — Catalog Intelligence (em andamento)
+
+**Trilha independente.** Não se mistura com a Trilha CI, com a SEC-01 nem com a
+GOV-01/GOV-02 — objetivo, tabelas, namespace e roadmap são próprios.
+
+Constrói uma camada de inteligência de catálogo da própria Feira: base de
+conhecimento, similaridade entre itens, assistente de cadastro e memória de
+feedback humano. O objetivo não é um botão "Gerar com IA" — é acumular
+conhecimento reutilizável, consultando IA externa apenas quando o conhecimento
+interno não basta. Três regras invioláveis: a inteligência **não inventa fatos
+objetivos**, **nada é salvo sem aprovação humana** e **falha da inteligência não
+impede o cadastro manual**.
+
+| Fase | Status |
+|---|---|
+| CAT-01 — Auditoria e arquitetura | ✅ Concluída |
+| CAT-02 — Evolução do modelo de catálogo | ⬜ Próxima |
+| CAT-03 — Base de conhecimento | ⬜ |
+| CAT-04 — Motor de similaridade | ⬜ |
+| CAT-05 — Assistente de conteúdo | ⬜ |
+| CAT-06 — IA externa (opcional) | ⬜ |
+| CAT-07 — Feedback humano e memória | ⬜ |
+| CAT-08 — Interface administrativa | ⬜ |
+| CAT-09 — Integração no cadastro | ⬜ |
+| CAT-10 — Observabilidade, custos e segurança | ⬜ |
+| CAT-11 — Hardening, testes e documentação final | ⬜ |
+
+Arquitetura, auditoria e riscos: [`CATALOG_INTELLIGENCE.md`](CATALOG_INTELLIGENCE.md).
+Roadmap executável da trilha: [`ROADMAP_CATALOG_INTELLIGENCE.md`](ROADMAP_CATALOG_INTELLIGENCE.md).
+
+---
+
 
 ## 🎯 Princípios Transversais de Desenvolvimento
 
