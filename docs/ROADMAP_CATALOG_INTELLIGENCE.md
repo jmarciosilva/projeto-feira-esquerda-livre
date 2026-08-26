@@ -90,8 +90,8 @@ Entregue:
 4. **Não existe `ProductFactory`.** 22 arquivos de teste montam catálogo com
    `Product::create` à mão. Vira pré-requisito da CAT-04.
 5. **Risco de autorização pré-existente** no `ProdutoForm` (ver
-   `CATALOG_INTELLIGENCE.md` §2.4). Fora do escopo desta trilha; recomendado
-   tratar como **SEC-02 antes da CAT-09**.
+   `CATALOG_INTELLIGENCE.md` §2.4). Tratado fora desta trilha, pela **SEC-02**,
+   concluída antes da CAT-02.
 6. **FULLTEXT não existe em SQLite**, e a suíte roda em SQLite. Decisão de
    estratégia de teste fica na CAT-04.
 
@@ -181,7 +181,7 @@ seletiva, edição livre, salvamento normal.
 
 **Aplicar sugestão não salva o produto.**
 
-> Recomendado só depois de resolvido o risco de autorização do `ProdutoForm`.
+> O risco de autorização do `ProdutoForm` foi resolvido pela SEC-02.
 
 ---
 
@@ -222,7 +222,7 @@ Sem push sem autorização explícita. Sem Pint global. Sem refatoração oportu
 
 | # | Item | Severidade | Onde |
 |---|---|---|---|
-| 1 | `ProdutoForm` não verifica propriedade do produto | Alta | `CATALOG_INTELLIGENCE.md` §2.4 |
+| 1 | ~~`ProdutoForm` não verifica propriedade do produto~~ | — | **Resolvido pela SEC-02** |
 | 2 | Regra de cadastro duplicada entre Livewire e API | Média | §2.4 |
 | 3 | Ausência de `ProductFactory` | Média | §2.10 |
 | 4 | FULLTEXT indisponível em SQLite | Média | §6 |

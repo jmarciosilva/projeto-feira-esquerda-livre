@@ -1956,6 +1956,86 @@ Nenhum dos dois carrega a decisão de analytics da jornada original do comprador
 
 ---
 
+## 🔐 SEC-02 — Autorização e isolamento do catálogo por expositor (concluída)
+
+**Trilha de segurança própria**, independente da Catalog Intelligence. Nasceu de um achado da CAT-01 e é **pré-requisito da CAT-02**: não se acrescenta funcionalidade a um formulário que ainda aceita item de outra loja.
+
+### Vulnerabilidade encontrada
+
+`ProdutoForm` (`/minha-loja/produtos/{product}/editar`) recebia o produto por route-model binding **sem conferir a quem ele pertencia**. A listagem era escopada por expositor, então nada aparecia na tela — mas a URL aceitava o id de qualquer lojista. E `save()` montava o payload com `'expositor_id' => $expositor->id`, o expositor de **quem estava salvando**.
+
+Comprovado empiricamente sobre o código vulnerável, antes da correção: um segundo lojista abriu o item de outro, renomeou para `SEQUESTRADO` e o `expositor_id` migrou de A para B. Não era leitura indevida — era tomada de posse.
+
+Classe: IDOR / Broken Object Level Authorization, com transferência de propriedade.
+
+### Superfície afetada
+
+Apenas `ProdutoForm`. A auditoria (SEC-02A) percorreu todas as outras e as encontrou já protegidas: `ProdutoIndex`, `PerguntaIndex`, `CursoIndex`, `CursoBuilder`, `ProductShareImageController`, `ProductSharePreviewController`, `Api\V1\Lojista\ProdutoController` e `Api\V1\Lojista\CursoController`.
+
+### Decisão arquitetural — guard escopado, sem `ProductPolicy`
+
+Avaliadas as três opções (query escopada, Policy, ambas). Escolhida a **comparação direta contra o expositor autenticado**, o idioma que o próprio projeto já usa na área do lojista.
+
+Uma `ProductPolicy` foi rejeitada por razão técnica, não estética: `AppServiceProvider` registra `Gate::before(fn ($user) => $user->isAdmin() ? true : null)`. Admin passa por **qualquer** policy — e admin não tem expositor. Uma Policy autorizaria o admin e o código seguinte quebraria no expositor nulo, trocando um 403 por um 500. Nesse contexto a Policy seria mais fraca que o guard direto, não mais forte.
+
+### Comportamento anterior → corrigido
+
+| | Antes | Depois |
+|---|---|---|
+| Abrir item alheio | Formulário carregava preenchido | `403` |
+| `save()` sobre item alheio | Gravava | `403`, item intacto |
+| `removeImage()` em item alheio | Apagava arquivo e metadado | `403`, antes de qualquer I/O |
+| FAQ de item alheio | Regravada | `403`, FAQ intacta |
+| AVA de item alheio | Sincronizado | `403`, ocorre depois do guard |
+| `expositor_id` em edição | Recalculado de quem salvava | Fora do payload de update |
+| Sem expositor (admin/editor) | Erro fatal no `save()` | `403` explícito |
+
+`expositor_id` só entra na **criação**, vindo do expositor autenticado. Em edição ele não participa do payload: a propriedade virou imutável por construção, independente de autorização.
+
+### Baseline
+
+```text
+SEC-02 baseline:
+- commit:     67f545c
+- testes:     455
+- assertions: 1318
+- failures:   0
+- data:       2026-08-26
+```
+
+### Fases
+
+| Fase | Objetivo | Status |
+|---|---|---|
+| **SEC-02A** | Auditoria das superfícies de acesso e decisão arquitetural | **CONCLUÍDA** |
+| **SEC-02B** | Autorização no carregamento do `ProdutoForm` | **CONCLUÍDA** |
+| **SEC-02C** | Imutabilidade de propriedade e proteção das mutações | **CONCLUÍDA** |
+| **SEC-02D** | Consistência Web/API | **CONCLUÍDA** |
+| **SEC-02E** | Testes de IDOR e regressão | **CONCLUÍDA** |
+| **SEC-02F** | Hardening final, documentação e validação | **CONCLUÍDA** |
+
+**SEC-02A** — auditadas rotas, componentes Livewire e seus métodos públicos, controllers de API, views, models, policies, middleware e testes. Uma única superfície vulnerável. Achado colateral: **não existe cadastro de produto no admin** — o lojista é o único autor de itens.
+
+**SEC-02B** — `guardOwnership()` no `mount()`. Resposta **403**, seguindo `CursoBuilder`, `ProductShareImageController` e a API, que já usavam 403 na área do lojista. Não se adotou 404: mudaria o padrão da área inteira por uma superfície só.
+
+**SEC-02C** — o guard é rechamado no início de `save()` e de `removeImage()`. Em Livewire cada método público é um endpoint alcançável sem passar pela tela que renderizou o componente; proteger só o `mount()` seria proteção de fachada. Em `removeImage()` o guard vem **antes** do `Storage::delete` — autorizar depois do I/O deixaria o arquivo já destruído. FAQ e AVA são sincronizados dentro de `save()`, portanto já depois do guard.
+
+**SEC-02D** — a API **não foi alterada**: já estava correta (`authorizeProduct` em show/update/destroy, listagem escopada, `store` amarrado ao expositor autenticado, `update` preservando o dono). Foi o Livewire que subiu ao nível da API. As duas superfícies passaram a ter a mesma invariante e o mesmo 403.
+
+**SEC-02E** — `tests/Feature/CatalogoIsolamentoTest.php`, 21 testes / 37 assertions. Antes de aprovar, os testes negativos foram executados **contra o código vulnerável** e falharam — teste de segurança que passa nos dois estados não prova nada.
+
+**SEC-02F** — varredura global por `Product::find/findOrFail/where`, `Product $product`, `->update`, `->delete`, `Product::create`, `ProductFaq`, `AvaCourse` e `expositor_id` em `app/`, `routes/`, `resources/` e `tests/`. Toda ocorrência restante é leitura de catálogo público (loja, carrinho, frete, Q&A) ou já escopada por expositor. Nenhuma superfície ficou sem decisão.
+
+### Garantia de isolamento
+
+Conhecer id, slug ou URL de um item de outra loja não dá leitura, edição, exclusão, remoção de imagem, alteração de FAQ nem posse — no painel web e na API. `expositor_id` de item existente não é reatribuível por nenhuma das duas superfícies.
+
+### Banco
+
+Nenhuma migration. SEC-02 é correção de autorização; o esquema não mudou e os dados de desenvolvimento foram preservados.
+
+---
+
 ## 🧶 Trilha CAT — Catalog Intelligence (em andamento)
 
 **Trilha independente.** Não se mistura com a Trilha CI, com a SEC-01 nem com a
@@ -1982,6 +2062,8 @@ impede o cadastro manual**.
 | CAT-09 — Integração no cadastro | ⬜ |
 | CAT-10 — Observabilidade, custos e segurança | ⬜ |
 | CAT-11 — Hardening, testes e documentação final | ⬜ |
+
+A CAT-02 depende da conclusão da **SEC-02**, acima — atendida.
 
 Arquitetura, auditoria e riscos: [`CATALOG_INTELLIGENCE.md`](CATALOG_INTELLIGENCE.md).
 Roadmap executável da trilha: [`ROADMAP_CATALOG_INTELLIGENCE.md`](ROADMAP_CATALOG_INTELLIGENCE.md).

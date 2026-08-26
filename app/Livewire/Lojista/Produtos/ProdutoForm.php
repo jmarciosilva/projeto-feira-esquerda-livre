@@ -101,7 +101,35 @@ class ProdutoForm extends Component
             $this->faqs = $product->faqs
                 ->map(fn ($f) => ['question' => $f->question, 'answer' => $f->answer])
                 ->toArray();
+
+            $this->guardOwnership();
         }
+    }
+
+    /**
+     * Propriedade do item, reconferida a cada operação.
+     *
+     * Proteger apenas o mount() não basta: em Livewire cada método público é
+     * um endpoint próprio, alcançável sem passar de novo pela tela que
+     * renderizou o componente. Por isso o guard é chamado também no início de
+     * save() e de removeImage(), antes de qualquer escrita.
+     *
+     * A comparação é direta contra o expositor do usuário autenticado, e não
+     * uma Policy: `Gate::before` no AppServiceProvider concede tudo a admin, e
+     * admin não possui expositor — uma Policy passaria e o código seguinte
+     * quebraria no expositor nulo. Item novo não tem dono a conferir.
+     */
+    private function guardOwnership(): void
+    {
+        if (! $this->product || ! $this->product->exists) {
+            return;
+        }
+
+        abort_unless(
+            $this->product->expositor_id === auth()->user()?->expositor?->id,
+            403,
+            'Este item pertence a outra loja.',
+        );
     }
 
     public function addFaq(): void
@@ -127,6 +155,10 @@ class ProdutoForm extends Component
 
     public function removeImage(int $index): void
     {
+        // Autorizar ANTES do I/O: apagar o arquivo e só depois descobrir que
+        // não havia permissão deixaria o estrago feito.
+        $this->guardOwnership();
+
         if (isset($this->images[$index])) {
             Storage::disk('public')->delete($this->images[$index]['thumb'] ?? '');
             Storage::disk('public')->delete($this->images[$index]['medium'] ?? '');
@@ -139,6 +171,8 @@ class ProdutoForm extends Component
 
     public function save(ImageService $imageService): void
     {
+        $this->guardOwnership();
+
         foreach (['upload1', 'upload2', 'upload3', 'upload4'] as $field) {
             if (! $this->checkUploadedFile($this->{$field}, 4096, $field)) {
                 return;
@@ -167,7 +201,11 @@ class ProdutoForm extends Component
             'upload4' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp',
         ]);
 
-        $expositor = auth()->user()->expositor;
+        // O LojistaMiddleware deixa admin e editor entrarem na área do lojista,
+        // mas eles não têm expositor. Sem expositor não há dono a atribuir.
+        $expositor = auth()->user()?->expositor;
+        abort_if($expositor === null, 403, 'Sua conta não possui uma loja associada.');
+
         $images = $this->images;
 
         foreach (['upload1', 'upload2', 'upload3', 'upload4'] as $field) {
@@ -176,8 +214,10 @@ class ProdutoForm extends Component
             }
         }
 
+        // `expositor_id` fica FORA de $data de propósito: o dono de um item
+        // existente nunca é recalculado a partir de quem está salvando. Ele só
+        // entra na criação, abaixo, onde o dono ainda não existe.
         $data = [
-            'expositor_id' => $expositor->id,
             'item_type' => $this->item_type,
             'category_id' => $this->category_id,
             'name' => $this->name,
@@ -208,7 +248,7 @@ class ProdutoForm extends Component
             $label = ItemType::from($this->item_type)->label();
             session()->flash('success', "{$label} atualizado com sucesso!");
         } else {
-            $product = Product::create($data);
+            $product = Product::create($data + ['expositor_id' => $expositor->id]);
             $this->syncFaqs($product->id);
             $this->syncAvaCourse($product);
             $this->redirect(route('lojista.produtos.edit', $product));

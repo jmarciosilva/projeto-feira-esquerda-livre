@@ -170,10 +170,11 @@ trás.
 > Não existe `ProductPolicy` (`app/Policies/` só tem `FeedPostPolicy` e
 > `FeedCommentPolicy`) e nenhum teste cobre esse cenário.
 >
-> **Não corrigido nesta fase** — é falha pré-existente, sem relação com Catalog
-> Intelligence, e corrigi-la aqui misturaria trilhas. Recomendação: tratar como
-> item próprio (sugestão: **SEC-02**) **antes** da CAT-09, que integra
-> exatamente neste componente.
+> **Resolvido pela SEC-02** (trilha própria de segurança, concluída depois da
+> CAT-01 e antes da CAT-02). O `ProdutoForm` passou a conferir propriedade no
+> `mount()` e no início de cada mutação, e `expositor_id` saiu do payload de
+> update. O texto acima descreve o estado auditado na CAT-01, mantido aqui como
+> registro do achado. Detalhes em `ROADMAP.md`, seção SEC-02.
 
 ### 2.5 Não existe cadastro de produto no admin
 
@@ -580,7 +581,7 @@ a inteligência estiver indisponível, cadastra manualmente como sempre.
 | 7 | Similaridade começa sem infraestrutura nova | Níveis 1 e 2 cabem no MySQL existente; embeddings são aceleração |
 | 8 | Integrar primeiro no Livewire do lojista | É o único fluxo de criação com UI; admin não cadastra produto |
 | 9 | API mobile integrada depois, no mesmo `ListingAssistant` | Evita terceira duplicação da regra |
-| 10 | Risco de autorização de §2.4 documentado, não corrigido | Falha pré-existente e sem relação com a trilha; merece item próprio antes da CAT-09 |
+| 10 | Risco de autorização de §2.4 tratado fora da trilha | Virou a SEC-02, concluída antes da CAT-02; misturar segurança com funcionalidade esconderia as duas |
 | 11 | FAQ automático fora da primeira entrega | Decisão da trilha; arquitetura apenas não impede |
 | 12 | Sem fine-tuning | Primeiro dataset e memória |
 
