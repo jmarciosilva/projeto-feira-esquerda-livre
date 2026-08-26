@@ -2053,8 +2053,8 @@ impede o cadastro manual**.
 |---|---|
 | CAT-01 — Auditoria e arquitetura | ✅ Concluída |
 | CAT-02 — Evolução do modelo de catálogo | ✅ Concluída |
-| CAT-03 — Base de conhecimento | ⬜ Próxima |
-| CAT-04 — Motor de similaridade | ⬜ |
+| CAT-03 — Base de conhecimento | ✅ Concluída |
+| CAT-04 — Motor de similaridade | ⬜ Próxima |
 | CAT-05 — Assistente de conteúdo | ⬜ |
 | CAT-06 — IA externa (opcional) | ⬜ |
 | CAT-07 — Feedback humano e memória | ⬜ |
@@ -2083,6 +2083,33 @@ Nenhum botão de IA, nenhuma tag, nenhum atributo estruturado em `products`.
 | CAT-02D — API e contratos | CONCLUÍDA |
 | CAT-02E — Factories e testes | CONCLUÍDA |
 | CAT-02F — Hardening e documentação | CONCLUÍDA |
+
+**CAT-03 (concluída em 2026-08-26).** A memória da trilha. Quatro tabelas
+`catalog_*` — conceitos, termos, relações e a ponte com o catálogo — todas fora
+de `products`, que não ganhou nenhuma coluna. Cinco enums, um normalizador
+central, três Actions como única porta de escrita.
+
+O que a fase realmente entregou foi **governança**: conhecimento assinado por
+uma pessoa nasce aprovado, todo o resto nasce rascunho, o status nunca sobe
+sozinho e uma origem de menor confiança não sobrescreve o que uma de maior já
+afirmou. Sem isso a base viraria um monte de afirmações igualmente confiáveis —
+que é exatamente o que ela não pode ser quando servir para ajudar o próximo
+lojista.
+
+A base inicial tem 28 conceitos, escolhidos lendo os 75 itens reais da Feira, e
+o seeder é idempotente. **Zero IA externa, zero embedding, zero similaridade** —
+isso é CAT-04 em diante.
+
+| Subfase | Status |
+|---|---|
+| CAT-03A — Auditoria do domínio existente | CONCLUÍDA |
+| CAT-03B — Schema da base de conhecimento | CONCLUÍDA |
+| CAT-03C — Models, enums e normalização | CONCLUÍDA |
+| CAT-03D — Proveniência e governança | CONCLUÍDA |
+| CAT-03E — Relações e associação com catálogo | CONCLUÍDA |
+| CAT-03F — Seed inicial controlado | CONCLUÍDA |
+| CAT-03G — Testes e hardening | CONCLUÍDA |
+| CAT-03H — Validação final | CONCLUÍDA |
 
 Arquitetura, auditoria e riscos: [`CATALOG_INTELLIGENCE.md`](CATALOG_INTELLIGENCE.md).
 Roadmap executável da trilha: [`ROADMAP_CATALOG_INTELLIGENCE.md`](ROADMAP_CATALOG_INTELLIGENCE.md).

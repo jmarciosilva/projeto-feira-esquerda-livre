@@ -470,10 +470,16 @@ para arquitetura, agregação, retenção e LGPD.
 
 ## Catalog Intelligence — em construção
 
-Trilha em andamento, **ainda sem código em produção**. Constrói uma camada de
-inteligência do próprio catálogo — base de conhecimento, similaridade entre
-itens, assistente de cadastro e memória de feedback humano — para ajudar o
-lojista a descrever produtos, serviços e cuidados.
+Trilha em andamento. Constrói uma camada de inteligência do próprio catálogo —
+base de conhecimento, similaridade entre itens, assistente de cadastro e memória
+de feedback humano — para ajudar o lojista a descrever produtos, serviços e
+cuidados.
+
+Já existe a **base de conhecimento** (tabelas `catalog_*`): conceitos do
+catálogo — técnicas, materiais, tipos de item, contextos — com sinônimos,
+relações entre si e registro de origem. Cada conhecimento sabe de onde veio, e
+só o que uma pessoa aprovou é reutilizado. **Ainda não há geração de texto nem
+IA externa em lugar nenhum.**
 
 Não é um botão "Gerar com IA": o conhecimento acumulado pela própria Feira vem
 primeiro, e IA externa é consultada só quando esse conhecimento não basta. Três
@@ -727,7 +733,7 @@ Consulte [`docs/ROADMAP.md`](docs/ROADMAP.md) para o planejamento detalhado. O c
 | Fase 8 — AVA | Concluída | Course builder, player, materiais protegidos, progresso e certificado PDF |
 | Fase 9 — API Mobile (Flutter) | Concluída (v1) | API `/api/v1` com Sanctum, catálogo, carrinho, checkout, pedidos, chat, endereços, AVA e endpoints de lojista |
 | Fase 10 — Inteligência de Cliente | Concluída | Módulo nativo, consentimento opt-in, dashboard, auditoria e expurgo automático |
-| Trilha CAT — Catalog Intelligence | Em andamento (CAT-01 de 11) | Auditoria e arquitetura concluídas; base de conhecimento, similaridade e assistente de cadastro pela frente |
+| Trilha CAT — Catalog Intelligence | Em andamento (CAT-03 de 11) | Descrição curta no catálogo e base de conhecimento própria; similaridade e assistente de cadastro pela frente |
 
 ### Cenário demo do AVA
 

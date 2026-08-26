@@ -4,9 +4,10 @@ Inteligência de catálogo da **Feira Esquerda Livre**: base de conhecimento
 própria, similaridade entre itens, assistente de cadastro e memória de feedback
 humano.
 
-> **Status:** CAT-01 concluída (auditoria e arquitetura). Nenhuma linha do módulo
-> foi implementada ainda. Este documento descreve o que **existe hoje** e o que
-> **se propõe construir** — as duas coisas estão explicitamente separadas.
+> **Status:** CAT-01, CAT-02 e CAT-03 concluídas. A seção **§3A** descreve o que
+> já está no código; a **§3** descreve a arquitetura proposta, cuja maior parte
+> ainda é planejamento. Implementado e planejado estão explicitamente separados
+> — nada aqui deve ser lido como pronto só por estar escrito.
 
 Trilha independente. Não se confunde com Customer Intelligence (CI-01…CI-09),
 SEC-01 ou GOV-01, e não antecipa a GOV-02.
@@ -463,6 +464,130 @@ base curada.
 
 ---
 
+## 3A. Estado implementado (CAT-03)
+
+Tudo nesta seção existe no código e está coberto por teste. O que a CAT-03
+entregou foi **memória**, não inteligência: nada aqui deduz, sugere ou gera
+texto.
+
+### 3A.1 Tabelas
+
+| Tabela | Papel | Unicidade |
+|---|---|---|
+| `catalog_knowledge_entries` | O conceito: "Crochê", "Barro", "Feito à mão" | `(type, normalized_name)` |
+| `catalog_knowledge_terms` | Outras formas de escrever ou procurar o conceito | `(knowledge_entry_id, normalized_term)` |
+| `catalog_knowledge_relations` | Ligação dirigida entre dois conceitos | `(from, to, relation_type)` |
+| `catalog_product_knowledge` | Ponte item comercial ↔ conceito | `(product_id, knowledge_entry_id)` |
+
+`products` **não ganhou nenhuma coluna** — há teste que falha se ganhar.
+
+As unicidades são do banco, não de `if (! exists())`. Duas requisições
+simultâneas cadastrando "Crochê" e "croché" colidem de verdade; a Action trata a
+colisão como reencontro do registro existente.
+
+Índices além das unicidades: `(status, type)` e `normalized_name` em entries,
+`normalized_term` em terms, `(to_entry_id, relation_type)` em relations — este
+último para tornar barata a leitura inversa do grafo.
+
+### 3A.2 Enums
+
+| Enum | Valores |
+|---|---|
+| `KnowledgeEntryType` | `product_type`, `technique`, `material`, `context`, `theme`, `attribute` |
+| `KnowledgeSource` | `human_curated`, `seed`, `approved_listing`, `derived`, `external_ai` |
+| `KnowledgeStatus` | `draft`, `approved`, `rejected`, `inactive` |
+| `KnowledgeTermType` | `synonym`, `keyword`, `alias`, `commercial_term` |
+| `KnowledgeRelationType` | `related_to`, `technique_of`, `used_in`, `belongs_to` |
+
+`style` e `audience` foram deixados fora de `KnowledgeEntryType`: nenhum item do
+catálogo atual os exigiria. Tipo sem uso convida a classificação arbitrária, e
+acrescentar um caso depois é barato — a coluna é string.
+
+### 3A.3 Normalização
+
+`KnowledgeNormalizer` é a **única** forma de produzir a chave de deduplicação.
+Minúsculas, sem acento, hífen e apóstrofo viram espaço, resto da pontuação sai,
+espaços colapsados.
+
+**A remoção de acentos é uma escolha com custo.** `Str::ascii()` reduz tanto
+"sabiá" quanto "sabia" a `sabia`. Aceitamos porque o dano é assimétrico: dois
+conceitos distintos colidindo é raro e **visível** — a UNIQUE recusa o segundo
+cadastro e uma pessoa resolve; já o mesmo conceito duplicado por acento é
+frequente, **silencioso** e envenena a base sem ninguém perceber. E "crochê",
+"macramê", "cerâmica" são exatamente o caso em que a grafia varia e o
+significado não.
+
+O acento não se perde: `name` guarda o texto como a pessoa escreveu e é ele que
+aparece na tela. A normalização produz só a chave de comparação.
+
+### 3A.4 Governança
+
+Três regras, todas com teste:
+
+1. **Origem assinada por pessoa** (`human_curated`, `seed`) nasce `approved`.
+   **Todo o resto nasce `draft`** — é esta linha que impede
+   "produto cadastrado → conhecimento aprovado".
+2. **Status nunca sobe sozinho.** Reencontrar um conceito não o aprova. Forçar
+   `approved` numa origem não humana lança exceção.
+3. **Origem de menor confiança não sobrescreve a de maior.** Uma dedução
+   automática não corrige a descrição de um curador; no máximo preenche uma que
+   estava vazia.
+
+A ordem de confiança é **ordinal**, vive em `KnowledgeSource::trustLevel()`:
+
+```text
+human_curated > seed > approved_listing > derived > external_ai
+```
+
+A coluna `confidence` existe e fica **nula**. Atribuir 0,7 a uma origem hoje
+seria inventar precisão que ninguém mediu; o campo está reservado para valores
+derivados das fases seguintes.
+
+Apenas `approved` é reutilizável — `KnowledgeEntry::usable()`.
+
+### 3A.5 Actions
+
+Escrita só por estas portas; nada cria os models direto:
+
+| Action | Garante |
+|---|---|
+| `CreateOrUpdateKnowledge` | Normaliza, respeita unicidade, preserva proveniência, nunca promove status |
+| `AttachKnowledgeTerm` | Termo único por conceito |
+| `RelateKnowledge` | Relação única por par+tipo; recusa auto-relação |
+
+São três Actions pequenas em vez de um service que faz tudo: conceito, termo e
+relação têm ciclos de vida diferentes.
+
+### 3A.6 Relações
+
+Gravadas **dirigidas e uma vez só**. `related_to` lê-se como simétrico, mas
+duplicar o par criaria duas fontes da mesma verdade; quem percorrer o grafo olha
+os dois lados (`isSymmetric()` sinaliza quais).
+
+A ponte com `products` é **capacidade estrutural apenas**: a CAT-03 não infere
+associação nenhuma a partir do texto do lojista, e há teste que prova isso. A
+ponte carrega `source` própria porque um conceito ligado por curadoria vale mais
+que o mesmo conceito ligado por inferência.
+
+### 3A.7 Base inicial
+
+28 conceitos, semeados por `CatalogKnowledgeSeeder`, escolhidos a partir da
+leitura dos 75 itens que a Feira realmente tem — não de uma lista genérica de
+artesanato. Idempotente e sem tocar em `products`.
+
+### 3A.8 O que deliberadamente NÃO foi feito
+
+| Item | Onde pertence | Por quê |
+|---|---|---|
+| Painel administrativo de curadoria | **CAT-08** | O roadmap da CAT-01 já atribuía a interface administrativa à CAT-08; antecipá-la aqui bagunçaria as fases |
+| Permissão `catalog_intelligence.*` | **CAT-08** | Sem UI não há o que proteger; permissão sem tela é configuração morta |
+| `CatalogIntelligenceServiceProvider` | quando houver responsabilidade | Nada a registrar nesta fase — sem config, middleware, comando ou binding. Provider vazio é estética |
+| `config/catalog-intelligence.php` | quando houver o que configurar | A base é funcionalidade interna e não depende de configuração |
+| Inferência produto → conceito | **CAT-04** | É similaridade, não memória |
+| Similaridade, embeddings, IA externa | CAT-04/05/06 | Fora do escopo por decisão |
+
+---
+
 ## 4. Fronteiras — o que esta trilha não faz
 
 - Não integra com Customer Intelligence. A arquitetura só é preparada para o
@@ -596,3 +721,4 @@ a inteligência estiver indisponível, cadastra manualmente como sempre.
 | CAT-01 | Concluída | 2026-08-26 | Auditoria do catálogo, arquitetura proposta, riscos e plano de testes. Nenhum código de módulo criado. |
 | SEC-02 | Concluída | 2026-08-26 | Trilha de segurança própria: corrigiu o IDOR do §2.4 e isolou o catálogo por expositor. Pré-requisito da CAT-02. |
 | CAT-02 | Concluída | 2026-08-26 | `short_description` no domínio, formulário, API e factories. Sem IA, sem tags, sem atributos estruturados. |
+| CAT-03 | Concluída | 2026-08-26 | Base de conhecimento: 4 tabelas `catalog_*`, 5 enums, normalizador, 3 Actions, governança de proveniência e base inicial de 28 conceitos. Zero IA externa. |

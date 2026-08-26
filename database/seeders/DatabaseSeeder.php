@@ -30,6 +30,10 @@ class DatabaseSeeder extends Seeder
             DemoFeedPostSeeder::class,
             ExpositorZipcodeSeeder::class,
             ProductLogisticDataSeeder::class,
+
+            // CAT-03: base de conhecimento do catálogo. Idempotente e
+            // independente dos itens — não lê nem altera `products`.
+            CatalogKnowledgeSeeder::class,
         ]);
     }
 }

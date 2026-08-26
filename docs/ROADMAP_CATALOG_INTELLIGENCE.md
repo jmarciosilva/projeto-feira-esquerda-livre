@@ -12,9 +12,9 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-02 concluída** — evolução do modelo de catálogo |
-| Próxima | CAT-03 — base de conhecimento |
-| Código do módulo | Nenhum arquivo de `App\CatalogIntelligence` ainda — a CAT-02 mexeu só no domínio de catálogo |
+| Fase atual | **CAT-03 concluída** — base de conhecimento |
+| Próxima | CAT-04 — motor de similaridade |
+| Código do módulo | `App\CatalogIntelligence` existe: 5 enums, 3 models, 3 Actions, 1 Support |
 | Branch | `main` |
 
 ---
@@ -51,8 +51,8 @@ Qualquer regressão em relação a esses números precisa ser justificada.
 |---|---|---|
 | **CAT-01** | ✅ Concluída | Auditoria, arquitetura, riscos, plano de testes, documentação |
 | **CAT-02** | ✅ Concluída | `short_description` no domínio, formulário, API e factories |
-| **CAT-03** | ⬜ Próxima | Base de conhecimento |
-| **CAT-04** | ⬜ | Motor de similaridade |
+| **CAT-03** | ✅ Concluída | Base de conhecimento, proveniência e governança |
+| **CAT-04** | ⬜ Próxima | Motor de similaridade |
 | **CAT-05** | ⬜ | Assistente de conteúdo |
 | **CAT-06** | ⬜ | Integração opcional com IA externa |
 | **CAT-07** | ⬜ | Feedback humano e memória |
@@ -131,15 +131,47 @@ campo novo não abriu brecha lateral.
 multivalorados e pertencem a estruturas `catalog_*` próprias, nas CAT-03/CAT-04.
 Nenhum botão de IA foi adicionado ao formulário.
 
-## CAT-03 — Base de conhecimento ⬜
+## CAT-03 — Base de conhecimento ✅
 
-`catalog_knowledge_entries`, `catalog_knowledge_terms`,
-`catalog_knowledge_relations` (nomes finais a confirmar), com enum
-`KnowledgeOrigin` (`human_curated`, `approved_listing`, `external_ai`,
-`derived`, `seed`) e noção de confiança.
+**Concluída em 2026-08-26.** Baseline 498 → final 542 testes, 0 falhas.
 
-Seed de conhecimento identificável como desenvolvimento — nunca centenas de
-itens fictícios passando por conhecimento validado.
+A memória estrutural da trilha. Entregou **memória, não inteligência**: nada aqui
+deduz, sugere ou gera texto — a CAT-03 termina exatamente onde a CAT-04 começa.
+
+| Subfase | Status |
+|---|---|
+| CAT-03A — Auditoria do domínio existente | CONCLUÍDA |
+| CAT-03B — Schema da base de conhecimento | CONCLUÍDA |
+| CAT-03C — Models, enums e normalização | CONCLUÍDA |
+| CAT-03D — Proveniência e governança | CONCLUÍDA |
+| CAT-03E — Relações e associação com catálogo | CONCLUÍDA |
+| CAT-03F — Seed inicial controlado | CONCLUÍDA |
+| CAT-03G — Testes e hardening | CONCLUÍDA |
+| CAT-03H — Validação final | CONCLUÍDA |
+
+**Auditoria.** `content_categories` existe e é taxonomia de **navegação** — um
+nível, escopada por eixo, sem sinônimo, sem relação entre categorias, sem
+proveniência e sem aprovação. Não serve como base de conhecimento e não foi
+reaproveitada como tal; as duas permanecem separadas, e a junção acontecerá via
+produto na CAT-04. Nenhuma tabela `catalog_*`, `knowledge`, `tag` ou `term`
+existia.
+
+**Quatro tabelas**, todas fora de `products`: `catalog_knowledge_entries`,
+`catalog_knowledge_terms`, `catalog_knowledge_relations` e
+`catalog_product_knowledge`. Unicidade no banco, não em `if (! exists())`.
+
+**Governança.** Origem assinada por pessoa nasce aprovada; todo o resto nasce
+rascunho. Status nunca sobe sozinho, e origem de menor confiança não sobrescreve
+a de maior. É o que impede "produto cadastrado → conhecimento aprovado".
+
+**Base inicial de 28 conceitos**, escolhidos lendo os 75 itens reais do catálogo
+— xilogravura porque existe uma gravura, ervas medicinais porque existem
+tinturas e cremes, costura porque existe ajuste de roupa. Idempotente.
+
+**Fora de escopo por decisão registrada:** painel administrativo e permissão
+(pertencem à CAT-08), ServiceProvider e config (nada a registrar nesta fase),
+inferência produto → conceito (CAT-04). Detalhes em
+`CATALOG_INTELLIGENCE.md` §3A.8.
 
 ---
 
@@ -150,7 +182,7 @@ existente. `EmbeddingProvider` como contrato, sem acoplar fornecedor. Funciona
 sem embeddings.
 
 Decidir aqui a estratégia FULLTEXT vs. SQLite. `ProductFactory` já existe, criada
-na CAT-02.
+na CAT-02, e a base de conhecimento da CAT-03 é o ponto de partida do nível 1.
 
 ---
 
