@@ -60,6 +60,9 @@ class PerguntaController extends Controller
 
     private function baseQuery(int $expositorId)
     {
-        return ProductQuestion::whereHas('product', fn ($q) => $q->where('expositor_id', $expositorId));
+        return ProductQuestion::whereHas(
+            'product',
+            fn ($q) => $q->whereHas('offers', fn ($o) => $o->where('expositor_id', $expositorId))
+        );
     }
 }

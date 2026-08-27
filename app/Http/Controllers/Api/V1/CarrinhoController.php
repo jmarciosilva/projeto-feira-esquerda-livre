@@ -18,12 +18,20 @@ class CarrinhoController extends Controller
         return $this->summary($cart);
     }
 
-    /** POST /api/v1/carrinho/itens */
+    /**
+     * POST /api/v1/carrinho/itens
+     *
+     * O contrato do app continua sendo `product_id` — nenhuma versão nova é
+     * necessária. Quem entra no carrinho, porém, é a oferta vigente daquele
+     * item: sem uma, não há preço nem loja, e o pedido não teria de quem ser.
+     */
     public function store(StoreCartItemRequest $request, CartService $cart): JsonResponse
     {
-        $product = Product::where('is_active', true)->findOrFail($request->validated('product_id'));
+        $product = Product::comOfertaVigente()
+            ->with('ofertaVigente')
+            ->findOrFail($request->validated('product_id'));
 
-        $cart->add($product, (int) ($request->validated('quantity') ?? 1));
+        $cart->add($product->ofertaVigente, (int) ($request->validated('quantity') ?? 1));
 
         return $this->summary($cart, 201);
     }

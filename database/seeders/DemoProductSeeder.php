@@ -5,11 +5,15 @@ namespace Database\Seeders;
 use App\Models\ContentCategory;
 use App\Models\Expositor;
 use App\Models\Product;
+use App\Models\ProductOffer;
+use Database\Seeders\Concerns\SincronizaOfertaDoItem;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
 class DemoProductSeeder extends Seeder
 {
+    use SincronizaOfertaDoItem;
+
     private const DEMO_PRICE = 0.01;
 
     public function run(): void
@@ -55,7 +59,7 @@ class DemoProductSeeder extends Seeder
                         $name = "{$template['name']} - {$expositor->name}";
                         $slug = Str::slug("demo {$eixo} {$expositor->slug} {$template['name']}");
 
-                        Product::updateOrCreate(
+                        $product = Product::updateOrCreate(
                             ['slug' => $slug],
                             [
                                 'expositor_id' => $expositor->id,
@@ -82,16 +86,23 @@ class DemoProductSeeder extends Seeder
                             ]
                         );
 
+                        $this->sincronizarOferta($product, $expositor->id);
+
                         $created++;
                     }
                 }
             });
 
-        Product::query()->update([
+        $demo = [
             'price' => self::DEMO_PRICE,
             'price_type' => 'fixo',
             'is_active' => true,
-        ]);
+        ];
+
+        // Preco e status de venda sao da oferta; `products` recebe o espelho
+        // legado (divida D-1) para nao guardar valor diferente.
+        ProductOffer::query()->update($demo);
+        Product::query()->update($demo);
 
         $this->command->info("DemoProductSeeder: {$created} itens de demonstração garantidos. Todos os produtos ficaram com preço R$ 0,01.");
     }

@@ -190,7 +190,7 @@ class ShippingQuoteTest extends TestCase
             'zipcode' => '01310-000',
         ]);
 
-        $product = Product::create(array_merge([
+        $product = Product::factory()->create(array_merge([
             'expositor_id' => $store->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Tecida',

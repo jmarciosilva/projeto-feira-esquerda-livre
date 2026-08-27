@@ -15,7 +15,7 @@
         $productOgImage = $productOgImage
             ? url($productOgImage)
             : route('loja.produto.share-preview', [$expositor->slug, $product->slug]);
-        $sharePrice = $product->price ? 'R$ ' . number_format((float) $product->price, 2, ',', '.') : 'valor sob consulta';
+        $sharePrice = $offer->price ? 'R$ ' . number_format((float) $offer->price, 2, ',', '.') : 'valor sob consulta';
         $shareText = "Conheça {$product->name} por {$sharePrice} na loja {$expositor->name}: {$productUrl}";
         $returnTo = request()->query('return_to');
         $returnTo = $returnTo && parse_url($returnTo, PHP_URL_HOST) === request()->getHost()
@@ -121,9 +121,9 @@
 
                     <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 leading-tight">{{ $product->name }}</h1>
 
-                    @if($product->price)
+                    @if($offer->price)
                     <p class="text-3xl font-black mt-4" style="color: #C47A00;">
-                        R$ {{ number_format((float) $product->price, 2, ',', '.') }}
+                        R$ {{ number_format((float) $offer->price, 2, ',', '.') }}
                     </p>
                     @endif
 
@@ -138,12 +138,12 @@
                     @endif
 
                     {{-- Estoque --}}
-                    @if($product->has_stock)
+                    @if($offer->has_stock)
                     <div class="mt-4 flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full bg-green-400 flex-shrink-0"></span>
                         <span class="text-sm text-green-700 font-medium">
-                            @if($product->stock_quantity !== null)
-                                {{ $product->stock_quantity }} {{ $product->stock_quantity === 1 ? 'unidade disponível' : 'unidades disponíveis' }}
+                            @if($offer->stock_quantity !== null)
+                                {{ $offer->stock_quantity }} {{ $offer->stock_quantity === 1 ? 'unidade disponível' : 'unidades disponíveis' }}
                             @else
                                 Disponível em estoque
                             @endif
@@ -154,7 +154,7 @@
 
                 {{-- CTA --}}
                 <div class="mt-8 space-y-3">
-                    <button onclick="Livewire.dispatch('add-to-cart', { productId: {{ $product->id }} })"
+                    <button onclick="Livewire.dispatch('add-to-cart', { offerId: {{ $offer->id }} })"
                             class="w-full py-4 rounded-xl text-white text-lg font-bold transition-colors"
                             style="background: #E8A000; min-height: 60px;">
                         Adicionar ao Carrinho
@@ -265,11 +265,12 @@
     @endif
 
     {{-- Outros produtos da loja --}}
-    @if($otherProducts->isNotEmpty())
+    @if($otherOffers->isNotEmpty())
     <div class="mt-10">
         <h2 class="text-lg font-bold text-gray-900 mb-4">Outros produtos de {{ $expositor->name }}</h2>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            @foreach($otherProducts as $other)
+            @foreach($otherOffers as $otherOffer)
+            @php $other = $otherOffer->product; @endphp
             <a href="{{ route('loja.produto', [$expositor->slug, $other->slug, 'return_to' => $returnTo]) }}"
                class="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                 <div class="aspect-square overflow-hidden bg-gray-50">
@@ -285,8 +286,8 @@
                 </div>
                 <div class="p-3">
                     <p class="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">{{ $other->name }}</p>
-                    @if($other->price)
-                    <p class="font-bold text-base mt-1" style="color: #C47A00;">R$ {{ number_format((float) $other->price, 2, ',', '.') }}</p>
+                    @if($otherOffer->price)
+                    <p class="font-bold text-base mt-1" style="color: #C47A00;">R$ {{ number_format((float) $otherOffer->price, 2, ',', '.') }}</p>
                     @endif
                 </div>
             </a>

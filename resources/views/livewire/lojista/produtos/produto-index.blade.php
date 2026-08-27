@@ -50,7 +50,8 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
-                    @forelse($products as $product)
+                    @forelse($offers as $offer)
+                    @php $product = $offer->product; @endphp
                     <tr class="hover:bg-gray-50 transition-colors">
                         <td class="py-4 px-4">
                             <div class="flex items-center gap-3">
@@ -91,15 +92,15 @@
                             </div>
                         </td>
                         <td class="py-4 px-4 hidden sm:table-cell">
-                            @if($product->price_type?->value === 'sob_consulta')
+                            @if($offer->price_type?->value === 'sob_consulta')
                             <span class="text-gray-500 text-sm font-medium">A combinar</span>
-                            @elseif($product->price)
+                            @elseif($offer->price)
                             <div>
                                 <span class="font-bold text-lg" style="color: #C47A00;">
-                                    R$ {{ number_format((float)$product->price, 2, ',', '.') }}
+                                    R$ {{ number_format((float)$offer->price, 2, ',', '.') }}
                                 </span>
-                                @if($product->price_type && $product->item_type?->value !== 'produto')
-                                <span class="block text-xs text-gray-400">{{ $product->price_type->label() }}</span>
+                                @if($offer->price_type && $product->item_type?->value !== 'produto')
+                                <span class="block text-xs text-gray-400">{{ $offer->price_type->label() }}</span>
                                 @endif
                             </div>
                             @else
@@ -107,10 +108,10 @@
                             @endif
                         </td>
                         <td class="py-4 px-4 text-center">
-                            <button wire:click="toggleActive({{ $product->id }})"
+                            <button wire:click="toggleActive({{ $offer->id }})"
                                     class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold transition-colors"
-                                    style="{{ $product->is_active ? 'background:#dcfce7; color:#166534;' : 'background:#f3f4f6; color:#6b7280;' }}">
-                                {{ $product->is_active ? 'Ativo' : 'Inativo' }}
+                                    style="{{ $offer->is_active ? 'background:#dcfce7; color:#166534;' : 'background:#f3f4f6; color:#6b7280;' }}">
+                                {{ $offer->is_active ? 'Ativo' : 'Inativo' }}
                             </button>
                         </td>
                         <td class="py-4 px-4 text-right">
@@ -125,8 +126,8 @@
                                    style="border-color: #1a472a; color: #1a472a; min-height: 40px; display:inline-flex; align-items:center;">
                                     Gerar imagem
                                 </a>
-                                <button wire:click="delete({{ $product->id }})"
-                                        wire:confirm="Remover o produto '{{ $product->name }}'?"
+                                <button wire:click="delete({{ $offer->id }})"
+                                        wire:confirm="Remover '{{ $product->name }}' da sua loja?"
                                         class="px-3 py-2 rounded-lg text-sm font-semibold border-2 border-red-200 text-red-500 transition-colors hover:bg-red-50"
                                         style="min-height: 40px;">
                                     Excluir
@@ -151,9 +152,9 @@
             </table>
         </div>
 
-        @if($products->hasPages())
+        @if($offers->hasPages())
         <div class="px-4 py-4 border-t border-gray-100">
-            {{ $products->links() }}
+            {{ $offers->links() }}
         </div>
         @endif
     </div>

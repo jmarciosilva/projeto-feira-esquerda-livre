@@ -85,6 +85,18 @@ failures** em 521,44s.
 
 ### 2.1 O catálogo é uma tabela só
 
+> **Atualizado pela CAT-DOM-01 (2026-08-27).** Continua sendo uma tabela por
+> eixo, mas `products` deixou de responder por preço, estoque, dimensões, dono e
+> status comercial: isso passou para `product_offers`. Para a inteligência, a
+> mudança é a favor — `Product` agora é só a identidade do item, exatamente o
+> que o matcher e a similaridade sempre leram. Motivação e decisão em
+> [`CAT_DOM_01_DECISAO_PRODUTO_MESTRE_E_OFERTAS.md`](CAT_DOM_01_DECISAO_PRODUTO_MESTRE_E_OFERTAS.md).
+>
+> Consequência prática: **o conhecimento sobrevive à saída do lojista**. Quando
+> uma oferta é desativada ou removida, `catalog_product_knowledge` não é tocado,
+> e o item continua servindo de referência para os outros — que é o objetivo
+> declarado da trilha desde a CAT-01.
+
 `products` é o catálogo unificado dos três eixos, separados por `item_type`.
 
 `app/Enums/ItemType.php` — três casos, **confirmados, não presumidos**:

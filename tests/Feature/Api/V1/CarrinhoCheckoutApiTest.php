@@ -17,7 +17,7 @@ class CarrinhoCheckoutApiTest extends TestCase
     {
         $expositor = Expositor::create(['name' => 'Ateliê das Mãos', 'slug' => 'atelie-das-maos', 'is_active' => true]);
 
-        return Product::create([
+        return Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Artesanal',

@@ -12,20 +12,23 @@ class CursoIndex extends Component
     {
         $expositor = auth()->user()->expositor;
 
-        $cursos = Product::where('expositor_id', $expositor->id)
+        $cursos = Product::whereHas('offers', fn ($o) => $o->where('expositor_id', $expositor->id))
             ->where('is_digital', true)
-            ->with(['avaCourse'])
+            ->with(['avaCourse', 'offers' => fn ($o) => $o->where('expositor_id', $expositor->id)])
             ->orderBy('name')
             ->get()
             ->map(function (Product $product) {
                 $course = $product->avaCourse;
 
                 return [
-                    'product'          => $product,
-                    'course'           => $course,
+                    'product' => $product,
+                    // O preco exibido e o da oferta deste lojista, nunca a
+                    // coluna legada de `products` (CAT-DOM-01, divida D-1).
+                    'offer' => $product->offers->first(),
+                    'course' => $course,
                     'total_enrollments' => $course?->enrollments()->count() ?? 0,
-                    'total_lessons'    => $course?->totalLessons() ?? 0,
-                    'is_published'     => $course?->isPublished() ?? false,
+                    'total_lessons' => $course?->totalLessons() ?? 0,
+                    'is_published' => $course?->isPublished() ?? false,
                 ];
             });
 

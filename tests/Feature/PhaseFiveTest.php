@@ -45,7 +45,7 @@ class PhaseFiveTest extends TestCase
             'name' => 'Atelie das Maos',
             'slug' => 'atelie-das-maos',
         ]);
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'name' => 'Bolsa Tecida Artesanal',
             'slug' => 'bolsa-tecida-artesanal',
@@ -53,7 +53,7 @@ class PhaseFiveTest extends TestCase
             'is_active' => true,
         ]);
 
-        $png = app(ProductShareImageService::class)->make($product);
+        $png = app(ProductShareImageService::class)->make($product->ofertaVigente);
         $size = getimagesizefromstring($png);
 
         $this->assertSame('image/png', $size['mime']);

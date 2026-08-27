@@ -30,7 +30,7 @@ class CatalogoApiTest extends TestCase
     {
         $expositor = $this->makeExpositor();
 
-        Product::create([
+        Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Artesanal',
@@ -39,7 +39,7 @@ class CatalogoApiTest extends TestCase
             'is_active' => true,
         ]);
 
-        Product::create([
+        Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'servico',
             'name' => 'Aula de Design',
@@ -59,7 +59,7 @@ class CatalogoApiTest extends TestCase
     public function test_shows_single_product(): void
     {
         $expositor = $this->makeExpositor();
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Artesanal',
@@ -77,7 +77,7 @@ class CatalogoApiTest extends TestCase
     public function test_inactive_product_returns_404(): void
     {
         $expositor = $this->makeExpositor();
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Descontinuado',
@@ -92,7 +92,7 @@ class CatalogoApiTest extends TestCase
     public function test_shows_store_with_products(): void
     {
         $expositor = $this->makeExpositor();
-        Product::create([
+        Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Artesanal',
@@ -272,7 +272,7 @@ class CatalogoApiTest extends TestCase
     public function test_guest_cannot_submit_product_question(): void
     {
         $expositor = $this->makeExpositor();
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Artesanal',
@@ -288,7 +288,7 @@ class CatalogoApiTest extends TestCase
     public function test_authenticated_user_can_submit_and_view_answered_question(): void
     {
         $expositor = $this->makeExpositor();
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Artesanal',

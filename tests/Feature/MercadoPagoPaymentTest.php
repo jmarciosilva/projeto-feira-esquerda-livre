@@ -183,7 +183,7 @@ class MercadoPagoPaymentTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $attributes
+     * @param  array<string, mixed>  $attributes
      */
     private function makeOrder(array $attributes = []): Order
     {
@@ -192,7 +192,7 @@ class MercadoPagoPaymentTest extends TestCase
             'slug' => 'atelie-das-maos',
         ]);
 
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'name' => 'Bolsa Tecida',
             'slug' => 'bolsa-tecida',

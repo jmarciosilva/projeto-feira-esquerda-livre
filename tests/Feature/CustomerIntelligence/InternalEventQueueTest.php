@@ -50,7 +50,7 @@ class InternalEventQueueTest extends TestCase
     {
         $expositor = Expositor::create(['name' => 'Loja Fila', 'slug' => 'loja-fila']);
 
-        return Product::create([
+        return Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Chapéu de Palha',
@@ -236,7 +236,7 @@ class InternalEventQueueTest extends TestCase
 
         $product = $this->makeProduct();
         $this->get(route('loja.produto', [$product->expositor->slug, $product->slug]))->assertOk();
-        app(CartService::class)->add($product, 1);
+        app(CartService::class)->add($product->ofertaVigente, 1);
 
         Queue::assertPushedOn('customer-intelligence', TrackCustomerEventJob::class);
         Queue::assertPushed(TrackCustomerEventJob::class, 2);

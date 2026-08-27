@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\ProductOffer;
 use App\Services\CartService;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -30,12 +31,21 @@ class CartDrawer extends Component
         $this->dispatch('cart-updated');
     }
 
+    /**
+     * O carrinho recebe uma oferta, não um produto.
+     *
+     * Um item de catálogo não tem preço nem dono — quem tem é a oferta de um
+     * expositor sobre ele. Adicionar "o produto" deixaria em aberto de qual
+     * loja e por quanto, e é exatamente essa ambiguidade que a CAT-DOM-01
+     * eliminou.
+     */
     #[On('add-to-cart')]
-    public function addToCart(int $productId, CartService $cart): void
+    public function addToCart(int $offerId, CartService $cart): void
     {
-        $product = \App\Models\Product::find($productId);
-        if ($product && $product->is_active) {
-            $cart->add($product);
+        $offer = ProductOffer::with(['product', 'expositor'])->find($offerId);
+
+        if ($offer && $offer->isVigente()) {
+            $cart->add($offer);
             $this->open = true;
             $this->dispatch('cart-updated');
         }
@@ -45,8 +55,8 @@ class CartDrawer extends Component
     {
         return view('livewire.cart-drawer', [
             'grouped' => $cart->grouped(),
-            'total'   => $cart->total(),
-            'count'   => $cart->count(),
+            'total' => $cart->total(),
+            'count' => $cart->count(),
         ]);
     }
 }

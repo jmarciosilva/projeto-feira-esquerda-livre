@@ -53,7 +53,7 @@ class AvaMateriaisTest extends TestCase
 
     private function makePublishedCourse(Expositor $expositor): array
     {
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'name'         => 'Curso Mat ' . uniqid(),
             'slug'         => 'curso-mat-' . uniqid(),

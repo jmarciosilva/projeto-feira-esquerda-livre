@@ -22,7 +22,7 @@ class CartServiceTest extends TestCase
             'slug' => 'atelie-das-maos',
         ]);
 
-        $bag = Product::create([
+        $bag = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'name' => 'Bolsa Tecida Artesanal',
             'slug' => 'bolsa-tecida-artesanal',
@@ -30,7 +30,7 @@ class CartServiceTest extends TestCase
             'is_active' => true,
         ]);
 
-        $book = Product::create([
+        $book = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'name' => 'Livro Popular',
             'slug' => 'livro-popular',

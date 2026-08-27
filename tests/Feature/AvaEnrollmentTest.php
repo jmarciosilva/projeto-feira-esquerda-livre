@@ -36,7 +36,7 @@ class AvaEnrollmentTest extends TestCase
 
     private function makeDigitalProductWithPublishedCourse(Expositor $expositor): Product
     {
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type'    => ItemType::Servico,
             'name'         => 'Curso de Culinária',
@@ -154,7 +154,7 @@ class AvaEnrollmentTest extends TestCase
 
         $buyer    = User::factory()->create();
         $expositor = $this->makeExpositor();
-        $product  = Product::create([
+        $product  = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type'    => ItemType::Produto,
             'name'         => 'Bolsa Artesanal',
@@ -176,7 +176,7 @@ class AvaEnrollmentTest extends TestCase
 
         $buyer    = User::factory()->create();
         $expositor = $this->makeExpositor();
-        $product  = Product::create([
+        $product  = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type'    => ItemType::Servico,
             'name'         => 'Curso Rascunho',
@@ -216,7 +216,7 @@ class AvaEnrollmentTest extends TestCase
 
         $buyer    = User::factory()->create();
         $expositor = $this->makeExpositor();
-        $product  = Product::create([
+        $product  = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type'    => ItemType::Servico,
             'name'         => 'Curso com Prazo',

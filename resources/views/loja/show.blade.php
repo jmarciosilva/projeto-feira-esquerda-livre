@@ -105,10 +105,11 @@
         <main class="lg:col-span-3">
             @php
                 use App\Enums\ItemType;
-                $grupos = $products->groupBy(fn($p) => $p->item_type?->value ?? 'produto');
+                // A vitrine lista as ofertas desta loja; o eixo é do item.
+                $grupos = $offers->groupBy(fn($o) => $o->product->item_type?->value ?? 'produto');
             @endphp
 
-            @if($products->isEmpty())
+            @if($offers->isEmpty())
             <div class="bg-white rounded-2xl p-12 text-center border border-gray-100">
                 <div class="text-5xl mb-4">🛍</div>
                 <p class="text-lg font-semibold text-gray-500">Esta loja ainda não tem itens cadastrados.</p>
@@ -125,7 +126,8 @@
                     <span class="text-sm text-gray-400">({{ $itensDoEixo->count() }})</span>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    @foreach($itensDoEixo as $product)
+                    @foreach($itensDoEixo as $offer)
+                    @php $product = $offer->product; @endphp
                     <a href="{{ route('loja.produto', [$expositor->slug, $product->slug, 'return_to' => $storeBackUrl]) }}"
                        class="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                         <div class="aspect-square overflow-hidden bg-gray-50">
@@ -144,20 +146,20 @@
                         </div>
                         <div class="p-3">
                             <p class="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">{{ $product->name }}</p>
-                            @if($product->price_type?->value === 'sob_consulta')
+                            @if($offer->price_type?->value === 'sob_consulta')
                             <p class="font-semibold text-sm mt-1.5" style="color:#C47A00;">A combinar</p>
-                            @elseif($product->price)
+                            @elseif($offer->price)
                             <p class="font-bold text-base mt-1.5" style="color:#C47A00;">
-                                R$ {{ number_format((float) $product->price, 2, ',', '.') }}
-                                @if($product->price_type && $product->item_type?->value !== 'produto')
-                                <span class="text-xs font-normal text-gray-400">/ {{ $product->price_type->label() }}</span>
+                                R$ {{ number_format((float) $offer->price, 2, ',', '.') }}
+                                @if($offer->price_type && $product->item_type?->value !== 'produto')
+                                <span class="text-xs font-normal text-gray-400">/ {{ $offer->price_type->label() }}</span>
                                 @endif
                             </p>
                             @endif
-                            @if($product->modality)
+                            @if($offer->modality)
                             <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium"
                                   style="background:#f0fdf4; color:#166534;">
-                                {{ $product->modality->label() }}
+                                {{ $offer->modality->label() }}
                             </span>
                             @endif
                         </div>

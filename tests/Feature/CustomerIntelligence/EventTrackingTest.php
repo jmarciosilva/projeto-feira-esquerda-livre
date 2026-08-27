@@ -65,7 +65,7 @@ class EventTrackingTest extends TestCase
 
     private function makeProduct(Expositor $expositor): Product
     {
-        return Product::create([
+        return Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Artesanal',
@@ -132,7 +132,7 @@ class EventTrackingTest extends TestCase
         $expositor = $this->makeExpositor();
         $product = $this->makeProduct($expositor);
 
-        app(CartService::class)->add($product, 2);
+        app(CartService::class)->add($product->ofertaVigente, 2);
 
         $event = $this->assertEventTracked(
             EventName::ProdutoAdicionadoCarrinho,
@@ -314,7 +314,7 @@ class EventTrackingTest extends TestCase
         $product = $this->makeProduct($expositor);
 
         $this->get(route('loja.produto', [$expositor->slug, $product->slug]))->assertOk();
-        app(CartService::class)->add($product, 1);
+        app(CartService::class)->add($product->ofertaVigente, 1);
 
         $this->assertSame(2, TrackedEvent::count());
     }
@@ -331,7 +331,7 @@ class EventTrackingTest extends TestCase
         $expositor = $this->makeExpositor();
         $product = $this->makeProduct($expositor);
 
-        app(CartService::class)->add($product, 1);
+        app(CartService::class)->add($product->ofertaVigente, 1);
 
         $this->assertDatabaseHas('cart_items', [
             'product_id' => $product->id,

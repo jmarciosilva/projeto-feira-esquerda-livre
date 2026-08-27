@@ -44,7 +44,7 @@ class InternalModelsTest extends TestCase
     {
         $expositor = Expositor::create(['name' => 'Loja CI-02', 'slug' => 'loja-ci-02']);
 
-        return Product::create([
+        return Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Cesta de Palha',

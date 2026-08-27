@@ -7,6 +7,7 @@ use App\Models\ContentCategory;
 use App\Models\Expositor;
 use App\Models\Product;
 use App\Models\User;
+use Database\Seeders\Concerns\SincronizaOfertaDoItem;
 use Illuminate\Database\Seeder;
 
 /**
@@ -23,6 +24,8 @@ use Illuminate\Database\Seeder;
  */
 class CuidadoSeeder extends Seeder
 {
+    use SincronizaOfertaDoItem;
+
     public function run(): void
     {
         // Mapa slug → id para lookup rápido
@@ -247,7 +250,7 @@ class CuidadoSeeder extends Seeder
                 $categorySlug = $prod['category_slug'] ?? null;
                 unset($prod['category_slug']);
 
-                Product::updateOrCreate(
+                $product = Product::updateOrCreate(
                     ['name' => $prod['name']],
                     array_merge($prod, [
                         'expositor_id' => $expositor->id,
@@ -255,6 +258,8 @@ class CuidadoSeeder extends Seeder
                         'category_id'  => $categorySlug ? ($cats[$categorySlug] ?? null) : null,
                     ])
                 );
+
+                $this->sincronizarOferta($product, $expositor->id);
             }
 
             $this->command->line("  ✓ {$dados['expositor']['name']} → {$dados['user']['email']}");

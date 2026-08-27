@@ -24,7 +24,7 @@ class AprendizadoApiTest extends TestCase
     {
         $expositor = Expositor::create(['name' => 'Tecnologia Solidária', 'slug' => 'tecnologia-solidaria']);
 
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => ItemType::Servico,
             'name' => 'Curso Online de Informática Popular',

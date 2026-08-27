@@ -51,11 +51,11 @@ class Expositor extends Model
     protected function casts(): array
     {
         return [
-            'is_featured'          => 'boolean',
-            'is_active'            => 'boolean',
-            'eixos'                => 'array',
+            'is_featured' => 'boolean',
+            'is_active' => 'boolean',
+            'eixos' => 'array',
             'home_rotation_weight' => 'integer',
-            'total_impressions'    => 'integer',
+            'total_impressions' => 'integer',
         ];
     }
 
@@ -73,9 +73,20 @@ class Expositor extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @deprecated CAT-DOM-01 — o vínculo do expositor com o catálogo passou a
+     * ser a oferta. Mantida enquanto `products.expositor_id` existir (dívida
+     * D-1); use `offers()` em código novo.
+     */
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
+    }
+
+    /** As ofertas comerciais desta loja. */
+    public function offers(): HasMany
+    {
+        return $this->hasMany(ProductOffer::class);
     }
 
     public function orderSplits(): HasMany

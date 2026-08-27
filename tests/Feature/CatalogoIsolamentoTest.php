@@ -58,7 +58,7 @@ class CatalogoIsolamentoTest extends TestCase
     {
         self::$counter++;
 
-        return Product::create(array_merge([
+        return Product::factory()->create(array_merge([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Toalha para abajur',

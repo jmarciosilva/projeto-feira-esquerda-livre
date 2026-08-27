@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Lojista\Produtos;
 
+use App\Actions\Catalog\SaveProductWithOffer;
 use App\Enums\ItemType;
 use App\Enums\Modality;
 use App\Enums\PriceType;
@@ -10,6 +11,7 @@ use App\Models\Ava\AvaCourse;
 use App\Models\ContentCategory;
 use App\Models\Product;
 use App\Models\ProductFaq;
+use App\Models\ProductOffer;
 use App\Services\ImageService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -22,6 +24,15 @@ class ProdutoForm extends Component
     use ValidatesFileUploads, WithFileUploads;
 
     public ?Product $product = null;
+
+    /**
+     * A oferta do lojista autenticado sobre este item.
+     *
+     * O formulário continua sendo aberto pelo produto — a URL não mudou —, mas
+     * o que o lojista edita é a oferta dele. Um item de catálogo que ele não
+     * ofereça não é editável por ele, ainda que exista.
+     */
+    public ?ProductOffer $offer = null;
 
     public string $item_type = 'produto';
 
@@ -80,32 +91,43 @@ class ProdutoForm extends Component
     {
         if ($product && $product->exists) {
             $this->product = $product;
+            $this->offer = $product->offers()
+                ->where('expositor_id', auth()->user()?->expositor?->id)
+                ->first();
+
+            // Antes de ler qualquer campo: sem oferta própria não há o que
+            // editar aqui, e a tela não deve nem se montar.
+            $this->guardOwnership();
+
             $this->item_type = $product->item_type?->value ?? 'produto';
             $this->name = $product->name;
             $this->slug = $product->slug;
             $this->short_description = $product->short_description ?? '';
             $this->description = $product->description ?? '';
-            $this->price = $product->price ? number_format((float) $product->price, 2, '.', '') : '';
-            $this->weight = $product->weight ? number_format((float) $product->weight, 3, '.', '') : '';
-            $this->height = $product->height ? number_format((float) $product->height, 2, '.', '') : '';
-            $this->width = $product->width ? number_format((float) $product->width, 2, '.', '') : '';
-            $this->length = $product->length ? number_format((float) $product->length, 2, '.', '') : '';
-            $this->price_type = $product->price_type?->value ?? 'fixo';
-            $this->modality = $product->modality?->value ?? 'presencial';
-            $this->duration_min = $product->duration_min;
             $this->category_id = $product->category_id;
-            $this->has_stock = $product->has_stock;
-            $this->stock_quantity = $product->stock_quantity;
-            $this->is_active = $product->is_active;
-            $this->is_featured = $product->is_featured;
             $this->is_digital = (bool) $product->is_digital;
-            $this->sort_order = $product->sort_order ?? 0;
             $this->images = $product->images ?? [];
+
+            // Daqui para baixo, tudo vem da oferta: é o que este lojista cobra
+            // e oferece, não o que o item é.
+            $offer = $this->offer;
+            $this->price = $offer->price ? number_format((float) $offer->price, 2, '.', '') : '';
+            $this->weight = $offer->weight ? number_format((float) $offer->weight, 3, '.', '') : '';
+            $this->height = $offer->height ? number_format((float) $offer->height, 2, '.', '') : '';
+            $this->width = $offer->width ? number_format((float) $offer->width, 2, '.', '') : '';
+            $this->length = $offer->length ? number_format((float) $offer->length, 2, '.', '') : '';
+            $this->price_type = $offer->price_type?->value ?? 'fixo';
+            $this->modality = $offer->modality?->value ?? 'presencial';
+            $this->duration_min = $offer->duration_min;
+            $this->has_stock = $offer->has_stock;
+            $this->stock_quantity = $offer->stock_quantity;
+            $this->is_active = $offer->is_active;
+            $this->is_featured = $offer->is_featured;
+            $this->sort_order = $offer->sort_order ?? 0;
+
             $this->faqs = $product->faqs
                 ->map(fn ($f) => ['question' => $f->question, 'answer' => $f->answer])
                 ->toArray();
-
-            $this->guardOwnership();
         }
     }
 
@@ -128,8 +150,14 @@ class ProdutoForm extends Component
             return;
         }
 
+        // A CAT-DOM-01 mudou o que se confere, não o rigor: o produto mestre
+        // deixou de ter dono, e a pergunta passou a ser se ESTE lojista tem uma
+        // oferta sobre ele. Item que ele não oferece não é editável por ele,
+        // ainda que exista no catálogo — e um produto que ficou sem nenhuma
+        // oferta não vira porta de entrada para ninguém.
         abort_unless(
-            $this->product->expositor_id === auth()->user()?->expositor?->id,
+            $this->offer !== null
+                && $this->offer->expositor_id === auth()->user()?->expositor?->id,
             403,
             'Este item pertence a outra loja.',
         );
@@ -218,9 +246,10 @@ class ProdutoForm extends Component
             }
         }
 
-        // `expositor_id` fica FORA de $data de propósito: o dono de um item
-        // existente nunca é recalculado a partir de quem está salvando. Ele só
-        // entra na criação, abaixo, onde o dono ainda não existe.
+        // `expositor_id` não aparece aqui: quem decide o dono é a
+        // SaveProductWithOffer, e só na criação. A divisão entre o que é
+        // identidade do item e o que é condição de venda também mora lá — esta
+        // tela apenas entrega o que o lojista preencheu.
         $data = [
             'item_type' => $this->item_type,
             'category_id' => $this->category_id,
@@ -246,20 +275,22 @@ class ProdutoForm extends Component
             'image_path' => $images[0]['medium'] ?? ($this->product?->image_path),
         ];
 
-        if ($this->product && $this->product->exists) {
-            $this->product->update($data);
-            $this->syncFaqs($this->product->id);
-            $this->syncAvaCourse($this->product);
-            $label = ItemType::from($this->item_type)->label();
-            session()->flash('success', "{$label} atualizado com sucesso!");
-        } else {
-            $product = Product::create($data + ['expositor_id' => $expositor->id]);
-            $this->syncFaqs($product->id);
-            $this->syncAvaCourse($product);
-            $this->redirect(route('lojista.produtos.edit', $product));
+        $editando = $this->product && $this->product->exists;
+
+        $offer = app(SaveProductWithOffer::class)($data, $expositor, $editando ? $this->offer : null);
+
+        $this->syncFaqs($offer->product_id);
+        $this->syncAvaCourse($offer->product);
+
+        if (! $editando) {
+            $this->redirect(route('lojista.produtos.edit', $offer->product));
 
             return;
         }
+
+        $this->offer = $offer;
+        $label = ItemType::from($this->item_type)->label();
+        session()->flash('success', "{$label} atualizado com sucesso!");
 
         $this->images = $this->product->fresh()->images ?? [];
         $this->upload1 = $this->upload2 = $this->upload3 = $this->upload4 = null;
@@ -284,8 +315,8 @@ class ProdutoForm extends Component
         foreach ($valid as $i => $faq) {
             ProductFaq::create([
                 'product_id' => $productId,
-                'question'   => trim($faq['question']),
-                'answer'     => trim($faq['answer']),
+                'question' => trim($faq['question']),
+                'answer' => trim($faq['answer']),
                 'sort_order' => $i,
             ]);
         }

@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\ItemType;
 use App\Models\Expositor;
 use App\Models\Product;
+use App\Models\ProductOffer;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -49,6 +50,55 @@ class ProductFactory extends Factory
             'stock_quantity' => 10,
             'sort_order' => 0,
         ];
+    }
+
+    /**
+     * Todo produto de teste nasce com a oferta de quem o cadastrou.
+     *
+     * É o que acontece no domínio desde a CAT-DOM-01: o lojista cadastra um
+     * item e, no mesmo ato, passa a oferecê-lo. Um produto sem oferta nenhuma
+     * existe — é o item que ficou no catálogo depois que o expositor saiu —,
+     * mas é o caso excepcional, não o padrão, e tem estado próprio abaixo.
+     *
+     * Os valores comerciais espelham os campos legados de `products` enquanto a
+     * dívida D-1 não for quitada, para que nenhuma coluna do banco guarde valor
+     * diferente do que a oferta cobra.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Product $product) {
+            if ($product->expositor_id === null) {
+                return;
+            }
+
+            ProductOffer::factory()->create([
+                'product_id' => $product->id,
+                'expositor_id' => $product->expositor_id,
+                'price' => $product->price,
+                'price_type' => $product->price_type,
+                'modality' => $product->modality,
+                'duration_min' => $product->duration_min,
+                'weight' => $product->weight,
+                'height' => $product->height,
+                'width' => $product->width,
+                'length' => $product->length,
+                'has_stock' => $product->has_stock,
+                'stock_quantity' => $product->stock_quantity,
+                'is_active' => $product->is_active,
+                'is_featured' => $product->is_featured,
+                'sort_order' => $product->sort_order,
+            ]);
+        });
+    }
+
+    /**
+     * Item de catálogo que ninguém oferece — o produto que sobreviveu à saída
+     * do expositor. Sem dono não há oferta a criar, e é essa a situação que a
+     * CAT-DOM-01 existe para representar sem ambiguidade.
+     */
+    public function semOferta(): static
+    {
+        return $this->state(fn () => ['expositor_id' => null]);
     }
 
     public function comResumo(?string $resumo = null): static

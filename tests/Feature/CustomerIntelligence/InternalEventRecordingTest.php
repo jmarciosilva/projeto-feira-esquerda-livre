@@ -59,7 +59,7 @@ class InternalEventRecordingTest extends TestCase
     {
         $expositor = Expositor::create(['name' => 'Loja Recording', 'slug' => 'loja-recording']);
 
-        return Product::create([
+        return Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Rede de Descanso',
@@ -235,7 +235,7 @@ class InternalEventRecordingTest extends TestCase
 
         $product = $this->makeProduct();
         $this->get(route('loja.produto', [$product->expositor->slug, $product->slug]))->assertOk();
-        app(CartService::class)->add($product, 1);
+        app(CartService::class)->add($product->ofertaVigente, 1);
 
         // produto.visualizado + produto.adicionado_carrinho
         Bus::assertDispatchedTimes(TrackCustomerEventJob::class, 2);

@@ -6,6 +6,7 @@ use App\DTO\ShippingQuoteData;
 use App\Enums\ItemType;
 use App\Models\Expositor;
 use App\Models\Product;
+use App\Models\ProductOffer;
 use Illuminate\Support\Collection;
 
 /**
@@ -18,8 +19,12 @@ trait ValidatesShippableItems
     abstract public function isConfigured(): bool;
 
     /**
+     * O que se despacha é uma oferta, não um item de catálogo: peso, dimensões
+     * e valor segurado são de quem embala e envia. Desde a CAT-DOM-01 esses
+     * dados vivem em `product_offers`.
+     *
      * @param  Collection<int, mixed>  $items
-     * @param  callable(string, string, array<int, array{product: Product, quantity: int}>): array<int, ShippingQuoteData>  $calculate
+     * @param  callable(string, string, array<int, array{offer: ProductOffer, quantity: int}>): array<int, ShippingQuoteData>  $calculate
      * @return array<int, ShippingQuoteData>
      */
     protected function quoteForStoreUsing(
@@ -38,20 +43,20 @@ trait ValidatesShippableItems
         $products = [];
 
         foreach ($items as $item) {
-            $product = $item->product;
+            $offer = $item->offer;
 
-            if (! $product instanceof Product || ! $this->isShippable($product)) {
+            if (! $offer instanceof ProductOffer || ! $this->isShippable($offer->product)) {
                 continue;
             }
 
-            $logisticError = $this->logisticDataError($product);
+            $logisticError = $this->logisticDataError($offer);
 
             if ($logisticError) {
                 return [ShippingQuoteData::error($logisticError)];
             }
 
             $products[] = [
-                'product' => $product,
+                'offer' => $offer,
                 'quantity' => (int) $item->quantity,
             ];
         }
@@ -84,25 +89,25 @@ trait ValidatesShippableItems
         return null;
     }
 
-    protected function logisticDataError(Product $product): ?string
+    protected function logisticDataError(ProductOffer $offer): ?string
     {
         $missing = collect([
-            'peso' => $product->weight,
-            'altura' => $product->height,
-            'largura' => $product->width,
-            'comprimento' => $product->length,
+            'peso' => $offer->weight,
+            'altura' => $offer->height,
+            'largura' => $offer->width,
+            'comprimento' => $offer->length,
         ])->filter(fn ($value) => blank($value) || (float) $value <= 0)->keys()->implode(', ');
 
         if ($missing === '') {
             return null;
         }
 
-        return "O produto {$product->name} não possui dados logísticos cadastrados: {$missing}.";
+        return "O produto {$offer->product->name} não possui dados logísticos cadastrados: {$missing}.";
     }
 
-    protected function isShippable(Product $product): bool
+    protected function isShippable(?Product $product): bool
     {
-        return $product->item_type === ItemType::Produto;
+        return $product?->item_type === ItemType::Produto;
     }
 
     protected function onlyDigits(string $value): string

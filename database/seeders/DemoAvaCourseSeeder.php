@@ -15,11 +15,14 @@ use App\Models\ContentCategory;
 use App\Models\Expositor;
 use App\Models\Product;
 use App\Models\User;
+use Database\Seeders\Concerns\SincronizaOfertaDoItem;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
 
 class DemoAvaCourseSeeder extends Seeder
 {
+    use SincronizaOfertaDoItem;
+
     public function run(): void
     {
         $expositor = Expositor::query()
@@ -82,6 +85,8 @@ class DemoAvaCourseSeeder extends Seeder
                 'sort_order' => 1,
             ],
         );
+
+        $this->sincronizarOferta($product, $expositor->id);
 
         $course = AvaCourse::updateOrCreate(
             ['product_id' => $product->id],
@@ -151,7 +156,7 @@ class DemoAvaCourseSeeder extends Seeder
     }
 
     /**
-     * @param array<int, array{title: string, description: string, text: string}> $lessons
+     * @param  array<int, array{title: string, description: string, text: string}>  $lessons
      */
     private function createModule(AvaCourse $course, int $sortOrder, string $title, string $description, array $lessons): void
     {

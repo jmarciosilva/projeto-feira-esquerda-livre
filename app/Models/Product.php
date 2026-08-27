@@ -73,9 +73,38 @@ class Product extends Model
         });
     }
 
+    /**
+     * @deprecated CAT-DOM-01 — o produto deixou de ter dono. Quem tem dono é a
+     * oferta. Mantida enquanto `products.expositor_id` existir como coluna
+     * legada (dívida D-1); nenhuma superfície deve autorizar nada por ela.
+     */
     public function expositor(): BelongsTo
     {
         return $this->belongsTo(Expositor::class);
+    }
+
+    /** Todos os expositores que oferecem este item, em qualquer status. */
+    public function offers(): HasMany
+    {
+        return $this->hasMany(ProductOffer::class);
+    }
+
+    /**
+     * A oferta que o público vê quando chega a este item sem passar por uma
+     * loja — card do catálogo, destaque da home, resultado de busca.
+     *
+     * Hoje há sempre no máximo uma oferta vigente por produto, porque o
+     * backfill da CAT-DOM-01C foi 1:1 e o cadastro cria produto e oferta
+     * juntos. A ordenação por preço não é decoração: ela fixa qual oferta
+     * responde no dia em que houver duas, sem que a resposta dependa da ordem
+     * de inserção no banco.
+     */
+    public function ofertaVigente(): HasOne
+    {
+        return $this->hasOne(ProductOffer::class)
+            ->vigente()
+            ->orderBy('price')
+            ->orderBy('id');
     }
 
     public function category(): BelongsTo
@@ -117,21 +146,62 @@ class Product extends Model
         return null;
     }
 
+    /**
+     * Itens que alguém está efetivamente oferecendo agora.
+     *
+     * É a tradução em consulta da decisão H-1 da CAT-DOM-01B: um produto só
+     * aparece nas vitrines enquanto existir ao menos uma oferta vigente. Sem
+     * nenhuma, ele continua existindo no catálogo e na memória da Catalog
+     * Intelligence — apenas não há quem o venda.
+     *
+     * A regra de vigência não é repetida aqui: ela vive inteira em
+     * `ProductOffer::scopeVigente()`, e é essa concentração que impede o
+     * catálogo por eixo e a página da loja de divergirem de novo.
+     */
+    public function scopeComOfertaVigente(Builder $query, bool $apenasDestaques = false): Builder
+    {
+        return $query->whereHas('offers', function (Builder $offer) use ($apenasDestaques) {
+            $offer->vigente();
+
+            if ($apenasDestaques) {
+                $offer->where('is_featured', true);
+            }
+        });
+    }
+
+    /**
+     * Ordena pela vitrine do expositor, não por uma coluna de `products`.
+     *
+     * `sort_order` é decisão de quem vende — a mesma peça pode abrir a vitrine
+     * de uma loja e fechar a de outra. A subconsulta evita o join que
+     * duplicaria o produto quando houver mais de uma oferta.
+     */
+    public function scopeOrdenadoPelaVitrine(Builder $query): Builder
+    {
+        return $query->orderBy(
+            ProductOffer::query()
+                ->select('sort_order')
+                ->whereColumn('product_offers.product_id', 'products.id')
+                ->vigente()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->limit(1)
+        );
+    }
+
     public function scopeFeatured(Builder $query): Builder
     {
-        return $query->where('is_featured', true)
-            ->where('is_active', true)
-            ->orderBy('sort_order');
+        return $query->comOfertaVigente(apenasDestaques: true)->ordenadoPelaVitrine();
     }
 
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('is_active', true)->orderBy('sort_order');
+        return $query->comOfertaVigente()->ordenadoPelaVitrine();
     }
 
     public function scopeDoEixo(Builder $query, ItemType $type): Builder
     {
-        return $query->where('item_type', $type->value)->where('is_active', true);
+        return $query->where('item_type', $type->value)->comOfertaVigente();
     }
 
     public function isProduto(): bool

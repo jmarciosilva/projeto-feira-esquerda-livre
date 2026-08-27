@@ -19,10 +19,10 @@ class CatalogoController extends Controller
         $categoriaId = (int) $request->input('categoria', 0);
 
         $items = Product::doEixo($eixo)
-            ->with('expositor')
+            ->with('ofertaVigente.expositor')
             ->when($busca, fn ($q) => $q->where('name', 'like', "%{$busca}%"))
             ->when($categoriaId, fn ($q) => $q->where('category_id', $categoriaId))
-            ->orderBy('sort_order')
+            ->ordenadoPelaVitrine()
             ->orderByDesc('created_at')
             ->paginate(24);
 
@@ -32,8 +32,12 @@ class CatalogoController extends Controller
     /** GET /api/v1/produtos/{product} */
     public function show(Product $product): ProductResource
     {
-        abort_unless($product->is_active, 404);
+        $product->load(['ofertaVigente.expositor', 'category', 'faqs']);
 
-        return new ProductResource($product->load(['expositor', 'category', 'faqs']));
+        // Item sem oferta vigente continua existindo no catálogo, mas não há o
+        // que responder ao público: nenhum expositor o está oferecendo.
+        abort_unless($product->ofertaVigente !== null, 404);
+
+        return new ProductResource($product);
     }
 }

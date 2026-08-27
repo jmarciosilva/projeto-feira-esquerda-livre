@@ -15,7 +15,7 @@ class CursoController extends Controller
     {
         $expositor = $request->user()->expositor;
 
-        $cursos = Product::where('expositor_id', $expositor->id)
+        $cursos = Product::whereHas('offers', fn ($o) => $o->where('expositor_id', $expositor->id))
             ->where('is_digital', true)
             ->with('avaCourse')
             ->orderBy('name')
@@ -40,7 +40,7 @@ class CursoController extends Controller
     public function publicar(Request $request, int $course): JsonResponse
     {
         $curso = AvaCourse::whereHas(
-            'product',
+            'product.offers',
             fn ($q) => $q->where('expositor_id', $request->user()->expositor->id)
         )->findOrFail($course);
 

@@ -4,7 +4,7 @@ namespace App\Services\Shipping;
 
 use App\DTO\ShippingQuoteData;
 use App\Models\Expositor;
-use App\Models\Product;
+use App\Models\ProductOffer;
 use App\Models\SiteSetting;
 use App\Services\Shipping\Concerns\ValidatesShippableItems;
 use Illuminate\Http\Client\RequestException;
@@ -19,7 +19,7 @@ class FrenetService
     private const BASE_URL = 'https://api.frenet.com.br';
 
     /**
-     * @param  array<int, array{product: Product, quantity: int}>  $products
+     * @param  array<int, array{offer: ProductOffer, quantity: int}>  $products
      * @return array<int, ShippingQuoteData>
      */
     public function calculate(string $originZipcode, string $destinationZipcode, array $products): array
@@ -33,7 +33,7 @@ class FrenetService
         }
 
         $invoiceValue = collect($products)->sum(
-            fn (array $item) => round((float) ($item['product']->price ?? 0), 2) * max(1, (int) $item['quantity'])
+            fn (array $item) => round((float) ($item['offer']->price ?? 0), 2) * max(1, (int) $item['quantity'])
         );
 
         $payload = [
@@ -103,17 +103,17 @@ class FrenetService
     }
 
     /**
-     * @param  array<int, array{product: Product, quantity: int}>  $products
+     * @param  array<int, array{offer: ProductOffer, quantity: int}>  $products
      * @return array<int, array<string, mixed>>
      */
     private function productsPayload(array $products): array
     {
         return collect($products)
             ->map(fn (array $item) => [
-                'Weight' => (float) $item['product']->weight,
-                'Length' => (float) $item['product']->length,
-                'Height' => (float) $item['product']->height,
-                'Width' => (float) $item['product']->width,
+                'Weight' => (float) $item['offer']->weight,
+                'Length' => (float) $item['offer']->length,
+                'Height' => (float) $item['offer']->height,
+                'Width' => (float) $item['offer']->width,
                 'Quantity' => max(1, (int) $item['quantity']),
             ])
             ->values()

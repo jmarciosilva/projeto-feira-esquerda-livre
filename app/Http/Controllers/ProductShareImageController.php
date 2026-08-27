@@ -10,17 +10,25 @@ class ProductShareImageController extends Controller
 {
     public function __invoke(Product $product, ProductShareImageService $service): Response
     {
-        abort_unless(auth()->check() && (
-            auth()->user()->isEditor()
-            || auth()->user()->expositor?->id === $product->expositor_id
-        ), 403);
+        $offer = $product->offers()
+            ->where('expositor_id', auth()->user()?->expositor?->id)
+            ->first();
 
-        $image = $service->make($product);
-        $filename = $product->slug . '-compartilhar.png';
+        // A imagem carrega preço e loja — ou seja, uma oferta. O lojista gera a
+        // da própria loja; o editor, a primeira que existir, porque ele não tem
+        // oferta nenhuma e ainda assim precisa do material de divulgação.
+        $offer ??= auth()->user()?->isEditor()
+            ? $product->offers()->orderBy('id')->first()
+            : null;
+
+        abort_unless(auth()->check() && $offer !== null, 403);
+
+        $image = $service->make($offer);
+        $filename = $product->slug.'-compartilhar.png';
 
         return response($image, 200, [
             'Content-Type' => 'image/png',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 }

@@ -77,6 +77,7 @@ use App\Models\OrderShipping;
 use App\Services\ExpositorVisibilityService;
 use App\Models\Post;
 use App\Models\Product;
+use App\Models\ProductOffer;
 use App\Models\SiteSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -98,9 +99,11 @@ Route::get('/', function () {
 
     $sessionHash = hash('sha256', session()->getId());
     $featuredExpositores = app(ExpositorVisibilityService::class)->selectForHome($sessionHash);
-    $featuredProducts = Product::featured()->where('item_type', 'produto')->with('expositor')->limit(10)->get();
-    $featuredServicos = Product::featured()->where('item_type', 'servico')->with('expositor')->limit(12)->get();
-    $featuredCuidados = Product::featured()->where('item_type', 'cuidado')->with('expositor')->limit(12)->get();
+    // `featured()` passou a exigir oferta vigente (CAT-DOM-01B, H-1): item de
+    // loja inativa nao chega mais a home so porque o produto esta ativo.
+    $featuredProducts = Product::featured()->where('item_type', 'produto')->with('ofertaVigente.expositor')->limit(10)->get();
+    $featuredServicos = Product::featured()->where('item_type', 'servico')->with('ofertaVigente.expositor')->limit(12)->get();
+    $featuredCuidados = Product::featured()->where('item_type', 'cuidado')->with('ofertaVigente.expositor')->limit(12)->get();
     $latestPosts = Post::published()->orderByDesc('published_at')->limit(5)->get();
 
     return view('welcome', compact(
@@ -197,12 +200,11 @@ foreach (['produtos' => 'produto', 'servicos' => 'servico', 'cuidados' => 'cuida
         $busca = $request->input('busca', '');
         $categoriaId = (int) $request->input('categoria', 0);
 
-        $items = Product::where('item_type', $tipo)
-            ->where('is_active', true)
-            ->with('expositor')
+        $items = Product::doEixo($eixo)
+            ->with('ofertaVigente.expositor')
             ->when($busca, fn ($q) => $q->where('name', 'like', "%{$busca}%"))
             ->when($categoriaId, fn ($q) => $q->where('category_id', $categoriaId))
-            ->orderBy('sort_order')
+            ->ordenadoPelaVitrine()
             ->orderByDesc('created_at')
             ->paginate(24);
 
@@ -438,13 +440,15 @@ Route::get('/loja/{slug}', function (string $slug) {
         ->where('is_active', true)
         ->firstOrFail();
 
-    $products = Product::where('expositor_id', $expositor->id)
-        ->where('is_active', true)
+    // A vitrine da loja e a lista de ofertas dela, nao do catalogo inteiro.
+    $offers = ProductOffer::where('expositor_id', $expositor->id)
+        ->vigente()
+        ->with('product.category')
         ->orderBy('sort_order')
         ->orderByDesc('created_at')
         ->get();
 
-    return view('loja.show', compact('expositor', 'products'));
+    return view('loja.show', compact('expositor', 'offers'));
 })->name('loja.show');
 
 Route::get('/loja/{slug}/{productSlug}/compartilhar.png', ProductSharePreviewController::class)
@@ -455,15 +459,21 @@ Route::get('/loja/{slug}/{productSlug}', function (string $slug, string $product
         ->where('is_active', true)
         ->firstOrFail();
 
-    $product = Product::where('expositor_id', $expositor->id)
-        ->where('slug', $productSlug)
-        ->where('is_active', true)
-        ->with('faqs')
+    // A URL identifica loja + item; o que ela resolve e a oferta daquela loja
+    // sobre aquele item. O mesmo produto mestre pode ser oferecido por outra
+    // loja, em outra URL, com outro preco - e sao ofertas diferentes.
+    $offer = ProductOffer::whereHas('product', fn ($q) => $q->where('slug', $productSlug))
+        ->where('expositor_id', $expositor->id)
+        ->vigente()
+        ->with('product.faqs')
         ->firstOrFail();
 
-    $otherProducts = Product::where('expositor_id', $expositor->id)
-        ->where('id', '!=', $product->id)
-        ->where('is_active', true)
+    $product = $offer->product;
+
+    $otherOffers = ProductOffer::where('expositor_id', $expositor->id)
+        ->where('id', '!=', $offer->id)
+        ->vigente()
+        ->with('product')
         ->limit(4)
         ->get();
 
@@ -473,9 +483,9 @@ Route::get('/loja/{slug}/{productSlug}', function (string $slug, string $product
             [
                 'produto_id' => $product->id,
                 'nome' => $product->name,
-                'preco' => (float) ($product->price ?? 0),
+                'preco' => (float) ($offer->price ?? 0),
                 'eixo' => $product->item_type->value,
-                'expositor_id' => $product->expositor_id,
+                'expositor_id' => $offer->expositor_id,
             ],
             $product,
         );
@@ -483,7 +493,7 @@ Route::get('/loja/{slug}/{productSlug}', function (string $slug, string $product
         report($exception);
     }
 
-    return view('loja.produto', compact('expositor', 'product', 'otherProducts'));
+    return view('loja.produto', compact('expositor', 'product', 'offer', 'otherOffers'));
 })->name('loja.produto');
 
 // ─── Painel Administrativo ────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\ExpositorResource;
 use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Expositor;
-use App\Models\Product;
+use App\Models\ProductOffer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -28,15 +28,18 @@ class LojaController extends Controller
     {
         $expositor = Expositor::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
-        $products = Product::where('expositor_id', $expositor->id)
-            ->where('is_active', true)
+        $offers = ProductOffer::where('expositor_id', $expositor->id)
+            ->vigente()
+            ->with('product')
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->get();
 
         return response()->json([
             'expositor' => new ExpositorResource($expositor),
-            'products' => ProductResource::collection($products),
+            // Cada item vem com o preço e as condições DESTA loja, não com a
+            // oferta mais barata do catálogo.
+            'products' => $offers->map(fn (ProductOffer $offer) => ProductResource::daOferta($offer)),
         ]);
     }
 }

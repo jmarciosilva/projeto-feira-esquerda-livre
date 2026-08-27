@@ -793,8 +793,11 @@
         @if($featuredProducts->isNotEmpty())
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 lg:gap-5">
                 @foreach($featuredProducts as $product)
-                    @if($product->expositor)
-                    <a href="{{ route('loja.produto', [$product->expositor->slug, $product->slug, 'return_to' => url()->full()]) }}"
+                    {{-- Preco e loja vem da oferta vigente, nunca das colunas
+                         legadas de `products` (CAT-DOM-01, divida D-1). --}}
+                    @php $oferta = $product->ofertaVigente; @endphp
+                    @if($oferta?->expositor)
+                    <a href="{{ route('loja.produto', [$oferta->expositor->slug, $product->slug, 'return_to' => url()->full()]) }}"
                        class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col"
                        style="border-color: #F0D060;">
                     @else
@@ -821,17 +824,17 @@
                             <h3 class="text-sm sm:text-base font-bold leading-snug mb-1 flex-1 line-clamp-2" style="color: #1A1A1A;">
                                 {{ $product->name }}
                             </h3>
-                            @if($product->price)
+                            @if($oferta?->price)
                                 <p class="text-base sm:text-lg font-black my-2" style="color: #C47A00;">
-                                    R$ {{ number_format($product->price, 2, ',', '.') }}
+                                    R$ {{ number_format($oferta->price, 2, ',', '.') }}
                                 </p>
                             @endif
-                            @if($product->expositor)
+                            @if($oferta?->expositor)
                                 <p class="text-xs text-gray-500 mb-3 flex items-center gap-1 line-clamp-1">
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
                                     </svg>
-                                    {{ $product->expositor->name }}
+                                    {{ $oferta->expositor->name }}
                                 </p>
                             @endif
                             <span class="btn-primary text-xs py-2 px-3 text-center w-full" style="min-height: 36px; font-size: 0.8125rem;">
@@ -839,7 +842,7 @@
                             </span>
                         </div>
 
-                    @if($product->expositor)
+                    @if($oferta?->expositor)
                     </a>
                     @else
                     </article>
@@ -893,8 +896,9 @@
         @if($featuredServicos->isNotEmpty())
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 @foreach($featuredServicos as $item)
-                    @if($item->expositor)
-                    <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug, 'return_to' => url()->full()]) }}"
+                    @php $oferta = $item->ofertaVigente; @endphp
+                    @if($oferta?->expositor)
+                    <a href="{{ route('loja.produto', [$oferta->expositor->slug, $item->slug, 'return_to' => url()->full()]) }}"
                        class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col"
                        style="border-color: #F0D060;">
                     @else
@@ -941,26 +945,26 @@
 
                             {{-- Preço com contexto --}}
                             <div class="my-2">
-                                @if($item->price_type?->value === 'sob_consulta' || (! $item->price && $item->price_type?->value !== 'fixo'))
+                                @if($oferta?->price_type?->value === 'sob_consulta' || (! $oferta?->price && $oferta?->price_type?->value !== 'fixo'))
                                     <p class="text-sm font-bold" style="color: #5C8A3C;">A combinar</p>
-                                @elseif($item->price)
+                                @elseif($oferta?->price)
                                     <p class="text-base font-black" style="color: #C47A00;">
-                                        R$ {{ number_format($item->price, 2, ',', '.') }}
-                                        @if($item->price_type?->value === 'por_hora')
+                                        R$ {{ number_format($oferta->price, 2, ',', '.') }}
+                                        @if($oferta->price_type?->value === 'por_hora')
                                             <span class="text-xs font-normal text-gray-500">/hora</span>
-                                        @elseif($item->price_type?->value === 'por_sessao')
+                                        @elseif($oferta->price_type?->value === 'por_sessao')
                                             <span class="text-xs font-normal text-gray-500">/sessão</span>
                                         @endif
                                     </p>
                                 @endif
                             </div>
 
-                            @if($item->expositor)
+                            @if($oferta?->expositor)
                                 <p class="text-xs text-gray-500 mb-3 flex items-center gap-1 line-clamp-1">
                                     <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                                     </svg>
-                                    {{ $item->expositor->name }}
+                                    {{ $oferta->expositor->name }}
                                 </p>
                             @endif
                             <span class="btn-primary text-xs py-2 px-3 text-center w-full" style="min-height: 36px; font-size: 0.8125rem;">
@@ -968,7 +972,7 @@
                             </span>
                         </div>
 
-                    @if($item->expositor)
+                    @if($oferta?->expositor)
                     </a>
                     @else
                     </article>
@@ -1023,8 +1027,9 @@
         @if($featuredCuidados->isNotEmpty())
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 @foreach($featuredCuidados as $item)
-                    @if($item->expositor)
-                    <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug, 'return_to' => url()->full()]) }}"
+                    @php $oferta = $item->ofertaVigente; @endphp
+                    @if($oferta?->expositor)
+                    <a href="{{ route('loja.produto', [$oferta->expositor->slug, $item->slug, 'return_to' => url()->full()]) }}"
                        class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover border flex flex-col"
                        style="border-color: #F0D060;">
                     @else
@@ -1068,26 +1073,26 @@
                             </h3>
 
                             <div class="my-2">
-                                @if($item->price_type?->value === 'sob_consulta' || (! $item->price && $item->price_type?->value !== 'fixo'))
+                                @if($oferta?->price_type?->value === 'sob_consulta' || (! $oferta?->price && $oferta?->price_type?->value !== 'fixo'))
                                     <p class="text-sm font-bold" style="color: #5C8A3C;">A combinar</p>
-                                @elseif($item->price)
+                                @elseif($oferta?->price)
                                     <p class="text-base font-black" style="color: #C47A00;">
-                                        R$ {{ number_format($item->price, 2, ',', '.') }}
-                                        @if($item->price_type?->value === 'por_hora')
+                                        R$ {{ number_format($oferta->price, 2, ',', '.') }}
+                                        @if($oferta->price_type?->value === 'por_hora')
                                             <span class="text-xs font-normal text-gray-500">/hora</span>
-                                        @elseif($item->price_type?->value === 'por_sessao')
+                                        @elseif($oferta->price_type?->value === 'por_sessao')
                                             <span class="text-xs font-normal text-gray-500">/sessão</span>
                                         @endif
                                     </p>
                                 @endif
                             </div>
 
-                            @if($item->expositor)
+                            @if($oferta?->expositor)
                                 <p class="text-xs text-gray-500 mb-3 flex items-center gap-1 line-clamp-1">
                                     <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                                     </svg>
-                                    {{ $item->expositor->name }}
+                                    {{ $oferta->expositor->name }}
                                 </p>
                             @endif
                             <span class="btn-primary text-xs py-2 px-3 text-center w-full" style="min-height: 36px; font-size: 0.8125rem;">
@@ -1095,7 +1100,7 @@
                             </span>
                         </div>
 
-                    @if($item->expositor)
+                    @if($oferta?->expositor)
                     </a>
                     @else
                     </article>

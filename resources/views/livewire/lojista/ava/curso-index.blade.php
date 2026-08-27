@@ -49,7 +49,7 @@
             <div class="p-5 flex flex-col gap-3 flex-1">
                 <div>
                     <h3 class="text-base font-bold text-gray-900 leading-snug">{{ $product->name }}</h3>
-                    <p class="text-sm text-gray-500 mt-0.5">R$ {{ number_format($product->price, 2, ',', '.') }}</p>
+                    <p class="text-sm text-gray-500 mt-0.5">R$ {{ number_format((float) ($item['offer']?->price ?? 0), 2, ',', '.') }}</p>
                 </div>
 
                 <div class="flex items-center gap-3 text-sm text-gray-500">

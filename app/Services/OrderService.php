@@ -55,6 +55,7 @@ class OrderService
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $item->product_id,
+                    'product_offer_id' => $item->product_offer_id,
                     'expositor_id' => $item->expositor_id,
                     'product_name' => $item->product?->name ?? 'Item removido',
                     'unit_price' => $item->price_snapshot,

@@ -57,7 +57,7 @@ class InternalReliabilityTest extends TestCase
     {
         $expositor = Expositor::create(['name' => 'Loja Conf', 'slug' => 'loja-conf']);
 
-        return Product::create([
+        return Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Rede Confiável',

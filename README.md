@@ -523,6 +523,14 @@ A Feira Esquerda Livre está organizada em seis grandes áreas funcionais:
 
 O catálogo é unificado na tabela `products`, mas separado por `item_type` para navegação pública, filtros e campos específicos.
 
+Desde a **CAT-DOM-01**, identidade de catálogo e condição de venda vivem
+separadas: `products` diz *o que o item é* (nome, descrições, categoria, eixo,
+imagens) e `product_offers` diz *quem vende, por quanto e como* (expositor,
+preço, estoque, dimensões, status, destaque). Um item continua no catálogo
+mesmo quando o expositor que o cadastrou deixa a Feira — some das vitrines, mas
+o registro e o conhecimento acumulado sobre ele permanecem, prontos para quando
+outro expositor voltar a oferecê-lo.
+
 | Eixo | Rota pública | Campos exclusivos |
 |---|---|---|
 | Produtos | `/produtos` | Estoque, quantidade, peso e dimensões de frete |

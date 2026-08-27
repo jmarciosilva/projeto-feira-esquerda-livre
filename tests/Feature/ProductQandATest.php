@@ -52,7 +52,7 @@ class ProductQandATest extends TestCase
 
     private function makeProduct(Expositor $expositor): Product
     {
-        return Product::create([
+        return Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type'    => 'produto',
             'name'         => 'Produto QA',

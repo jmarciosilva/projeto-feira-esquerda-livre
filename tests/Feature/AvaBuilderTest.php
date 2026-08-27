@@ -48,7 +48,7 @@ class AvaBuilderTest extends TestCase
 
     private function makeDigitalProductWithCourse(Expositor $expositor, bool $published = false): array
     {
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'name'         => 'Curso Teste ' . uniqid(),
             'slug'         => 'curso-teste-' . uniqid(),

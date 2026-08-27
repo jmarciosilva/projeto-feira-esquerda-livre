@@ -2055,6 +2055,7 @@ impede o cadastro manual**.
 | CAT-02 — Evolução do modelo de catálogo | ✅ Concluída |
 | CAT-03 — Base de conhecimento | ✅ Concluída |
 | CAT-04 — Motor de similaridade | ✅ Concluída |
+| CAT-DOM-01 — Produto mestre × oferta do expositor | ✅ Concluída |
 | CAT-05 — Assistente de conteúdo | ⬜ Próxima |
 | CAT-06 — IA externa (opcional) | ⬜ |
 | CAT-07 — Feedback humano e memória | ⬜ |
@@ -2145,6 +2146,68 @@ tem comando com `--dry-run` e **não foi executado** — fica como decisão huma
 | CAT-04F — Score explicável | CONCLUÍDA |
 | CAT-04G — Testes, performance e segurança | CONCLUÍDA |
 | CAT-04H — Validação real e documentação | CONCLUÍDA |
+
+**CAT-DOM-01 (concluída em 2026-08-27).** Fase intermediária de domínio,
+inserida entre CAT-04 e CAT-05 sem renumerar as fases existentes. Nasceu de um
+achado da revisão da CAT-04: um produto ativo continua existindo quando o
+expositor que o cadastrou fica inativo. Depois de analisado, **isso não é bug** —
+é o domínio pedindo separação.
+
+> Um expositor vende capas para celular e deixa a Feira. Outro entra depois e
+> vende a mesma capa. A capa não deixou de existir porque o primeiro saiu;
+> mudou apenas quem a oferece.
+
+Hoje `Product` responde a duas perguntas ao mesmo tempo — *o que é este item?* e
+*quem vende, por quanto e em que condições?*. A fase separa **identidade de
+catálogo** (`Product`) de **relação comercial** (`ProductOffer`), para que o
+conhecimento acumulado pela Catalog Intelligence sobreviva à saída de um
+lojista. Construir o assistente de conteúdo da CAT-05 sobre o modelo atual
+consolidaria a ambiguidade — por isso a CAT-05 espera.
+
+A separação **não** autoriza transferência de registros entre expositores: a
+SEC-02 continua integralmente válida e o lojista passa a ser dono da sua
+**oferta**, não da identidade global do produto. Também **não** há fusão
+automática de produtos semelhantes — dois "Tapete de crochê" de artesãos
+diferentes não são o mesmo item.
+
+| Subfase | Status |
+|---|---|
+| CAT-DOM-01A — Auditoria completa do domínio atual | CONCLUÍDA |
+| CAT-DOM-01B — Arquitetura e invariantes | CONCLUÍDA |
+| CAT-DOM-01C — Estratégia de migração | CONCLUÍDA |
+| CAT-DOM-01D — Implementação do modelo | CONCLUÍDA |
+| CAT-DOM-01E — Migração das superfícies comerciais | CONCLUÍDA |
+| CAT-DOM-01F — Segurança e isolamento (SEC-02) | CONCLUÍDA |
+| CAT-DOM-01G — Catalog Intelligence | CONCLUÍDA |
+| CAT-DOM-01H — Testes, dados reais e documentação | CONCLUÍDA |
+
+Auditoria da 01A sobre o banco real: 75 produtos, todos ativos, todos com
+expositor e preço; zero nomes repetidos entre lojas; zero pedidos. O backfill foi
+**1 produto → 1 oferta**, aditivo e sem perda: 75 ofertas criadas, nenhum produto
+sem oferta, **zero divergências** entre produto e oferta no MySQL real.
+`cart_items` e `order_items` já gravavam snapshot de expositor, preço e nome — o
+histórico de pedidos não dependia desta fase e ganhou apenas `product_offer_id`.
+
+Duas decisões de produto orientaram a implementação: item de expositor inativo
+**sai das vitrines** (o produto e o conhecimento permanecem, e voltam a aparecer
+quando outro expositor ofertar), e as colunas comerciais **permanecem** em
+`products` como espelho, sem migration destrutiva.
+
+Mudança de comportamento visível: excluir um item no painel ou pela API remove a
+**oferta**, não o produto — o item continua no catálogo, com descrições, imagens
+e conhecimento, pronto para quando alguém voltar a oferecê-lo. Nenhum contrato
+de API mudou; o app mobile não precisa de nova versão.
+
+Suíte: 577 → **594 passed · 1626 assertions · 0 failures**.
+
+Uma revisão pré-commit dirigida corrigiu cinco achados que a suíte verde não
+pegava — entre eles a home ainda lendo preço e loja das colunas legadas (com
+N+1) e uma escrita não atômica entre oferta e espelho. Multi-oferta permanece
+suportada pelo schema e **não exposta** pela aplicação: as dívidas D-1 e D-2 são
+bloqueadoras antes disso.
+
+Decisão, motivação histórica e matriz de campos:
+[`CAT_DOM_01_DECISAO_PRODUTO_MESTRE_E_OFERTAS.md`](CAT_DOM_01_DECISAO_PRODUTO_MESTRE_E_OFERTAS.md).
 
 Arquitetura, auditoria e riscos: [`CATALOG_INTELLIGENCE.md`](CATALOG_INTELLIGENCE.md).
 Roadmap executável da trilha: [`ROADMAP_CATALOG_INTELLIGENCE.md`](ROADMAP_CATALOG_INTELLIGENCE.md).

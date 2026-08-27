@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\ProductOffer;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
@@ -14,12 +15,17 @@ class ProductShareImageService
 
     public function __construct()
     {
-        $this->manager = new ImageManager(new Driver());
+        $this->manager = new ImageManager(new Driver);
     }
 
-    public function make(Product $product): string
+    /**
+     * A arte de divulgacao mostra preco e loja: e uma oferta, nao um item de
+     * catalogo. O mesmo produto oferecido por duas lojas gera duas artes.
+     */
+    public function make(ProductOffer $offer): string
     {
-        $product->loadMissing('expositor');
+        $offer->loadMissing(['product', 'expositor']);
+        $product = $offer->product;
 
         $canvas = $this->manager->create(1080, 1080)->fill('#F7F3E4');
         $canvas->drawRectangle(0, 0, function ($rectangle): void {
@@ -43,15 +49,15 @@ class ProductShareImageService
 
         $regular = $this->fontPath('arial.ttf');
         $bold = $this->fontPath('arialbd.ttf');
-        $storeName = $product->expositor?->name ?? 'Feira Esquerda Livre';
-        $price = $product->price
-            ? 'R$ ' . number_format((float) $product->price, 2, ',', '.')
+        $storeName = $offer->expositor?->name ?? 'Feira Esquerda Livre';
+        $price = $offer->price
+            ? 'R$ '.number_format((float) $offer->price, 2, ',', '.')
             : 'Consulte o valor';
-        $url = route('loja.produto', [$product->expositor?->slug, $product->slug]);
+        $url = route('loja.produto', [$offer->expositor?->slug, $product->slug]);
         $titleX = 90;
 
-        if ($product->expositor?->logo_path && Storage::disk('public')->exists($product->expositor->logo_path)) {
-            $logo = $this->manager->read(Storage::disk('public')->path($product->expositor->logo_path))->cover(78, 78);
+        if ($offer->expositor?->logo_path && Storage::disk('public')->exists($offer->expositor->logo_path)) {
+            $logo = $this->manager->read(Storage::disk('public')->path($offer->expositor->logo_path))->cover(78, 78);
             $canvas->place($logo, 'top-left', 90, 36);
             $titleX = 188;
         }

@@ -61,7 +61,11 @@ class CursoBuilder extends Component
     {
         // Garante que o lojista só acessa seu próprio curso
         $expositor = auth()->user()->expositor;
-        if ($course->product->expositor_id !== $expositor->id) {
+        $temOferta = $course->product->offers()
+            ->where('expositor_id', $expositor->id)
+            ->exists();
+
+        if (! $temOferta) {
             abort(403);
         }
 

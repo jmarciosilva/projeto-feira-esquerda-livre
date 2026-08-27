@@ -95,11 +95,15 @@ class LojistaApiTest extends TestCase
             'stock_quantity' => 5,
         ])->assertOk()->assertJsonPath('data.name', 'Bolsa Artesanal Grande');
 
+        // Excluir tira o item da loja, não do catálogo (CAT-DOM-01): a oferta
+        // acaba, o produto e o conhecimento associado a ele sobrevivem.
         $this->deleteJson("/api/v1/lojista/produtos/{$productId}")->assertNoContent();
-        $this->assertDatabaseCount('products', 0);
+        $this->assertDatabaseCount('product_offers', 0);
+        $this->assertDatabaseCount('products', 1);
+        $this->assertDatabaseMissing('product_offers', ['expositor_id' => $expositor->id]);
 
-        // Confere que o produto pertence à loja do lojista autenticado
-        $this->assertDatabaseMissing('products', ['expositor_id' => $expositor->id]);
+        // E, sem oferta, ele deixa de aparecer no painel do lojista.
+        $this->getJson('/api/v1/lojista/produtos')->assertOk()->assertJsonCount(0, 'data');
     }
 
     public function test_cannot_edit_another_lojistas_product(): void
@@ -107,7 +111,7 @@ class LojistaApiTest extends TestCase
         ['user' => $ownerUser, 'expositor' => $ownerExpositor] = $this->makeLojista();
         ['user' => $otherUser] = $this->makeLojista();
 
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $ownerExpositor->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Artesanal',
@@ -176,7 +180,7 @@ class LojistaApiTest extends TestCase
     public function test_can_answer_and_toggle_question_visibility(): void
     {
         ['user' => $user, 'expositor' => $expositor] = $this->makeLojista();
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Artesanal',
@@ -216,7 +220,7 @@ class LojistaApiTest extends TestCase
     public function test_cursos_list_and_publish_toggle(): void
     {
         ['user' => $user, 'expositor' => $expositor] = $this->makeLojista();
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'servico',
             'name' => 'Curso de Culinária',

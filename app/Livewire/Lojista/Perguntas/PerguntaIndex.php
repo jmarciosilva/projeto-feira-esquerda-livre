@@ -27,7 +27,7 @@ class PerguntaIndex extends Component
 
         $question = ProductQuestion::whereHas(
             'product',
-            fn ($q) => $q->where('expositor_id', $expositorId)
+            fn ($q) => $q->whereHas('offers', fn ($o) => $o->where('expositor_id', $expositorId))
         )->findOrFail($questionId);
 
         $answer = trim($this->answers[$questionId] ?? '');
@@ -37,7 +37,7 @@ class PerguntaIndex extends Component
         ]);
 
         $question->update([
-            'answer'      => $answer,
+            'answer' => $answer,
             'answered_at' => now(),
             'answered_by' => auth()->id(),
         ]);
@@ -52,7 +52,7 @@ class PerguntaIndex extends Component
 
         $question = ProductQuestion::whereHas(
             'product',
-            fn ($q) => $q->where('expositor_id', $expositorId)
+            fn ($q) => $q->whereHas('offers', fn ($o) => $o->where('expositor_id', $expositorId))
         )->findOrFail($questionId);
 
         $question->update(['is_visible' => ! $question->is_visible]);
@@ -64,7 +64,7 @@ class PerguntaIndex extends Component
 
         $questions = ProductQuestion::whereHas(
             'product',
-            fn ($q) => $q->where('expositor_id', $expositorId)
+            fn ($q) => $q->whereHas('offers', fn ($o) => $o->where('expositor_id', $expositorId))
         )
             ->when($this->filter === 'pending', fn ($q) => $q->whereNull('answered_at'))
             ->when($this->filter === 'answered', fn ($q) => $q->whereNotNull('answered_at'))
@@ -72,8 +72,9 @@ class PerguntaIndex extends Component
             ->orderByDesc('created_at')
             ->paginate(15);
 
-        $pendingCount  = ProductQuestion::whereHas('product', fn ($q) => $q->where('expositor_id', $expositorId))->whereNull('answered_at')->count();
-        $answeredCount = ProductQuestion::whereHas('product', fn ($q) => $q->where('expositor_id', $expositorId))->whereNotNull('answered_at')->count();
+        $daLoja = fn ($q) => $q->whereHas('offers', fn ($o) => $o->where('expositor_id', $expositorId));
+        $pendingCount = ProductQuestion::whereHas('product', $daLoja)->whereNull('answered_at')->count();
+        $answeredCount = ProductQuestion::whereHas('product', $daLoja)->whereNotNull('answered_at')->count();
 
         return view('livewire.lojista.perguntas.pergunta-index', compact('questions', 'pendingCount', 'answeredCount'))
             ->layout('lojista.layouts.app', ['title' => 'Perguntas dos Clientes']);

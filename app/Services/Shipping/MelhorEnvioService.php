@@ -4,7 +4,7 @@ namespace App\Services\Shipping;
 
 use App\DTO\ShippingQuoteData;
 use App\Models\Expositor;
-use App\Models\Product;
+use App\Models\ProductOffer;
 use App\Models\SiteSetting;
 use App\Services\Shipping\Concerns\ValidatesShippableItems;
 use Illuminate\Http\Client\RequestException;
@@ -17,7 +17,7 @@ class MelhorEnvioService
     use ValidatesShippableItems;
 
     /**
-     * @param  array<int, array{product: Product, quantity: int}>  $products
+     * @param  array<int, array{offer: ProductOffer, quantity: int}>  $products
      * @return array<int, ShippingQuoteData>
      */
     public function calculate(string $originZipcode, string $destinationZipcode, array $products): array
@@ -124,9 +124,9 @@ class MelhorEnvioService
         return collect($events)
             ->filter(fn ($e) => is_array($e))
             ->map(fn (array $e) => [
-                'status'      => (string) ($e['status'] ?? 'in_transit'),
+                'status' => (string) ($e['status'] ?? 'in_transit'),
                 'description' => (string) ($e['message'] ?? $e['description'] ?? 'Atualização de status'),
-                'location'    => isset($e['city'], $e['state']) ? "{$e['city']}, {$e['state']}" : null,
+                'location' => isset($e['city'], $e['state']) ? "{$e['city']}, {$e['state']}" : null,
                 'happened_at' => $e['event_date'] ?? $e['created_at'] ?? now()->toDateTimeString(),
             ])
             ->values()
@@ -209,22 +209,22 @@ class MelhorEnvioService
     }
 
     /**
-     * @param  array<int, array{product: Product, quantity: int}>  $products
+     * @param  array<int, array{offer: ProductOffer, quantity: int}>  $products
      * @return array<int, array<string, mixed>>
      */
     private function productsPayload(array $products): array
     {
         return collect($products)
             ->map(function (array $item) {
-                $product = $item['product'];
+                $offer = $item['offer'];
 
                 return [
-                    'id' => (string) $product->id,
-                    'width' => (float) $product->width,
-                    'height' => (float) $product->height,
-                    'length' => (float) $product->length,
-                    'weight' => (float) $product->weight,
-                    'insurance_value' => round((float) ($product->price ?? 0), 2),
+                    'id' => (string) $offer->product_id,
+                    'width' => (float) $offer->width,
+                    'height' => (float) $offer->height,
+                    'length' => (float) $offer->length,
+                    'weight' => (float) $offer->weight,
+                    'insurance_value' => round((float) ($offer->price ?? 0), 2),
                     'quantity' => max(1, (int) $item['quantity']),
                 ];
             })

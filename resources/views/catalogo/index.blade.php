@@ -96,7 +96,9 @@
         @else
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             @foreach($items as $item)
-            <a href="{{ route('loja.produto', [$item->expositor->slug, $item->slug, 'return_to' => url()->full()]) }}"
+            {{-- O card mostra o item; quem vende, por quanto e como vem da oferta. --}}
+            @php $oferta = $item->ofertaVigente; @endphp
+            <a href="{{ route('loja.produto', [$oferta->expositor->slug, $item->slug, 'return_to' => url()->full()]) }}"
                class="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                 <div class="aspect-square overflow-hidden bg-gray-50">
                     @php
@@ -114,21 +116,21 @@
                 </div>
                 <div class="p-3">
                     <p class="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">{{ $item->name }}</p>
-                    <p class="text-xs text-gray-400 mt-0.5 truncate">{{ $item->expositor->name }}</p>
-                    @if($item->price_type?->value === 'sob_consulta')
+                    <p class="text-xs text-gray-400 mt-0.5 truncate">{{ $oferta->expositor->name }}</p>
+                    @if($oferta->price_type?->value === 'sob_consulta')
                     <p class="font-semibold text-sm mt-1.5" style="color:#C47A00;">A combinar</p>
-                    @elseif($item->price)
+                    @elseif($oferta->price)
                     <p class="font-bold text-base mt-1.5" style="color:#C47A00;">
-                        R$ {{ number_format((float) $item->price, 2, ',', '.') }}
-                        @if($item->price_type && $item->item_type?->value !== 'produto')
-                        <span class="text-xs font-normal text-gray-400">/ {{ $item->price_type->label() }}</span>
+                        R$ {{ number_format((float) $oferta->price, 2, ',', '.') }}
+                        @if($oferta->price_type && $item->item_type?->value !== 'produto')
+                        <span class="text-xs font-normal text-gray-400">/ {{ $oferta->price_type->label() }}</span>
                         @endif
                     </p>
                     @endif
-                    @if($item->modality)
+                    @if($oferta->modality)
                     <span class="inline-flex items-center mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
                           style="background:#f0fdf4; color:#166534;">
-                        {{ $item->modality->label() }}
+                        {{ $oferta->modality->label() }}
                     </span>
                     @endif
                 </div>

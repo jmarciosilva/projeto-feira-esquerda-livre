@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expositor;
-use App\Models\Product;
+use App\Models\ProductOffer;
 use App\Models\SiteSetting;
 use App\Services\Shipping\FrenetService;
 use App\Services\Shipping\MelhorEnvioService;
@@ -28,21 +28,28 @@ class ShippingController extends Controller
 
         $store = Expositor::findOrFail($validated['store_id']);
         $productIds = collect($validated['items'])->pluck('product_id')->all();
-        $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
+        // O contrato da requisição não mudou — continua chegando `store_id` e
+        // `product_id`. O que mudou é o que esse par identifica: a oferta
+        // daquela loja sobre aquele item. Buscar as ofertas já filtrando por
+        // expositor é, ao mesmo tempo, a resolução e a checagem de propriedade.
+        $offers = ProductOffer::whereIn('product_id', $productIds)
+            ->where('expositor_id', $store->id)
+            ->with('product')
+            ->get()
+            ->keyBy('product_id');
 
         foreach ($validated['items'] as $item) {
-            $product = $products->get($item['product_id']);
-
-            if ((int) $product?->expositor_id !== $store->id) {
+            if (! $offers->has($item['product_id'])) {
                 throw ValidationException::withMessages([
                     'items' => 'Todos os produtos informados devem pertencer à loja escolhida.',
                 ]);
             }
         }
 
-        $items = collect($validated['items'])->map(function (array $item) use ($products) {
+        $items = collect($validated['items'])->map(function (array $item) use ($offers) {
             return (object) [
-                'product' => $products->get($item['product_id']),
+                'offer' => $offers->get($item['product_id']),
                 'quantity' => (int) $item['quantity'],
             ];
         });

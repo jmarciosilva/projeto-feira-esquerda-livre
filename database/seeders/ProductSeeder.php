@@ -4,10 +4,13 @@ namespace Database\Seeders;
 
 use App\Models\Expositor;
 use App\Models\Product;
+use Database\Seeders\Concerns\SincronizaOfertaDoItem;
 use Illuminate\Database\Seeder;
 
 class ProductSeeder extends Seeder
 {
+    use SincronizaOfertaDoItem;
+
     public function run(): void
     {
         $expositores = Expositor::all()->keyBy('name');
@@ -107,10 +110,12 @@ class ProductSeeder extends Seeder
             $data['expositor_id'] = $expositor->id;
             $data['is_active']    = true;
 
-            Product::updateOrCreate(
+            $product = Product::updateOrCreate(
                 ['name' => $data['name']],
                 $data
             );
+
+            $this->sincronizarOferta($product, $expositor->id);
         }
 
         $this->command->info('10 produtos criados.');

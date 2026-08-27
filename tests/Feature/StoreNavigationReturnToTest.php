@@ -19,7 +19,7 @@ class StoreNavigationReturnToTest extends TestCase
             'is_active' => true,
         ]);
 
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Vaso de Ceramica',

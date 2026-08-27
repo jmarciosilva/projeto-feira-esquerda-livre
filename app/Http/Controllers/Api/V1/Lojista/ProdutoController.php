@@ -2,16 +2,18 @@
 
 namespace App\Http\Controllers\Api\V1\Lojista;
 
+use App\Actions\Catalog\SaveProductWithOffer;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lojista\ProdutoRequest;
 use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Ava\AvaCourse;
 use App\Models\Product;
 use App\Models\ProductFaq;
+use App\Models\ProductOffer;
 use App\Services\ImageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Response;
 use Illuminate\Support\Str;
 
 class ProdutoController extends Controller
@@ -19,80 +21,106 @@ class ProdutoController extends Controller
     /** GET /api/v1/lojista/produtos */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $products = Product::where('expositor_id', $request->user()->expositor->id)
-            ->with('category')
+        $offers = ProductOffer::where('expositor_id', $request->user()->expositor->id)
+            ->with('product.category')
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->paginate(20);
 
-        return ProductResource::collection($products);
+        // Cada item responde com a oferta DESTE lojista, inclusive quando ela
+        // está inativa — é o painel dele, não a vitrine pública. Fixar a
+        // relação evita que o resource caia na oferta vigente de outra loja.
+        $offers->setCollection(
+            $offers->getCollection()->map(
+                fn (ProductOffer $offer) => $offer->product->setRelation('ofertaVigente', $offer)
+            )
+        );
+
+        return ProductResource::collection($offers);
     }
 
     /** GET /api/v1/lojista/produtos/{product} */
     public function show(Request $request, Product $product): ProductResource
     {
-        $this->authorizeProduct($request, $product);
+        $offer = $this->authorizeProduct($request, $product);
+        $product->load(['category', 'faqs']);
 
-        return new ProductResource($product->load(['category', 'faqs']));
+        return ProductResource::daOferta($offer);
     }
 
     /** POST /api/v1/lojista/produtos */
     public function store(ProdutoRequest $request, ImageService $imageService): ProductResource
     {
-        // Upload/compressão de imagem é I/O de disco, não de banco — fica fora da transação.
-        $data = $this->buildData($request, $request->user()->expositor->id, [], $imageService);
+        // Upload/compressao de imagem e I/O de disco, nao de banco: fica fora
+        // da transacao, que agora vive dentro da SaveProductWithOffer.
+        $data = $this->buildData($request, [], $imageService);
 
-        $product = DB::transaction(function () use ($data, $request) {
-            $product = Product::create($data);
-            $this->syncFaqs($product->id, $request->input('faqs', []));
-            $this->syncAvaCourse($product, (bool) ($data['is_digital'] ?? false));
+        $offer = app(SaveProductWithOffer::class)($data, $request->user()->expositor);
 
-            return $product;
-        });
+        $this->syncFaqs($offer->product_id, $request->input('faqs', []));
+        $this->syncAvaCourse($offer->product, (bool) ($data['is_digital'] ?? false));
 
-        return new ProductResource($product->load(['category', 'faqs']));
+        $offer->product->load(['category', 'faqs']);
+
+        return ProductResource::daOferta($offer);
     }
 
     /**
      * PUT /api/v1/lojista/produtos/{product} (use POST + _method=PUT quando enviar
-     * novas imagens, já que PHP não popula uploads em requests PUT reais).
+     * novas imagens, ja que PHP nao popula uploads em requests PUT reais).
      */
     public function update(ProdutoRequest $request, Product $product, ImageService $imageService): ProductResource
     {
-        $this->authorizeProduct($request, $product);
+        $offer = $this->authorizeProduct($request, $product);
 
-        $data = $this->buildData($request, $product->expositor_id, $product->images ?? [], $imageService, $product);
+        $data = $this->buildData($request, $product->images ?? [], $imageService, $product);
 
-        DB::transaction(function () use ($product, $data, $request) {
-            $product->update($data);
-            $this->syncFaqs($product->id, $request->input('faqs', []));
-            $this->syncAvaCourse($product, (bool) ($data['is_digital'] ?? false));
-        });
+        $offer = app(SaveProductWithOffer::class)($data, $request->user()->expositor, $offer);
 
-        return new ProductResource($product->fresh()->load(['category', 'faqs']));
+        $this->syncFaqs($offer->product_id, $request->input('faqs', []));
+        $this->syncAvaCourse($offer->product, (bool) ($data['is_digital'] ?? false));
+
+        $offer->product->load(['category', 'faqs']);
+
+        return ProductResource::daOferta($offer);
     }
 
-    /** DELETE /api/v1/lojista/produtos/{product} */
-    public function destroy(Request $request, Product $product): \Illuminate\Http\Response
+    /**
+     * DELETE /api/v1/lojista/produtos/{product}
+     *
+     * Remove a oferta, nao o item do catalogo: mesma regra do painel. As
+     * imagens ficam, porque pertencem ao produto, que continua existindo para
+     * quando alguem voltar a oferece-lo.
+     */
+    public function destroy(Request $request, Product $product): Response
     {
-        $this->authorizeProduct($request, $product);
+        $offer = $this->authorizeProduct($request, $product);
 
-        (new ImageService)->delete(
-            collect($product->images ?? [])->flatMap(fn ($image) => [$image['thumb'] ?? null, $image['medium'] ?? null])->filter()->all()
-        );
-
-        $product->delete();
+        $offer->delete();
 
         return response()->noContent();
     }
 
-    private function authorizeProduct(Request $request, Product $product): void
+    /**
+     * Devolve a oferta do lojista autenticado sobre este item, ou aborta.
+     *
+     * Desde a CAT-DOM-01 a pergunta da SEC-02 mudou de alvo: nao e mais "este
+     * produto e seu?", e sim "voce tem uma oferta sobre ele?". Item que o
+     * lojista nao oferece nao e editavel por ele.
+     */
+    private function authorizeProduct(Request $request, Product $product): ProductOffer
     {
-        abort_unless($product->expositor_id === $request->user()->expositor->id, 403);
+        $offer = $product->offers()
+            ->where('expositor_id', $request->user()->expositor->id)
+            ->first();
+
+        abort_if($offer === null, 403);
+
+        return $offer;
     }
 
     /** @return array<string, mixed> */
-    private function buildData(ProdutoRequest $request, int $expositorId, array $currentImages, ImageService $imageService, ?Product $product = null): array
+    private function buildData(ProdutoRequest $request, array $currentImages, ImageService $imageService, ?Product $product = null): array
     {
         $data = $request->validated();
         $isProduto = $data['item_type'] === 'produto';
@@ -114,7 +142,6 @@ class ProdutoController extends Controller
         }
 
         return [
-            'expositor_id' => $expositorId,
             'item_type' => $data['item_type'],
             'category_id' => $data['category_id'] ?? null,
             'name' => $data['name'],

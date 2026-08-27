@@ -12,8 +12,9 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-04 concluída** — motor de similaridade |
+| Fase atual | **CAT-DOM-01 concluída** — produto mestre × oferta do expositor |
 | Próxima | CAT-05 — assistente de conteúdo |
+| Suíte | 594 passed · 1626 assertions · 0 failures |
 | Código do módulo | `App\CatalogIntelligence`: 6 enums, 3 models, 5 Actions, 4 DTOs, 3 Support, 1 Query, 1 Command, 1 Provider |
 | Branch | `main` |
 
@@ -53,6 +54,7 @@ Qualquer regressão em relação a esses números precisa ser justificada.
 | **CAT-02** | ✅ Concluída | `short_description` no domínio, formulário, API e factories |
 | **CAT-03** | ✅ Concluída | Base de conhecimento, proveniência e governança |
 | **CAT-04** | ✅ Concluída | Motor de similaridade determinístico e explicável |
+| **CAT-DOM-01** | ✅ Concluída | Separação entre produto mestre e oferta do expositor |
 | **CAT-05** | ⬜ Próxima | Assistente de conteúdo |
 | **CAT-06** | ⬜ | Integração opcional com IA externa |
 | **CAT-07** | ⬜ | Feedback humano e memória |
@@ -221,6 +223,76 @@ Detalhes de algoritmo, pesos e limitações em `CATALOG_INTELLIGENCE.md` §3B.
 
 ---
 
+## CAT-DOM-01 — Produto mestre × oferta do expositor ✅
+
+**Fase intermediária de domínio, inserida entre CAT-04 e CAT-05 sem renumerar as
+fases existentes.** Decisão comercial, motivação e critério de aceite em
+[`CAT_DOM_01_DECISAO_PRODUTO_MESTRE_E_OFERTAS.md`](CAT_DOM_01_DECISAO_PRODUTO_MESTRE_E_OFERTAS.md).
+
+Um produto não deixa de existir porque o expositor que o cadastrou saiu da
+Feira. Hoje `Product` responde a duas perguntas de uma vez — *o que é este
+item?* e *quem vende, por quanto e em que condições?* — e a CAT-05 construiria o
+assistente de conteúdo em cima dessa ambiguidade. A fase separa identidade de
+catálogo (`Product`) de relação comercial (`ProductOffer`).
+
+| Subfase | Status |
+|---|---|
+| CAT-DOM-01A — Auditoria completa do domínio atual | CONCLUÍDA |
+| CAT-DOM-01B — Arquitetura e invariantes | CONCLUÍDA |
+| CAT-DOM-01C — Estratégia de migração | CONCLUÍDA |
+| CAT-DOM-01D — Implementação do modelo | CONCLUÍDA |
+| CAT-DOM-01E — Migração das superfícies comerciais | CONCLUÍDA |
+| CAT-DOM-01F — Segurança e isolamento (SEC-02) | CONCLUÍDA |
+| CAT-DOM-01G — Catalog Intelligence | CONCLUÍDA |
+| CAT-DOM-01H — Testes, dados reais e documentação | CONCLUÍDA |
+
+**Baseline da fase** (2026-08-27): commit `3cab7e2`, working tree limpa,
+**577 passed · 1568 assertions · 0 failures** em 592,07s.
+**Resultado:** **594 passed · 1626 assertions · 0 failures** (após revisão pré-commit), três migrations
+aditivas, 75 ofertas backfilladas 1:1 com **zero divergências** no MySQL real.
+
+**Decisões humanas da fase.** (H-1) Item de expositor inativo **sai das
+vitrines** — o produto e o conhecimento continuam no catálogo e voltam a
+aparecer quando outro expositor criar uma oferta. (H-2) As colunas comerciais
+**permanecem** em `products`, sem migration destrutiva; ficam em espelho,
+mantido pela `SaveProductWithOffer`, como dívida D-1.
+
+**Auditoria (01A).** 75 produtos, todos ativos, todos com expositor e com preço;
+**zero** nomes repetidos entre lojas, **zero** pedidos e itens de carrinho.
+O backfill é **1 produto → 1 oferta**, sem fusão e sem perda: a fase cria a
+capacidade de um produto ter várias ofertas, não faz nenhum produto existente
+passar a ser compartilhado — deduplicar é proibido pelo §9 da decisão.
+
+Achados que mudam o plano:
+
+1. **O histórico já é snapshot.** `cart_items` e `order_items` gravam
+   `expositor_id`, preço e nome do produto. A integridade de pedidos passados
+   não depende desta fase; `product_offer_id` entra como coluna aditiva.
+2. **Visibilidade pública é incoerente.** `/produtos` não filtra expositor
+   ativo, `/loja/{slug}` filtra. Item de loja inativa aparece na listagem e dá
+   404 ao ser clicado — o achado que originou a fase. Regra correta é decisão
+   de produto, tratada na 01B.
+3. **O conhecimento já está no lugar certo.** `catalog_product_knowledge` aponta
+   para `products`, nunca para expositor: a 01G é verificação, não reescrita.
+4. **A regra de cadastro está duplicada** entre `ProdutoForm` (Livewire) e
+   `ProdutoController::buildData()` (API). Separar produto e oferta dobraria a
+   duplicação — a 01D extrai uma action compartilhada.
+
+Matriz de campos completa em `CAT_DOM_01_...md` §19.4.
+
+**Revisão pré-commit.** Cinco achados corrigidos antes do commit — dois HIGH: a
+home lia o espelho legado (e com N+1), e `toggleActive` escrevia oferta e espelho
+fora de transação. Detalhes em `CAT_DOM_01_...md` §29.
+
+**Multi-oferta: estrutura pronta, funcionalidade não exposta.** Nenhum caminho da
+aplicação cria uma segunda oferta sobre um produto existente, e D-1/D-2 são
+bloqueadores antes de expor isso.
+
+**Restrições da fase:** nada de CAT-05, IA externa, embeddings, merge automático
+de produtos, `migrate:fresh`, Pint global ou enfraquecimento da SEC-02.
+
+---
+
 ## CAT-05 — Assistente de conteúdo ⬜
 
 `ListingContext` → `ListingAssistant` → `ListingSuggestion` estruturado:
@@ -309,3 +381,9 @@ Sem push sem autorização explícita. Sem Pint global. Sem refatoração oportu
 | 4 | FULLTEXT indisponível em SQLite | Média | §6 |
 | 5 | `ProdutoForm::save()` assume `auth()->user()->expositor` não nulo | Baixa | §2.5 |
 | 6 | `product_faqs` vazio — sem corpus de FAQ | Baixa | §2.7 |
+| 7 | ~~Catálogo por eixo e home não filtram expositor inativo~~ | — | **Resolvido na CAT-DOM-01** (decisão H-1) |
+| 8 | Colunas comerciais legadas em `products` (espelho, sem leitores) | Média — **bloqueia multi-oferta** | CAT-DOM-01, dívida D-1 |
+| 9 | Imagens, FAQs, perguntas e curso AVA são autorais do vendedor mas ficam no produto mestre | Média — **bloqueia multi-oferta** | CAT-DOM-01, dívida D-2 |
+| 10 | `order_items.expositor_id` é `CASCADE`: excluir expositor apaga itens de pedido | Alta — **preexistente**, fora da trilha | CAT-DOM-01 §29.7 |
+| 11 | Estoque nunca é decrementado nem validado no checkout | Média — **preexistente** | CAT-DOM-01 §29.7 |
+| 12 | `products.slug` é UNIQUE global e o cadastro não desambigua nomes iguais | Média — **preexistente** | CAT-DOM-01 §29.7 |

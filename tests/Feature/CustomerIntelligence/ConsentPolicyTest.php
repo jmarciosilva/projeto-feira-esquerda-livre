@@ -50,13 +50,12 @@ class ConsentPolicyTest extends TestCase
     {
         $expositor = Expositor::create(['name' => 'Loja Consentimento', 'slug' => 'loja-consentimento']);
 
-        return Product::create([
+        return Product::factory()->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Rede de Dormir',
             'slug' => 'rede-de-dormir',
             'price' => 189.90,
-            'stock' => 5,
             'is_active' => true,
         ]);
     }
@@ -221,7 +220,7 @@ class ConsentPolicyTest extends TestCase
         $produto = $this->produto();
         $carrinho = app(CartService::class);
 
-        $carrinho->add($produto, 2);
+        $carrinho->add($produto->ofertaVigente, 2);
 
         $this->assertSame(2, $carrinho->items()->sum('quantity'), 'O carrinho não depende de analytics.');
         $this->assertSame(0, TrackedEvent::count());

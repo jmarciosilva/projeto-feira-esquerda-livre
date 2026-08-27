@@ -372,8 +372,8 @@
                     <span wire:loading>Salvando...</span>
                 </button>
 
-                @if($product)
-                <a href="{{ route('loja.show', $product->expositor->slug) }}" target="_blank"
+                @if($offer?->expositor)
+                <a href="{{ route('loja.show', $offer->expositor->slug) }}" target="_blank"
                    class="block text-center py-3 rounded-xl border-2 font-semibold text-base transition-colors"
                    style="border-color: #E8A000; color: #C47A00;">
                     Ver Minha Loja →

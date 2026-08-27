@@ -37,7 +37,7 @@ class CheckoutAuthenticationTest extends TestCase
         ]);
 
         $expositor = Expositor::create(['name' => 'Loja Teste', 'slug' => 'loja-teste']);
-        $product = Product::create([
+        $product = Product::factory()->create([
             'expositor_id' => $expositor->id,
             'name' => 'Produto Teste',
             'slug' => 'produto-teste',

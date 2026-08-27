@@ -105,10 +105,10 @@
                     if (auth()->check() && auth()->user()->expositor) {
                         $expId = auth()->user()->expositor->id;
                         $perguntasPendentes = \App\Models\ProductQuestion::whereHas('product',
-                            fn ($q) => $q->where('expositor_id', $expId)
+                            fn ($q) => $q->whereHas('offers', fn ($o) => $o->where('expositor_id', $expId))
                         )->whereNull('answered_at')->count();
                         $chatNaoLidos = \App\Models\OrderMessage::whereHas('split',
-                            fn ($q) => $q->where('expositor_id', $expId)
+                            fn ($q) => $q->whereHas('offers', fn ($o) => $o->where('expositor_id', $expId))
                         )->where('sender_id', '!=', auth()->id())
                          ->whereNull('read_at')
                          ->count();
