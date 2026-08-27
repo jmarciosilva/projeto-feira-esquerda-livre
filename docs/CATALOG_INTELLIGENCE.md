@@ -4,10 +4,11 @@ Inteligência de catálogo da **Feira Esquerda Livre**: base de conhecimento
 própria, similaridade entre itens, assistente de cadastro e memória de feedback
 humano.
 
-> **Status:** CAT-01, CAT-02 e CAT-03 concluídas. A seção **§3A** descreve o que
-> já está no código; a **§3** descreve a arquitetura proposta, cuja maior parte
-> ainda é planejamento. Implementado e planejado estão explicitamente separados
-> — nada aqui deve ser lido como pronto só por estar escrito.
+> **Status:** CAT-01, CAT-02, CAT-03 e CAT-04 concluídas. As seções **§3A** e
+> **§3B** descrevem o que já está no código; a **§3** descreve a arquitetura
+> proposta, cuja maior parte ainda é planejamento. Implementado e planejado
+> estão explicitamente separados — nada aqui deve ser lido como pronto só por
+> estar escrito.
 
 Trilha independente. Não se confunde com Customer Intelligence (CI-01…CI-09),
 SEC-01 ou GOV-01, e não antecipa a GOV-02.
@@ -588,6 +589,193 @@ artesanato. Idempotente e sem tocar em `products`.
 
 ---
 
+## 3B. Motor de similaridade (CAT-04)
+
+Responde a duas perguntas, sempre com o motivo junto: *quais conceitos se
+aplicam a este item?* e *quais itens do catálogo se parecem com ele?*
+
+Determinístico, explicável e sem nenhuma chamada externa. O valor da fase não é
+o score — é conseguir responder **por quê**.
+
+### 3B.1 O caminho
+
+```text
+texto do item
+      ↓  ProductTextNormalizer (delega ao KnowledgeNormalizer da CAT-03)
+texto normalizado
+      ↓  MatchProductKnowledge — busca por FRASE, só conceito aprovado
+candidatos diretos (nome canônico / termo)
+      ↓  um passo pelas relações
+candidatos de contexto (peso muito menor)
+      ↓  AssociateProductKnowledge — só evidência direta vira registro
+catalog_product_knowledge
+      ↓  FindSimilarProducts — interseção de conceitos
+itens semelhantes, com razões
+```
+
+### 3B.2 Casamento por frase, não por token
+
+A busca é por **frase normalizada inteira**, cercada por espaços. Conceitos do
+catálogo são compostos — "feito à mão", "ervas medicinais", "economia
+solidária" — e quebrar por espaço destruiria o que os torna conceitos.
+
+A auditoria dos 75 itens reais deu o exemplo: "solidária" aparece 10 vezes, mas
+sempre em "Consultoria Solidária" e "Tecnologia Solidária". Nenhuma é economia
+solidária, e a busca por frase acerta ao não marcar nenhuma. As bordas de espaço
+também impedem que "crochê" seja encontrado dentro de "crocheteiro".
+
+Sem stemming e sem NLP: reduzir "tapetes" a "tapete" exigiria regras de
+português que erram o bastante para não valerem o risco agora.
+
+### 3B.3 Uma normalização só
+
+`ProductTextNormalizer` **não normaliza** — delega ao `KnowledgeNormalizer` da
+CAT-03. Se houvesse duas regras, "Crochê" digitado pelo lojista e `croche`
+gravado na base deixariam de se encontrar por um detalhe de acento, e o defeito
+seria invisível porque cada lado estaria certo pela sua própria régua.
+
+### 3B.4 Pesos
+
+Fonte única: `SimilarityScorer`. Nenhum `+10` espalhado por aí.
+
+| Evidência | Peso |
+|---|---|
+| Texto contém o **nome canônico** do conceito | 10 |
+| Texto contém um **termo** do conceito | 8 |
+| Conceito alcançado por **relação** | 3 |
+| Conceito compartilhado, **ambos os lados humanos** | 6 |
+| Conceito compartilhado, **algum lado automático** | 4 |
+| Mesma categoria pública | 2 |
+
+Os números não foram medidos — codificam uma **ordem de confiança**. O score
+serve para ordenar, não para ser lido como porcentagem: "87,3% de similaridade"
+seria falsa ciência; "12 pontos, por técnica e atributo compartilhados" é
+auditável.
+
+Relação vale 3 contra 10 de propósito: "crochê se relaciona com tricô" não torna
+um tapete de crochê uma peça de tricô. É contexto, não fato.
+
+### 3B.5 Candidato ≠ associação
+
+| | Candidato | Associação |
+|---|---|---|
+| Onde vive | memória | `catalog_product_knowledge` |
+| Quem produz | `MatchProductKnowledge` | `AssociateProductKnowledge` |
+| Escreve no banco | **nunca** | sim |
+| Inclui contexto por relação | sim | **nunca** |
+
+O matcher roda inteiro sem gravar uma linha — é o que permitirá sugerir durante
+um cadastro que ainda nem foi salvo.
+
+**Só evidência direta vira registro.** Falso negativo custa uma sugestão a
+menos; falso positivo entra na base, é lido depois como conhecimento e volta
+reforçando outros itens — o sistema passaria a confirmar o próprio engano. Os
+dois erros não têm o mesmo preço.
+
+### 3B.6 Contra a verdade circular
+
+Associação automática grava `KnowledgeSource::Derived`, valor que já existia na
+CAT-03 — nenhuma proveniência nova foi inventada. Na similaridade, um conceito
+compartilhado só vale peso cheio quando **os dois lados** foram assinados por
+pessoa. Basta um lado automático para o par valer menos, e é assim que um erro
+automático não se amplifica.
+
+Associação humana nunca é sobrescrita nem rebaixada por uma passagem automática.
+
+### 3B.7 Alcance: catálogo inteiro
+
+A similaridade atravessa lojistas, por decisão. O objetivo declarado da trilha é
+reaproveitar conhecimento **entre** lojas; limitar ao próprio expositor
+esvaziaria isso — um lojista novo não teria referência nenhuma.
+
+O que é lido já é público: apenas itens `is_active`, e apenas nome, categoria e
+conceitos — o mesmo que qualquer visitante vê em `/produtos` e `/loja/{slug}`.
+Nada de estoque, custo, dono ou pedido. A **SEC-02 continua intacta**: ela
+protege *edição* de item alheio, e nada aqui escreve em produto.
+
+### 3B.8 Custo
+
+Contagem de consultas travada por teste, não tempo de relógio:
+
+| Operação | Consultas |
+|---|---|
+| Casar item → conhecimento | ≤ 3, independente do tamanho da base |
+| Item → itens semelhantes | ≤ 3, independente do tamanho do catálogo |
+
+Sem consulta dentro de laço. O matcher carrega os conceitos aprovados de uma vez
+e casa em PHP: troca memória por previsibilidade, adequado enquanto a base for
+da ordem de centenas de conceitos — que é o horizonte declarado desta fase.
+
+Nada de FULLTEXT: só Blueprint e consultas relacionais, iguais em MySQL e
+SQLite.
+
+### 3B.9 Score não é persistido
+
+É derivado do texto atual do item e ficaria desatualizado no instante em que o
+lojista editasse a descrição. Recalcular é barato; invalidar cache não é.
+
+### 3B.10 Backfill
+
+`catalog-intelligence:associate-products`, com `--dry-run`, `--product=` e
+`--chunk=`. Vive num comando e não numa migration porque **migration muda
+esquema e comando muda dado** — backfill em migration roda sozinho no deploy,
+sem ninguém ler o resultado.
+
+Dry-run sobre os 75 itens reais: **45 com evidência direta, 30 sem nenhuma**.
+Conceitos mais encontrados: Artesanato (13), Feito à mão (11), Kit (10), Bem
+viver (9), Decoração (7), Presente (7), Cerâmica (5), Ervas medicinais (5).
+
+O backfill em massa **não foi executado**: fica como decisão humana informada,
+agora que o relatório existe.
+
+### 3B.11 Exemplo real (MySQL, itens do catálogo)
+
+```text
+Semelhantes a "Vaso de Cerâmica Esmaltado":
+
+  [12] Produto Artesanal de Demonstração - Cerâmica Viva
+         - Técnica compartilhada: Cerâmica.
+         - Contexto compartilhado: Decoração.
+         - Atributo compartilhado: Feito à mão.
+  [4]  Tigela de Barro Nordestina
+         - Técnica compartilhada: Cerâmica.
+```
+
+### 3B.12 O que a CAT-04 implementou e o que não implementou
+
+| Implementado | Onde |
+|---|---|
+| Casamento item → conhecimento, por frase | `MatchProductKnowledge` |
+| Associação controlada, só evidência direta | `AssociateProductKnowledge` |
+| Similaridade item → item | `FindSimilarProducts` |
+| Score explicável, fonte única | `SimilarityScorer` |
+| Razões em português junto do resultado | `MatchReason` |
+| Comando manual com `--dry-run` | `catalog-intelligence:associate-products` |
+
+| **Não** implementado | Onde pertence |
+|---|---|
+| Backfill persistente global do catálogo | Decisão humana, depois do relatório de dry-run |
+| Integração no `ProdutoForm` do lojista | CAT-05+ |
+| Tela de "produtos semelhantes" | CAT-05+ |
+| Geração de descrição | **CAT-05** |
+| Provider de IA externa | **CAT-06** |
+| Embeddings, busca vetorial, FULLTEXT | CAT-04 nível 3+ / futuro |
+| Agendamento automático do comando | Nenhuma — permanece manual por decisão |
+
+O motor existe e é exercitado por testes e por linha de comando. **Ele ainda não
+aparece em nenhuma tela.**
+
+### 3B.13 Limitações conhecidas
+
+- Sem stemming: "tapete" e "tapetes" são coisas diferentes para o matcher.
+- Sem tolerância a erro de digitação.
+- A base carrega os conceitos aprovados inteiros em memória a cada casamento.
+- A expansão por relação para em um salto.
+- `short_description` está vazia nos 75 itens (a CAT-02 não fez backfill), então
+  hoje ela não contribui — mas já é lida.
+
+---
+
 ## 4. Fronteiras — o que esta trilha não faz
 
 - Não integra com Customer Intelligence. A arquitetura só é preparada para o
@@ -722,3 +910,4 @@ a inteligência estiver indisponível, cadastra manualmente como sempre.
 | SEC-02 | Concluída | 2026-08-26 | Trilha de segurança própria: corrigiu o IDOR do §2.4 e isolou o catálogo por expositor. Pré-requisito da CAT-02. |
 | CAT-02 | Concluída | 2026-08-26 | `short_description` no domínio, formulário, API e factories. Sem IA, sem tags, sem atributos estruturados. |
 | CAT-03 | Concluída | 2026-08-26 | Base de conhecimento: 4 tabelas `catalog_*`, 5 enums, normalizador, 3 Actions, governança de proveniência e base inicial de 28 conceitos. Zero IA externa. |
+| CAT-04 | Concluída | 2026-08-26 | Motor de similaridade determinístico e explicável: casamento por frase, expansão por relação, associação conservadora e similaridade item↔item. Zero IA externa. |

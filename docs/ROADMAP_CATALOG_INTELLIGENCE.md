@@ -12,9 +12,9 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-03 concluída** — base de conhecimento |
-| Próxima | CAT-04 — motor de similaridade |
-| Código do módulo | `App\CatalogIntelligence` existe: 5 enums, 3 models, 3 Actions, 1 Support |
+| Fase atual | **CAT-04 concluída** — motor de similaridade |
+| Próxima | CAT-05 — assistente de conteúdo |
+| Código do módulo | `App\CatalogIntelligence`: 6 enums, 3 models, 5 Actions, 4 DTOs, 3 Support, 1 Query, 1 Command, 1 Provider |
 | Branch | `main` |
 
 ---
@@ -52,8 +52,8 @@ Qualquer regressão em relação a esses números precisa ser justificada.
 | **CAT-01** | ✅ Concluída | Auditoria, arquitetura, riscos, plano de testes, documentação |
 | **CAT-02** | ✅ Concluída | `short_description` no domínio, formulário, API e factories |
 | **CAT-03** | ✅ Concluída | Base de conhecimento, proveniência e governança |
-| **CAT-04** | ⬜ Próxima | Motor de similaridade |
-| **CAT-05** | ⬜ | Assistente de conteúdo |
+| **CAT-04** | ✅ Concluída | Motor de similaridade determinístico e explicável |
+| **CAT-05** | ⬜ Próxima | Assistente de conteúdo |
 | **CAT-06** | ⬜ | Integração opcional com IA externa |
 | **CAT-07** | ⬜ | Feedback humano e memória |
 | **CAT-08** | ⬜ | Interface administrativa da inteligência |
@@ -175,14 +175,49 @@ inferência produto → conceito (CAT-04). Detalhes em
 
 ---
 
-## CAT-04 — Motor de similaridade ⬜
+## CAT-04 — Motor de similaridade ✅
 
-Níveis 1 (categoria + termos + atributos) e 2 (textual) sobre a infraestrutura
-existente. `EmbeddingProvider` como contrato, sem acoplar fornecedor. Funciona
-sem embeddings.
+**Concluída em 2026-08-26.** Baseline 542 → final 577 testes, 0 falhas.
 
-Decidir aqui a estratégia FULLTEXT vs. SQLite. `ProductFactory` já existe, criada
-na CAT-02, e a base de conhecimento da CAT-03 é o ponto de partida do nível 1.
+O sistema passou a responder "quais conceitos se aplicam a este item?" e "quais
+itens se parecem com ele?" — sempre com o motivo junto. Determinístico,
+explicável, sem nenhuma chamada externa.
+
+| Subfase | Status |
+|---|---|
+| CAT-04A — Auditoria da superfície de similaridade | CONCLUÍDA |
+| CAT-04B — Representação normalizada do produto | CONCLUÍDA |
+| CAT-04C — Matching produto → conhecimento | CONCLUÍDA |
+| CAT-04D — Associação produto → conhecimento | CONCLUÍDA |
+| CAT-04E — Similaridade produto → produto | CONCLUÍDA |
+| CAT-04F — Score explicável | CONCLUÍDA |
+| CAT-04G — Testes, performance e segurança | CONCLUÍDA |
+| CAT-04H — Validação real e documentação | CONCLUÍDA |
+
+**Auditoria.** Dos campos disponíveis, `name` (75/75) e `description` (75/75)
+carregam o sinal; `category_id` cobre 65/75; `short_description` está vazia nos
+75 (a CAT-02 não fez backfill) e por isso não contribui hoje, embora já seja
+lida. A contagem de palavras dos itens reais mostrou que o catálogo é
+majoritariamente texto de seeder — "para" (52), "expositor" (46),
+"demonstração" (28) lideram sem dizer nada sobre o item. Sinal real:
+"artesanal" (11), "cerrado" (16), "cerâmica" (9), "solidária" (10).
+
+**Casamento por frase**, nunca por token solto — conceitos compostos como
+"ervas medicinais" e "economia solidária" se perderiam. E "solidária" em
+"Consultoria Solidária" corretamente **não** casa com economia solidária.
+
+**Candidato ≠ associação.** O matcher não escreve nada; só evidência direta vira
+registro no pivot. Contexto por relação nunca é persistido.
+
+**Alcance global**, atravessando lojistas — é o objetivo declarado da trilha.
+Só item ativo, só campo público. **SEC-02 intacta**: nada aqui escreve em
+produto.
+
+**Backfill não executado.** O comando existe com `--dry-run`; a passagem sobre
+os 75 itens reais deu 45 com evidência direta e 30 sem nenhuma. Persistir em
+massa fica como decisão humana informada.
+
+Detalhes de algoritmo, pesos e limitações em `CATALOG_INTELLIGENCE.md` §3B.
 
 ---
 

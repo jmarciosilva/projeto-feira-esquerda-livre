@@ -2054,8 +2054,8 @@ impede o cadastro manual**.
 | CAT-01 — Auditoria e arquitetura | ✅ Concluída |
 | CAT-02 — Evolução do modelo de catálogo | ✅ Concluída |
 | CAT-03 — Base de conhecimento | ✅ Concluída |
-| CAT-04 — Motor de similaridade | ⬜ Próxima |
-| CAT-05 — Assistente de conteúdo | ⬜ |
+| CAT-04 — Motor de similaridade | ✅ Concluída |
+| CAT-05 — Assistente de conteúdo | ⬜ Próxima |
 | CAT-06 — IA externa (opcional) | ⬜ |
 | CAT-07 — Feedback humano e memória | ⬜ |
 | CAT-08 — Interface administrativa | ⬜ |
@@ -2110,6 +2110,41 @@ isso é CAT-04 em diante.
 | CAT-03F — Seed inicial controlado | CONCLUÍDA |
 | CAT-03G — Testes e hardening | CONCLUÍDA |
 | CAT-03H — Validação final | CONCLUÍDA |
+
+**CAT-04 (concluída em 2026-08-26).** O motor que usa a memória da CAT-03. Dado
+o texto de um item, encontra os conceitos aprovados que se aplicam; dado um
+item, encontra outros que se parecem com ele. Sempre com a razão junto:
+*"técnica compartilhada: Cerâmica; contexto compartilhado: Decoração"*.
+
+O casamento é por **frase inteira**, não por palavra solta — "ervas medicinais"
+e "economia solidária" são conceitos, e quebrá-los por espaço os destruiria. A
+mesma normalização da CAT-03 é reaproveitada, para que "Crochê" digitado e
+`croche` gravado se encontrem.
+
+Duas separações sustentam a fase. **Candidato não é associação**: o matcher roda
+inteiro sem gravar, e só evidência direta no texto vira registro — conceito
+alcançado por relação é contexto, nunca fato. E **conceito confirmado por pessoa
+pesa mais que associado automaticamente**, para que um erro automático não se
+amplifique reforçando outros itens.
+
+Alcance global, atravessando lojistas, porque reaproveitar conhecimento entre
+lojas é o objetivo da trilha; só item ativo e só campo público. **SEC-02 intacta**
+— nada aqui escreve em produto. **Zero IA externa, zero embedding, zero
+FULLTEXT.**
+
+Validado no MySQL real: 45 dos 75 itens têm evidência direta. O backfill em massa
+tem comando com `--dry-run` e **não foi executado** — fica como decisão humana.
+
+| Subfase | Status |
+|---|---|
+| CAT-04A — Auditoria da superfície de similaridade | CONCLUÍDA |
+| CAT-04B — Representação normalizada do produto | CONCLUÍDA |
+| CAT-04C — Matching produto → conhecimento | CONCLUÍDA |
+| CAT-04D — Associação produto → conhecimento | CONCLUÍDA |
+| CAT-04E — Similaridade produto → produto | CONCLUÍDA |
+| CAT-04F — Score explicável | CONCLUÍDA |
+| CAT-04G — Testes, performance e segurança | CONCLUÍDA |
+| CAT-04H — Validação real e documentação | CONCLUÍDA |
 
 Arquitetura, auditoria e riscos: [`CATALOG_INTELLIGENCE.md`](CATALOG_INTELLIGENCE.md).
 Roadmap executável da trilha: [`ROADMAP_CATALOG_INTELLIGENCE.md`](ROADMAP_CATALOG_INTELLIGENCE.md).
