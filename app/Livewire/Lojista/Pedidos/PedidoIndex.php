@@ -84,6 +84,9 @@ class PedidoIndex extends Component
         ]);
 
         $shipping->fill([
+            // O que o cliente pagou de frete para esta loja ja e fato desde o
+            // checkout; o envio apenas o carrega, em vez de nascer com zero.
+            'price'         => $shipping->price > 0 ? $shipping->price : ($split->shipping_amount ?? 0),
             'carrier'       => trim($this->carrier),
             'tracking_code' => strtoupper(trim($this->trackingCode)),
             'status'        => ShippingStatus::Shipped,

@@ -33,13 +33,37 @@ class OrderService
         $itemsTotal = $cart->total();
         $shippingTotal = round((float) ($customerData['shipping_total'] ?? 0), 2);
 
+        // Frete por loja, como o cliente o contratou. Chega do checkout web;
+        // o checkout da API ainda envia apenas o total agregado.
+        $shippingPorExpositor = $customerData['shipping_por_expositor'] ?? [];
+        unset($customerData['shipping_por_expositor']);
+
         $deliveryType = $customerData['delivery_type'] ?? 'entrega';
         $shippingNote = $customerData['shipping_note'] ?? null;
         $shippingNote ??= $deliveryType === 'retirada'
             ? 'Retirada combinada diretamente com o(s) lojista(s) via WhatsApp.'
             : ($settings->frete_mensagem_manual ?: 'Frete a combinar diretamente com o(s) lojista(s) via WhatsApp.');
 
-        $order = DB::transaction(function () use ($customerData, $items, $itemsTotal, $shippingTotal, $cart, $shippingNote, $commission) {
+        $lojasDoPedido = $items->pluck('expositor_id')->unique();
+        $lojasNoPedido = $lojasDoPedido->count();
+
+        // O frete cobrado e a soma do que cada loja **deste pedido** cobrou.
+        //
+        // O carrinho pode ter mudado depois da cotacao — por outra aba, pelo
+        // drawer, pela API — e a selecao de frete de uma loja que saiu ficaria
+        // pendurada no total. Derivar o total das lojas presentes fecha a
+        // divergencia entre `orders.shipping_total` e a soma dos splits, e
+        // impede cobrar transporte de mercadoria que nao esta no pedido.
+        if ($shippingPorExpositor !== []) {
+            $shippingTotal = round(
+                $lojasDoPedido
+                    ->filter(fn ($id) => array_key_exists($id, $shippingPorExpositor))
+                    ->sum(fn ($id) => (float) $shippingPorExpositor[$id]),
+                2,
+            );
+        }
+
+        $order = DB::transaction(function () use ($customerData, $items, $itemsTotal, $shippingTotal, $cart, $shippingNote, $commission, $shippingPorExpositor, $lojasNoPedido) {
             $order = Order::create([
                 ...$customerData,
                 'user_id' => Auth::id(),
@@ -79,6 +103,12 @@ class OrderService
                     'commission_percent' => $commission,
                     'commission_amount' => $commissionAmount,
                     'net_amount' => $gross - $commissionAmount,
+                    'shipping_amount' => $this->freteDaLoja(
+                        $expositorId,
+                        $shippingPorExpositor,
+                        $shippingTotal,
+                        $lojasNoPedido,
+                    ),
                     'status' => 'pendente',
                 ]);
             }
@@ -109,5 +139,36 @@ class OrderService
         }
 
         return $order;
+    }
+
+    /**
+     * Quanto do frete pertence a esta loja — ou `null` quando nao da para saber.
+     *
+     * Tres situacoes, nesta ordem:
+     *
+     * 1. o checkout informou o valor por loja: e o fato, usa-se ele;
+     * 2. o pedido nao teve frete, ou tem uma unica loja: a divisao e deduzivel
+     *    com seguranca;
+     * 3. veio so o total agregado de um pedido com varias lojas: a divisao e
+     *    desconhecida, e `null` diz isso. Ratear por conta propria seria
+     *    inventar um fato comercial que ninguem afirmou.
+     *
+     * @param  array<int|string, float|int|string>  $shippingPorExpositor
+     */
+    private function freteDaLoja(
+        int|string|null $expositorId,
+        array $shippingPorExpositor,
+        float $shippingTotal,
+        int $lojasNoPedido,
+    ): ?float {
+        if (array_key_exists($expositorId, $shippingPorExpositor)) {
+            return round((float) $shippingPorExpositor[$expositorId], 2);
+        }
+
+        if ($shippingTotal <= 0.0 || $lojasNoPedido === 1) {
+            return $shippingTotal;
+        }
+
+        return null;
     }
 }

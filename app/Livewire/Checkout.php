@@ -235,19 +235,46 @@ class Checkout extends Component
         }
     }
 
+    /**
+     * O cliente escolhe **qual** cotacao, nunca **quanto** ela custa.
+     *
+     * Este metodo e um endpoint proprio do Livewire, alcancavel com qualquer
+     * argumento — a mesma licao da SEC-02C. O preco enviado pelo navegador e
+     * ignorado: vale o da cotacao correspondente em `$shipping_quotes`, que foi
+     * calculada no servidor e viaja protegida pelo checksum do componente.
+     *
+     * Sem isso, o frete congelado no pedido seria um numero escolhido por quem
+     * paga a conta.
+     */
     public function selectShippingOption(int $storeId, array $quote): void
     {
         if (! empty($quote['error_message'])) {
             return;
         }
 
+        $escolhido = $quote['service_id'] ?? null;
+
+        if ($escolhido === null) {
+            return;
+        }
+
+        // Casa pelo identificador do servico, nunca por nome de transportadora
+        // — duas opcoes podem se chamar igual, e o nome vem do navegador.
+        $cotada = collect($this->shipping_quotes[$storeId] ?? [])
+            ->first(fn (array $opcao) => ($opcao['service_id'] ?? null) === $escolhido
+                && empty($opcao['error_message']));
+
+        if ($cotada === null) {
+            return;
+        }
+
         $this->selected_shipping_options[$storeId] = [
-            'service_id' => $quote['service_id'] ?? null,
-            'company' => $quote['company'] ?? null,
-            'service_name' => $quote['service_name'] ?? null,
-            'price' => isset($quote['price']) ? round((float) $quote['price'], 2) : 0.0,
-            'delivery_time' => $quote['delivery_time'] ?? null,
-            'currency' => $quote['currency'] ?? 'BRL',
+            'service_id' => $cotada['service_id'] ?? null,
+            'company' => $cotada['company'] ?? null,
+            'service_name' => $cotada['service_name'] ?? null,
+            'price' => isset($cotada['price']) ? round((float) $cotada['price'], 2) : 0.0,
+            'delivery_time' => $cotada['delivery_time'] ?? null,
+            'currency' => $cotada['currency'] ?? 'BRL',
             'error_message' => null,
         ];
     }
@@ -376,6 +403,9 @@ class Checkout extends Component
             'address_estado' => $address?->estado,
             'shipping_total' => $this->shippingTotal(),
             'shipping_note' => $this->shippingNote(),
+            // Congela o frete loja a loja, e nao so a soma: o split precisa
+            // saber quanto daquela venda foi transporte.
+            'shipping_por_expositor' => $this->fretePorExpositor(),
         ], $cart);
 
         $this->orderReference = $order->reference;
@@ -463,6 +493,20 @@ class Checkout extends Component
     {
         return collect($this->selected_shipping_options)
             ->sum(fn (array $quote) => (float) ($quote['price'] ?? 0));
+    }
+
+    /**
+     * @return array<int|string, float>
+     */
+    private function fretePorExpositor(): array
+    {
+        if ($this->delivery_type === 'retirada') {
+            return [];
+        }
+
+        return collect($this->selected_shipping_options)
+            ->map(fn (array $quote) => round((float) ($quote['price'] ?? 0), 2))
+            ->all();
     }
 
     private function shippingNote(): ?string

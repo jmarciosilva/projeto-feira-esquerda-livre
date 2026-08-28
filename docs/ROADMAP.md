@@ -2286,7 +2286,7 @@ O princípio que a sustenta:
 |---|---|---|
 | FIN-SEC-01A — Auditoria e invariantes | ✅ Concluída | Matriz de riscos, mapa de FKs, reprodução dos cenários |
 | FIN-SEC-01B — Preservação histórica e FKs | ✅ Implementada | `SET NULL` nas FKs comerciais + snapshot do vendedor |
-| FIN-SEC-01C — Snapshot comercial completo | ⬜ | Comissão por item, frete e taxas de gateway |
+| FIN-SEC-01C — Snapshot comercial imutável | ✅ Pronta para revisão | Frete por loja congelado e origem confiável do valor |
 | FIN-SEC-01D — Ciclo de confirmação de pagamento | ⬜ | `applyPayment` atômico e por evento |
 | FIN-SEC-01E — Integridade e concorrência de estoque | ⬜ | Reserva, validação e proteção contra overselling |
 | FIN-SEC-01F — Cancelamento, expiração e restauração | ⬜ | Pix expirado, estorno, devolução |
@@ -2315,6 +2315,24 @@ incorretos — o mais grave deles uma brecha de autorização: a página do pedi
 pública, e `null === null` deixava um visitante anônimo alcançar o chat de um
 split cujo vendedor fora excluído. Histórico preservado não é permissão
 preservada.
+
+**FIN-SEC-01C (2026-08-28).** A 01B garantiu que o pedido sobreviva; a 01C
+garante que ele continue dizendo a verdade. A auditoria confirmou que preço,
+quantidade, comissão e valores do vendedor **já eram** snapshots corretos — o
+que faltava era o frete por loja, que só existia como texto em `shipping_note`.
+Agora `order_splits.shipping_amount` guarda quanto o cliente pagou de transporte
+a cada vendedor, nullable quando a divisão é genuinamente desconhecida.
+
+No caminho apareceu um achado de segurança: o checkout web gravava o **preço de
+frete enviado pelo navegador**, e congelar aquilo seria congelar um número
+escolhido por quem paga a conta. O cliente passou a escolher qual cotação, nunca
+quanto ela custa. O mesmo problema na API (`shipping_total` vindo do payload)
+ficou registrado como **F-13**, aberto, porque corrigi-lo muda contrato público.
+
+A revisão pré-commit da 01C encontrou mais um problema financeiro: o frete de
+uma loja que saísse do carrinho por fora do checkout continuava sendo cobrado, e
+a soma dos splits deixava de fechar com o total. O total do frete passou a ser
+derivado das lojas que realmente entram no pedido.
 
 Estoque, atomicidade do pagamento e regra de retenção **seguem abertos** nas
 fases seguintes. Detalhes, decisões e matriz de achados em

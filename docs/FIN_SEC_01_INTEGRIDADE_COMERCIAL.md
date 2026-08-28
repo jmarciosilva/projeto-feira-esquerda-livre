@@ -30,7 +30,7 @@ setembro a loja mude de nome, o produto saia do ar e a oferta seja removida.
 |---|---|---|
 | **FIN-SEC-01A** | ✅ Concluída | Auditoria, matriz de riscos e invariantes |
 | **FIN-SEC-01B** | ✅ Implementada | Preservação histórica e correção das FKs comerciais |
-| FIN-SEC-01C | ⬜ Não iniciada | Snapshot comercial completo (comissão por item, frete, taxas) |
+| **FIN-SEC-01C** | ✅ Pronta para revisão | Snapshot comercial imutável — frete por loja e origem confiável |
 | FIN-SEC-01D | ⬜ Não iniciada | Ciclo de confirmação de pagamento atômico e por evento |
 | FIN-SEC-01E | ⬜ Não iniciada | Integridade e concorrência de estoque |
 | FIN-SEC-01F | ⬜ Não iniciada | Cancelamento, expiração e restauração |
@@ -76,6 +76,7 @@ sustentasse**. Classificado como **BLOCKER BEFORE PRODUCTION**.
 | F-10 | Sem Pix expirado, estorno, devolução ou troca | MEDIUM | 01F |
 | F-11 | Domínio financeiro acoplado ao Mercado Pago | MEDIUM | 01D |
 | F-12 | Nenhum model usa SoftDeletes | DOCUMENTED DEBT | — |
+| F-13 | `POST /api/v1/checkout` aceita `shipping_total` do payload do cliente sem recotar no servidor | HIGH — **preexistente, aberto** | trilha de pagamento/frete |
 
 ---
 
@@ -211,6 +212,171 @@ O passado continua consultável sem o vendedor vivo; ninguém herda o papel dele
 | INV-B-08 | Snapshot não sincroniza com o cadastro vivo | ✔ |
 | INV-B-09 | FK nullable não quebra API nem view histórica | ✔ — após R-2 |
 | INV-B-10 | Relações internas `Order → Item/Split` intactas | ✔ |
+
+---
+
+## FIN-SEC-01C — Snapshot comercial imutável
+
+A 01B garantiu que o pedido **sobreviva**. A 01C garante que ele continue
+**dizendo a verdade**: que consiga explicar, anos depois, quais condições
+comerciais valiam no dia da venda, sem consultar o catálogo, a regra de comissão
+ou a tabela de frete de hoje.
+
+### Auditoria — o que já era congelado
+
+A maior parte do retrato já existia. A auditoria confirmou, e três testes novos
+provam, que estes campos **já eram** snapshots corretos:
+
+| Informação | Onde | Situação |
+|---|---|---|
+| Produto vendido | `order_items.product_name` | já congelado |
+| Vendedor | `order_items.expositor_name` · `order_splits.expositor_name` | congelado na 01B |
+| Preço unitário | `order_items.unit_price` (de `cart_items.price_snapshot`) | já congelado |
+| Quantidade e total | `order_items.quantity` · `total_price` | já congelados |
+| Bruto do vendedor | `order_splits.gross_amount` | já congelado |
+| Percentual e valor de comissão | `order_splits.commission_percent` · `commission_amount` | já congelados |
+| Líquido do vendedor | `order_splits.net_amount` | já congelado |
+| Frete total do pedido | `orders.shipping_total` | já congelado |
+| **Frete por loja** | — | **ausente** |
+| Desconto / cupom | — | não existe no sistema |
+| Taxa de gateway | — | ainda não é fato conhecido |
+
+A comissão vem de `SiteSetting.comissao_percentual` — configuração global,
+aplicada e congelada no momento do pedido. A regra não foi alterada.
+
+### O gap: frete por loja
+
+O cliente escolhe uma cotação **por loja** no checkout, mas o pedido só guardava
+a soma. O detalhe por vendedor virava texto livre em `shipping_note` —
+*"Loja 154: Correios PAC - R$ 25,00"* —, com o **id** da loja, onde nenhum
+relatório consegue ler. E `order_shippings.price`, que existia para isso, nascia
+com `0.00` porque o registro só é criado quando o lojista marca o envio.
+
+Consequência: o split não sabia quanto daquela venda foi mercadoria e quanto foi
+transporte — exatamente a pergunta que qualquer acerto de repasse faz.
+
+### O achado de segurança: o frete era escolhido pelo cliente
+
+`Checkout::selectShippingOption()` gravava o **preço enviado pelo navegador**.
+Como todo método público de Livewire é um endpoint próprio — a mesma lição da
+SEC-02C e da SEC-03 —, nada impedia uma chamada com `price` arbitrário, e
+`confirmar()` não revalidava. O valor ia para `orders.shipping_total`,
+para `total_amount` e para a cobrança no Mercado Pago.
+
+Congelar esse número seria congelar uma mentira. Agora o cliente escolhe **qual**
+cotação, nunca **quanto** ela custa: o servidor casa a escolha contra
+`$shipping_quotes`, que ele mesmo calculou e que viaja protegida pelo checksum
+do componente.
+
+### Campos adicionados
+
+| Campo | Tabela | Motivo |
+|---|---|---|
+| `shipping_amount` | `order_splits` | Quanto de frete o cliente pagou àquela loja |
+
+Um só campo. `commission_percent`, `gross_amount` e `net_amount` já existiam, e
+duplicá-los no item seria repetir fato sem necessidade.
+
+**Nullable, não `default 0`.** Zero é uma afirmação — "não houve frete para esta
+loja" — e só pode ser feita quando o pedido não teve frete ou quando há uma
+única loja. Quando chega apenas o total agregado de um pedido com várias lojas,
+a divisão é desconhecida e `NULL` é a resposta honesta. Ratear por conta própria
+seria inventar um fato que ninguém afirmou.
+
+Sem backfill além do caso deduzível (pedidos com frete zero): não há fonte
+confiável para dividir retroativamente o frete de um pedido antigo, e o texto de
+`shipping_note` é frase, não dado.
+
+### Decisões registradas
+
+| # | Decisão |
+|---|---|
+| **D-FIN-06** | Valores comerciais aplicados a um pedido são fatos históricos |
+| **D-FIN-07** | Alteração posterior em `ProductOffer` não reescreve o pedido |
+| **D-FIN-08** | Alteração posterior na regra de comissão não recalcula `OrderSplit` |
+| **D-FIN-09** | Taxa de gateway só vira snapshot quando for fato conhecido; não será estimada nem preenchida com zero |
+| **D-FIN-10** | `OrderSplit` é cálculo comercial histórico, **não** recebível financeiro |
+
+### Imutabilidade
+
+Varredura por escritas posteriores em `unit_price`, `gross_amount`,
+`commission_percent`, `commission_amount`, `net_amount` e `shipping_amount`:
+**nenhuma**. Esses campos são escritos uma única vez, na criação do pedido,
+dentro da transação do `OrderService`. Nenhuma rotina os sincroniza com o
+cadastro vivo.
+
+### Fora do escopo, com motivo
+
+| Item | Por quê |
+|---|---|
+| Taxa de gateway | Só nasce depois do pagamento/liquidação. Preenchê-la agora seria inventar (D-FIN-09) |
+| Desconto / cupom | Não existe no sistema — nada a congelar |
+| `seller_receivables`, `payments`, ledger | Fases financeiras posteriores (D-FIN-10) |
+| Regra dos 33 dias | Depende de decisão de negócio sobre o marco de contagem |
+
+### Revisão pré-commit da 01C
+
+Dois achados, ambos corrigidos, e ambos com teste que falha no estado anterior.
+
+| # | Achado | Severidade |
+|---|---|---|
+| **R-1** | **Frete de loja que saiu do carrinho continuava sendo cobrado.** `selected_shipping_options` guarda a escolha por loja, mas o carrinho pode mudar por fora do checkout — outra aba, o drawer, a API — e os métodos que limpam as cotações não são acionados. O total somava a loja ausente, cobrando transporte de mercadoria que não estava no pedido, e a soma dos splits deixava de fechar com `orders.shipping_total` | **HIGH — financeiro** |
+| **R-2** | A escolha da cotação casava por `service_id` mesmo quando nulo, e uma opção sem identificador podia ser selecionada por engano | LOW — endurecido |
+
+A correção do R-1 ficou no `OrderService`, e não no componente: o total do frete
+passou a ser **derivado** das lojas que realmente entraram no pedido, em vez de
+aceito como número pronto. Isso fecha a divergência para qualquer chamador, não
+só para a tela que originou o problema — e corrige de quebra uma cobrança
+indevida que era anterior a esta fase.
+
+### O que a revisão confirmou
+
+- **Sem dupla contabilização.** `total_amount = items_total + shipping_total`, e
+  `shipping_amount` não entra em `gross_amount`, `commission_amount` nem
+  `net_amount`. O frete aparece uma única vez.
+- **Comissão inalterada.** Ela incide sobre a mercadoria (`gross_amount` é a
+  soma dos subtotais dos itens), nunca sobre o frete. A 01C não tocou nisso.
+- **Imutabilidade.** Varredura por `update`, `forceFill`, `fill`, `increment` e
+  `decrement` sobre os campos históricos: **nenhuma escrita posterior**.
+- **Nenhum relatório soma `order_splits`** por agregação — não havia como o
+  campo novo contaminar dashboard algum.
+- **Sem N+1.** O casamento da cotação lê um array em memória.
+- **`NULL` é ignorado por `SUM`**, o que é o comportamento correto: um total
+  agregado não deve fingir conhecer uma divisão que ninguém registrou.
+
+### F-13 no fluxo da API — evidência
+
+O endpoint `POST /api/v1/checkout` valida `shipping_total` apenas como
+`nullable|numeric|min:0`. Executado contra o código atual:
+
+```text
+payload shipping_total=0      -> aceito | orders.shipping_total=0.00      | total_amount=100.00
+payload shipping_total=0.01   -> aceito | orders.shipping_total=0.01      | total_amount=100.01
+payload shipping_total=99999  -> aceito | orders.shipping_total=99999.00  | total_amount=100099.00
+payload shipping_total=-10    -> HTTP 422
+```
+
+O único limite existente é o negativo. O cliente autenticado escolhe quanto paga
+de frete, e o valor vai para o total cobrado pelo gateway.
+
+**Consequência para o snapshot:** no fluxo da API, `shipping_amount` herda essa
+origem — ele congela fielmente o que o payload disse. Não é uma regressão (o
+`orders.shipping_total` sempre foi assim), mas é preciso dizer com todas as
+letras: **um snapshot é tão confiável quanto sua origem.** No checkout web a
+origem foi corrigida; na API, não.
+
+---
+
+### Achado preexistente **não corrigido**
+
+`POST /api/v1/checkout` aceita `shipping_total` **direto do payload do cliente**,
+sem recotar no servidor — mesma classe do achado acima, e mais ampla, porque o
+app manda o número final. Corrigir exige decidir se o servidor recota ou se
+passa a validar contra uma cotação previamente emitida, o que **muda o contrato
+público da API** e pertence à trilha de pagamento/frete.
+
+Registrado como **F-13 — HIGH, preexistente**. No fluxo web o problema está
+fechado; na API, não.
 
 ---
 

@@ -15,8 +15,12 @@ class OrderSplitResource extends JsonResource
             'id' => $this->id,
             'status' => $this->status?->value,
             'gross_amount' => (float) $this->gross_amount,
+            'commission_percent' => (float) $this->commission_percent,
             'commission_amount' => (float) $this->commission_amount,
             'net_amount' => (float) $this->net_amount,
+            // Nulo quando a divisao do frete entre lojas nao e conhecida —
+            // ver a migration `add_shipping_amount_to_order_splits`.
+            'shipping_amount' => $this->shipping_amount === null ? null : (float) $this->shipping_amount,
             'confirmed_at' => $this->confirmed_at,
             'order' => $this->whenLoaded('order', fn () => [
                 'reference' => $this->order->reference,

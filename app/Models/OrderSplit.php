@@ -19,6 +19,7 @@ class OrderSplit extends Model
         'commission_percent',
         'commission_amount',
         'net_amount',
+        'shipping_amount',
         'status',
         'confirmed_at',
     ];
@@ -31,6 +32,7 @@ class OrderSplit extends Model
             'commission_percent'  => 'decimal:2',
             'commission_amount'   => 'decimal:2',
             'net_amount'          => 'decimal:2',
+            'shipping_amount'     => 'decimal:2',
             'confirmed_at'        => 'datetime',
         ];
     }
