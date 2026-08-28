@@ -32,7 +32,7 @@ setembro a loja mude de nome, o produto saia do ar e a oferta seja removida.
 | **FIN-SEC-01B** | ✅ Implementada | Preservação histórica e correção das FKs comerciais |
 | **FIN-SEC-01C** | ✅ Pronta para revisão | Snapshot comercial imutável — frete por loja e origem confiável |
 | **FIN-SEC-01C.1** | ✅ Pronta para revisão | Eliminação do F-13 — frete confiável no checkout da API |
-| FIN-SEC-01D | ⬜ Não iniciada | Ciclo de confirmação de pagamento atômico e por evento |
+| **FIN-SEC-01D** | ✅ Pronta para revisão | Ciclo de confirmação de pagamento atômico, idempotente e por evento |
 | FIN-SEC-01E | ⬜ Não iniciada | Integridade e concorrência de estoque |
 | FIN-SEC-01F | ⬜ Não iniciada | Cancelamento, expiração e restauração |
 | FIN-SEC-01G | ⬜ Não iniciada | Hardening, MySQL real e documentação final |
@@ -67,9 +67,9 @@ sustentasse**. Classificado como **BLOCKER BEFORE PRODUCTION**.
 |---|---|---|---|
 | F-01 | `DELETE` de expositor destrói histórico comercial | BLOCKER | **01B** |
 | F-02 | Estoque nunca validado, decrementado ou reservado; overselling ilimitado | BLOCKER | 01E |
-| F-03 | `splits()->update()` em massa não dispara `OrderSplitConfirmed` — matrícula AVA e tracking não ocorrem no pagamento online | HIGH | 01D |
+| ~~F-03~~ | `splits()->update()` em massa não disparava `OrderSplitConfirmed` — matrícula AVA não ocorria no pagamento online | ~~HIGH~~ | **RESOLVIDO na 01D** |
 | F-04 | Sem snapshot do nome do expositor | HIGH | **01B** |
-| F-05 | `applyPayment` não é transacional | HIGH | 01D |
+| ~~F-05~~ | `applyPayment` não era transacional | ~~HIGH~~ | **RESOLVIDO na 01D** |
 | F-06 | Webhook sem verificação de assinatura | MEDIUM | 01D |
 | F-07 | `DELETE` de produto apaga curso, matrículas e progresso de alunos | HIGH | fase própria de AVA |
 | F-08 | Sem entidade de pagamento nem de recebível; taxas de gateway inexistentes | HIGH | 01C/01D |
@@ -524,6 +524,182 @@ provedor por loja com item físico. Um pedido de N lojas faz N chamadas em séri
 no momento da compra. É o preço de ter um valor confiável, e paralelizar é
 otimização que não deve ser feita sacrificando o fail closed — fica como dívida,
 não como bloqueio.
+
+---
+
+## FIN-SEC-01D — Consolidação do ciclo de confirmação de pagamento
+
+Confirmar um pagamento deixou de ser um punhado de updates independentes e
+passou a ser **uma transição de domínio**: ou o pedido fica pago, com os splits
+confirmados e os efeitos executados, ou nada acontece.
+
+### O que havia antes
+
+Três caminhos — o Payment Brick, o retorno do gateway e o webhook — chamavam o
+mesmo `applyPayment`, que fazia duas escritas soltas:
+
+```php
+$order->forceFill($changes)->save();
+$order->splits()->update([...]);   // query em massa
+```
+
+E a confirmação manual do lojista seguia por um quarto caminho, `confirmar()`,
+que era o **único** a disparar `OrderSplitConfirmed`.
+
+### Problemas reproduzidos antes de corrigir
+
+| # | Problema | Como aparecia |
+|---|---|---|
+| **F-03** | Update em massa não instancia models e não dispara evento | Quem comprava um curso digital pagando por Pix ou cartão **não era matriculado** até o lojista clicar em "confirmar pagamento" |
+| **F-05** | Sem transação | Falha entre as duas escritas deixava pedido pago com split pendente |
+| **Idempotência** | Reprocessamento repetia efeitos | Webhook duplicado disparava a matrícula de novo |
+| **`paid_at`** | Recalculado a cada confirmação | Sem `date_approved` no payload, caía em `now()` e reescrevia o momento do pagamento |
+| **Valor** | Nunca comparado | Pagamento de R$ 1 aprovado marcava um pedido de R$ 500 como pago |
+
+Os cinco foram reproduzidos em teste **antes** da correção — quatro testes
+falhando no estado anterior.
+
+### A arquitetura adotada
+
+`app/Actions/Payments/ConfirmOrderPayment` concentra a transição, e é
+**gateway-agnostic**: recebe um `PaymentConfirmation` — provedor, id externo,
+valor, momento, payload — e decide sozinha se aquilo confirma o pedido.
+
+```text
+GATEWAY afirma "aprovado"
+        ↓
+MercadoPagoService traduz  →  PaymentConfirmation
+        ↓
+ConfirmOrderPayment  [DB::transaction + lockForUpdate]
+        ├── ja pago? devolve sem efeito nenhum
+        ├── valor cobre o pedido? senao recusa
+        ├── Order → pago, paid_at da primeira confirmacao
+        └── cada split pendente → confirmar()
+                                     ↓
+                          DB::afterCommit → OrderSplitConfirmed
+                                     ↓
+                          matricula · tracking
+```
+
+O `MercadoPagoService` voltou a ser o que devia: integração. Sabe ler payload,
+normalizar status e guardar a resposta crua; não decide consistência de domínio.
+
+### Decisões registradas
+
+| # | Decisão |
+|---|---|
+| **D-FIN-12** | A confirmação de pagamento é uma operação de domínio centralizada |
+| **D-FIN-13** | Confirmação de pagamento é idempotente — receber duas vezes produz o mesmo estado e os mesmos efeitos que receber uma |
+| **D-FIN-14** | `Order` e `OrderSplit` transitam atomicamente |
+| **D-FIN-15** | `OrderSplitConfirmed` representa transição real de estado, não execução de método |
+| **D-FIN-16** | Efeitos externos ocorrem após o commit |
+
+### Estados
+
+| Entidade | Antes | Depois | Condição |
+|---|---|---|---|
+| `orders.status` | `aguardando_pagamento` | `pagamento_confirmado` | pagamento validado pelo gateway e suficiente |
+| `orders.payment_status` | `pending` | `approved` | idem |
+| `orders.paid_at` | `null` | timestamp | **primeira** confirmação; nunca reescrito |
+| `order_splits.status` | `pendente` | `confirmado` | pedido confirmado, um split por vez |
+
+### Provas
+
+| Cenário | Resultado |
+|---|---|
+| Pagamento aprovado | evento disparado, 1 por split |
+| Curso digital pago online | **matrícula automática**, sem ação do lojista |
+| Webhook repetido | nenhum efeito novo, `paid_at` preservado |
+| Brick + webhook do mesmo pagamento | uma única transição |
+| Falha no segundo split | rollback total — pedido não pago, split A não confirmado |
+| Falha ao salvar o pedido | nenhum split confirmado |
+| Falha no listener | pagamento **continua pago** (efeito externo não desfaz fato financeiro) |
+| `pending`, `in_process`, `rejected`, status desconhecido | não confirmam |
+| Pagamento de valor menor | recusado, pedido intacto |
+| Confirmação manual do lojista | continua funcionando igual |
+
+### Concorrência, no MySQL real
+
+O SQLite da suíte não prova lock de linha. Com duas conexões contra o MySQL 8:
+
+```text
+T1: lock adquirido sobre o pedido
+T2: BLOQUEADA por 2s e recusada — o lock e efetivo
+T1: confirmou e liberou o lock
+T2: releu o pedido -> status=pagamento_confirmado
+T2: encontra o pedido ja pago e nao repete a transicao
+```
+
+### F-06 — webhook sem assinatura
+
+Auditado e **mitigado por desenho**, não corrigido: o endpoint não confia no
+payload. Ele extrai apenas o `payment_id` e consulta o Mercado Pago
+server-to-server com o token da própria loja; o status e o `external_reference`
+vêm dessa resposta. Um POST forjado com `"status": "approved"` não confirma nada.
+
+O que resta é a possibilidade de disparar sincronizações de pagamentos que já
+pertencem à conta da Feira — o que produz o mesmo estado que a sincronização
+legítima produziria. **MEDIUM**, segue registrado para a trilha de pagamento.
+
+---
+
+### Revisão pré-commit da 01D
+
+A revisão procurou combinações capazes de transformar um fato financeiro
+inválido em pedido pago, ou de executar os efeitos de um pagamento mais de uma
+vez. Quatro achados, todos corrigidos e cobertos por teste que falha no estado
+anterior.
+
+| # | Achado | Severidade |
+|---|---|---|
+| **R-1** | **`confirmar()` não olhava o estado do split.** Dois cliques do lojista — ou dois requests da API — disparavam `OrderSplitConfirmed` duas vezes, e cada disparo carrega efeito de negócio. O evento representava a chamada do método, não a transição | **HIGH** |
+| **R-2** | **Pedido cancelado ressuscitava.** Um `approved` chegando atrasado confirmava um pedido terminal, produzindo um pedido pago que ninguém espera atender | **HIGH** |
+| **R-5** | **Aprovado sem valor confiável confirmava.** Quando `transaction_amount` vinha ausente, nulo ou ilegível, a validação era pulada e o pedido era confirmado assim mesmo — a regra apostava que o gateway sempre informa o valor. Aposta não é regra de domínio financeiro: agora, sem valor legível, não há confirmação | **HIGH** |
+| **R-6** | **Comparação monetária dependia de ponto flutuante.** `abs($pago - $esperado) > 0,01` variava com a representação IEEE-754 — `499.99 * 100` vale 49998.999999999993 em binário. Passou a comparar centavos inteiros | MEDIUM |
+| **R-3** | **Valor maior era aceito.** A comparação era de suficiência (`>=`): R$ 999 num pedido de R$ 500 confirmava. Passou a ser **igualdade**, com tolerância de um centavo para o arredondamento entre o float do gateway e o decimal do banco | MEDIUM |
+| **R-4** | **Notificação de outro pagamento reescrevia o rastro.** Um segundo `payment_id` para um pedido já quitado sobrescrevia `mercado_pago_payment_id` e `payment_status`, fazendo o pedido apontar para o pagamento errado. Agora o payload é guardado como auditoria e o rastro do pagamento que quitou permanece | MEDIUM |
+
+### O que a revisão confirmou seguro
+
+- **Vínculo pagamento ↔ pedido.** O `external_reference` vem da consulta
+  server-to-server, nunca do request. Um pagamento de outro pedido não alcança
+  este — provado por teste com dois pedidos de mesmo valor.
+- **Rollback não deixa escapar evento.** Com falha no segundo split, nenhum
+  `OrderSplitConfirmed` é despachado: os callbacks de `afterCommit` morrem com a
+  transação.
+- **O lock relê o estado.** `lockForUpdate` é feito numa consulta nova, não sobre
+  o model já carregado — travar depois de ler não travaria nada.
+- **Valor exato confirma; menor e maior recusam.**
+- **Falha de listener não desfaz o pagamento.** Efeito externo não derruba fato
+  financeiro.
+
+### Política de comparação monetária
+
+Valores são convertidos para **centavos inteiros** — `(int) round($valor * 100)`
+— e comparados por igualdade. O `round()` antes do corte é o que impede o
+truncamento binário: sem ele, `(int) (499.99 * 100)` daria 49998.
+
+O real não representa frações de centavo, então o arredondamento é para o
+centavo mais próximo: R$ 500,001 e R$ 500,00 são o mesmo dinheiro e confirmam um
+pedido de R$ 500,00; R$ 500,006 arredonda para R$ 500,01 e é recusado, como
+qualquer outro centavo de diferença.
+
+### Limitação registrada
+
+O sistema distingue "a mesma confirmação chegando de novo" de "outra
+confirmação para pedido já pago" **pelo `payment_id`**, não por um registro de
+tentativas. Dá para saber que um segundo pagamento chegou e ignorá-lo com
+segurança, mas não há histórico de todas as notificações recebidas. Uma tabela
+de tentativas resolveria — e pertence à trilha financeira, não a esta fase.
+
+### Dívida operacional: pedidos digitais anteriores
+
+Enquanto o F-03 existiu, quem comprou curso digital pagando online **não foi
+matriculado** até o lojista confirmar à mão. A correção vale dali para frente e
+**não regulariza pedidos antigos**.
+
+A reconciliação é tarefa própria, e precisa ser auditável, com `--dry-run`,
+idempotente e restrita a pedidos comprovadamente pagos. Não foi feita aqui.
 
 ---
 

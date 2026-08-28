@@ -7,6 +7,7 @@ use App\Events\OrderSplitConfirmed;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class OrderSplit extends Model
@@ -57,13 +58,29 @@ class OrderSplit extends Model
         return $this->hasMany(OrderMessage::class, 'order_split_id')->orderBy('created_at');
     }
 
+    /**
+     * Transicao do split para confirmado, com o evento que carrega os efeitos.
+     *
+     * Split ja confirmado nao transiciona de novo: sem essa guarda, dois
+     * cliques do lojista — ou dois requests da API — disparariam o evento duas
+     * vezes, e cada disparo carrega efeito de negocio.
+     *
+     * O evento sai **depois do commit**: os listeners matriculam aluno e mandam
+     * e-mail, e nada disso pode acontecer sobre um estado que ainda pode sofrer
+     * rollback. Fora de transacao — a confirmacao manual do lojista —
+     * `afterCommit` executa na hora, entao aquele fluxo nao muda.
+     */
     public function confirmar(): void
     {
+        if ($this->status === OrderSplitStatus::Confirmado) {
+            return;
+        }
+
         $this->update([
             'status'       => OrderSplitStatus::Confirmado,
             'confirmed_at' => now(),
         ]);
 
-        event(new OrderSplitConfirmed($this));
+        DB::afterCommit(fn () => event(new OrderSplitConfirmed($this)));
     }
 }

@@ -64,6 +64,7 @@ class MercadoPagoPaymentTest extends TestCase
                 'id' => 999,
                 'status' => 'approved',
                 'external_reference' => $order->reference,
+                'transaction_amount' => 89.90,
                 'date_approved' => '2026-06-29T12:00:00.000-03:00',
             ]),
         ]);
@@ -100,6 +101,9 @@ class MercadoPagoPaymentTest extends TestCase
                     'status' => 'approved',
                     'status_detail' => 'accredited',
                     'external_reference' => $request['external_reference'],
+                    // O gateway devolve o valor que o servidor mandou cobrar —
+                    // nao o que o cliente tentou informar.
+                    'transaction_amount' => $request['transaction_amount'],
                     'date_approved' => '2026-06-29T12:00:00.000-03:00',
                 ]);
             },

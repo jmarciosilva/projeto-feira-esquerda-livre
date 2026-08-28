@@ -2288,7 +2288,7 @@ O princípio que a sustenta:
 | FIN-SEC-01B — Preservação histórica e FKs | ✅ Implementada | `SET NULL` nas FKs comerciais + snapshot do vendedor |
 | FIN-SEC-01C — Snapshot comercial imutável | ✅ Pronta para revisão | Frete por loja congelado e origem confiável do valor |
 | FIN-SEC-01C.1 — Eliminação do F-13 | ✅ Pronta para revisão | Frete do checkout da API decidido pelo servidor |
-| FIN-SEC-01D — Ciclo de confirmação de pagamento | ⬜ | `applyPayment` atômico e por evento |
+| FIN-SEC-01D — Ciclo de confirmação de pagamento | ✅ Pronta para revisão | Confirmação atômica, idempotente e por evento |
 | FIN-SEC-01E — Integridade e concorrência de estoque | ⬜ | Reserva, validação e proteção contra overselling |
 | FIN-SEC-01F — Cancelamento, expiração e restauração | ⬜ | Pix expirado, estorno, devolução |
 | FIN-SEC-01G — Hardening e documentação final | ⬜ | — |
@@ -2348,8 +2348,22 @@ deles vira frete zero: na dúvida sobre o valor, o pedido não é criado. Corrig
 também uma ambiguidade em que duas escolhas de frete para a mesma loja eram
 resolvidas silenciosamente pela última.
 
-Estoque, atomicidade do pagamento e regra de retenção **seguem abertos** nas
-fases seguintes. Detalhes, decisões e matriz de achados em
+**FIN-SEC-01D (2026-08-28).** Confirmar um pagamento virou uma transição de
+domínio única, em `ConfirmOrderPayment`: transacional, com lock no pedido,
+idempotente e gateway-agnostic. Fecha o **F-03** — o update em massa nos splits
+não disparava evento, e por isso quem comprava um curso digital pagando por Pix
+ou cartão **não era matriculado** até o lojista confirmar à mão — e o **F-05**,
+a ausência de transação. Também passou a recusar pagamento de valor menor que o
+pedido e a preservar `paid_at` da primeira confirmação.
+
+A revisão da 01D encontrou quatro achados, dois deles HIGH: `confirmar()` não
+olhava o estado do split e disparava o evento a cada chamada, e um `approved`
+atrasado ressuscitava pedido cancelado. Também passou a exigir **igualdade** de
+valor, em vez de suficiência. Fica registrada uma dívida operacional: pedidos
+digitais pagos enquanto o F-03 existia podem estar sem matrícula, e a
+reconciliação é tarefa própria.
+
+Estoque e regra de retenção **seguem abertos** nas fases seguintes. Detalhes, decisões e matriz de achados em
 [`FIN_SEC_01_INTEGRIDADE_COMERCIAL.md`](FIN_SEC_01_INTEGRIDADE_COMERCIAL.md).
 
 ---

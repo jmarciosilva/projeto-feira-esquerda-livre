@@ -2,7 +2,8 @@
 
 namespace App\Services;
 
-use App\Enums\OrderSplitStatus;
+use App\Actions\Payments\ConfirmOrderPayment;
+use App\DTO\PaymentConfirmation;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\SiteSetting;
@@ -10,6 +11,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 class MercadoPagoService
 {
@@ -137,6 +139,13 @@ class MercadoPagoService
     }
 
     /**
+     * Traduz a resposta do Mercado Pago para o domínio.
+     *
+     * Este serviço integra o gateway: sabe ler o payload, normalizar status e
+     * guardar a resposta crua para auditoria. Ele **não** decide que um pedido
+     * passou a estar pago — essa transição pertence a `ConfirmOrderPayment`,
+     * que é a mesma para qualquer gateway e roda atômica e uma única vez.
+     *
      * @param  array<string, mixed>  $payment
      */
     public function applyPayment(array $payment): ?Order
@@ -156,35 +165,73 @@ class MercadoPagoService
         $status = (string) ($payment['status'] ?? 'unknown');
         $paymentId = isset($payment['id']) ? (string) $payment['id'] : null;
 
-        $payload = array_merge($order->payment_payload ?? [], [
-            'payment' => $payment,
-        ]);
+        // Notificação de um pagamento diferente, para um pedido que já foi
+        // quitado por outro: o payload é guardado como rastro de auditoria, mas
+        // o id e o status do pagamento que de fato pagou o pedido permanecem.
+        // Sobrescrevê-los faria o pedido apontar para o pagamento errado.
+        $jaQuitadoPorOutro = $order->status === OrderStatus::PagamentoConfirmado
+            && $order->mercado_pago_payment_id !== null
+            && $paymentId !== null
+            && $order->mercado_pago_payment_id !== $paymentId;
 
-        $changes = [
-            'payment_method' => 'mercado_pago',
-            'payment_provider' => 'mercado_pago',
-            'payment_status' => $status,
-            'mercado_pago_payment_id' => $paymentId,
-            'payment_payload' => $payload,
+        $metadados = [
+            'payment_payload' => array_merge($order->payment_payload ?? [], [
+                $jaQuitadoPorOutro ? 'payment_ignorado_'.$paymentId : 'payment' => $payment,
+            ]),
         ];
 
-        if ($status === 'approved') {
-            $changes['status'] = OrderStatus::PagamentoConfirmado;
-            $changes['paid_at'] = $this->paidAt($payment);
-        } elseif (in_array($status, ['cancelled', 'refunded', 'charged_back'], true)) {
-            $changes['status'] = OrderStatus::Cancelado;
+        if (! $jaQuitadoPorOutro) {
+            $metadados += [
+                'payment_method' => 'mercado_pago',
+                'payment_provider' => 'mercado_pago',
+                'payment_status' => $status,
+                'mercado_pago_payment_id' => $paymentId,
+            ];
         }
 
-        $order->forceFill($changes)->save();
+        $order->forceFill($metadados)->save();
+
+        if ($jaQuitadoPorOutro) {
+            return $order->refresh();
+        }
 
         if ($status === 'approved') {
-            $order->splits()->update([
-                'status' => OrderSplitStatus::Confirmado->value,
-                'confirmed_at' => now(),
-            ]);
+            return $this->confirmar($order, $payment, $paymentId);
+        }
+
+        if (in_array($status, ['cancelled', 'refunded', 'charged_back'], true)) {
+            $order->forceFill(['status' => OrderStatus::Cancelado])->save();
         }
 
         return $order->refresh();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payment
+     */
+    private function confirmar(Order $order, array $payment, ?string $paymentId): Order
+    {
+        $confirmacao = new PaymentConfirmation(
+            provider: 'mercado_pago',
+            externalPaymentId: $paymentId,
+            amount: isset($payment['transaction_amount']) && is_numeric($payment['transaction_amount'])
+                ? round((float) $payment['transaction_amount'], 2)
+                : null,
+            paidAt: $this->paidAt($payment),
+            payload: $payment,
+        );
+
+        try {
+            return app(ConfirmOrderPayment::class)($order, $confirmacao);
+        } catch (Throwable $exception) {
+            // Pagamento aprovado no gateway que o domínio recusa — valor
+            // insuficiente, por exemplo. O pedido fica como está, com o rastro
+            // do gateway já gravado acima, e o erro sobe para o log em vez de
+            // virar uma confirmação silenciosa.
+            report($exception);
+
+            return $order->refresh();
+        }
     }
 
     public function syncPayment(string $paymentId): ?Order
