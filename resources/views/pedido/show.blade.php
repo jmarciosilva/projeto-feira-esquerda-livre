@@ -158,17 +158,25 @@
 
     <div class="space-y-6 mb-8">
         @foreach($order->splits as $split)
-        @php $expositor = $split->expositor; @endphp
+        @php
+            $expositor = $split->expositor;
+            $nomeDaLoja = $expositor?->name ?? $split->expositor_name ?? 'Loja';
+            // Agrupa pelo vinculo vivo quando ele existe e, sem ele, pelo nome
+            // gravado na compra: o pedido continua legivel sem o cadastro.
+            $itensDaLoja = $expositor
+                ? $order->items->where('expositor_id', $expositor->id)
+                : $order->items->whereNull('expositor_id')->where('expositor_name', $split->expositor_name);
+        @endphp
         <div class="bg-white rounded-2xl border border-gray-200 p-6">
             <div class="flex items-center justify-between gap-4 mb-4">
-                <h2 class="font-bold text-base" style="color:#3D3000;">{{ $expositor?->name ?? 'Loja' }}</h2>
+                <h2 class="font-bold text-base" style="color:#3D3000;">{{ $nomeDaLoja }}</h2>
                 <span class="text-xs font-semibold px-2.5 py-1 rounded-full {{ $split->status->value === 'confirmado' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
                     {{ $split->status->label() }}
                 </span>
             </div>
 
             <div class="space-y-1.5 mb-4">
-                @foreach($order->items->where('expositor_id', $expositor?->id) as $item)
+                @foreach($itensDaLoja as $item)
                 <div class="flex justify-between gap-4 text-sm">
                     <span class="text-gray-600">{{ $item->quantity }}x {{ $item->product_name }}</span>
                     <span class="font-semibold text-gray-800">R$ {{ number_format($item->total_price, 2, ',', '.') }}</span>

@@ -12,8 +12,10 @@ class PedidoChat extends Component
 
     public function mount(OrderSplit $split): void
     {
+        // O split historico de uma loja excluida nao tem dono: `expositor` nulo
+        // nunca pode casar com o lojista autenticado.
         abort_unless(
-            $split->expositor->user_id === auth()->id(),
+            $split->expositor !== null && $split->expositor->user_id === auth()->id(),
             403
         );
         $this->split = $split;

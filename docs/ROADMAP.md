@@ -2036,6 +2036,64 @@ Nenhuma migration. SEC-02 é correção de autorização; o esquema não mudou e
 
 ---
 
+## 🔐 SEC-03 — Autorização de recursos com identidade nullable (corrigida)
+
+**Descoberta durante a revisão pré-commit da FIN-SEC-01B**, não é uma trilha
+própria: é um achado de segurança registrado aqui para rastreabilidade, já
+corrigido dentro daquela fase.
+
+### O problema
+
+Comparação de propriedade feita diretamente entre dois valores que podem ser
+nulos:
+
+```php
+$isLojista = $split->expositor?->user_id === auth()->id();
+```
+
+Quando **os dois lados são nulos**, `null === null` é verdadeiro — e a ausência
+de identidade passa a ser lida como correspondência de propriedade. Não é um
+erro de digitação: é o comportamento correto do operador aplicado a um domínio
+onde a ausência deixou de ser impossível.
+
+### Onde apareceu
+
+`OrderChat`, montado pela página `/pedido/{reference}`, que é **rota pública**.
+Como em Livewire cada componente é um endpoint alcançável por conta própria — a
+mesma lição da SEC-02C —, a proteção da view não bastava.
+
+Dois cenários caíam na mesma linha:
+
+| Cenário | Origem |
+|---|---|
+| Split cujo expositor foi excluído (`expositor_id` nulo) | Introduzido pela nullable da FIN-SEC-01B |
+| Pedido feito por visitante (`orders.user_id` é nullable) | **Preexistente**, sem relação com a fase |
+
+Em ambos, um visitante anônimo passava na checagem e alcançava o chat do pedido.
+
+### A correção
+
+Exigir identidade válida **antes** de qualquer comparação de propriedade:
+
+```php
+$userId = auth()->id();
+abort_if($userId === null, 403);
+```
+
+E, nos demais pontos de chat, comparação explícita contra `null` em vez de
+depender do encadeamento opcional. O princípio que ficou:
+
+> Histórico preservado não é permissão preservada. Um fato comercial pode
+> sobreviver ao cadastro do vendedor; o papel dele, não.
+
+### Status
+
+**CORRIGIDO** na FIN-SEC-01B, com cobertura de teste — visitante anônimo barrado,
+outro expositor barrado, e o cliente dono do pedido mantendo acesso ao histórico.
+Detalhes em [`FIN_SEC_01_INTEGRIDADE_COMERCIAL.md`](FIN_SEC_01_INTEGRIDADE_COMERCIAL.md).
+
+---
+
 ## 🧶 Trilha CAT — Catalog Intelligence (em andamento)
 
 **Trilha independente.** Não se mistura com a Trilha CI, com a SEC-01 nem com a
@@ -2211,6 +2269,56 @@ Decisão, motivação histórica e matriz de campos:
 
 Arquitetura, auditoria e riscos: [`CATALOG_INTELLIGENCE.md`](CATALOG_INTELLIGENCE.md).
 Roadmap executável da trilha: [`ROADMAP_CATALOG_INTELLIGENCE.md`](ROADMAP_CATALOG_INTELLIGENCE.md).
+
+---
+
+## 🧾 Trilha FIN-SEC — Integridade Comercial e Preservação Histórica (em andamento)
+
+**Trilha independente**, nascida de achados **preexistentes** encontrados na
+revisão pré-commit da CAT-DOM-01 — nenhum deles introduzido por aquela fase.
+
+O princípio que a sustenta:
+
+> O relacionamento com o vendedor é temporal. O pedido é histórico.
+> Excluir um cadastro operacional nunca pode apagar um fato comercial.
+
+| Fase | Status | Entregável |
+|---|---|---|
+| FIN-SEC-01A — Auditoria e invariantes | ✅ Concluída | Matriz de riscos, mapa de FKs, reprodução dos cenários |
+| FIN-SEC-01B — Preservação histórica e FKs | ✅ Implementada | `SET NULL` nas FKs comerciais + snapshot do vendedor |
+| FIN-SEC-01C — Snapshot comercial completo | ⬜ | Comissão por item, frete e taxas de gateway |
+| FIN-SEC-01D — Ciclo de confirmação de pagamento | ⬜ | `applyPayment` atômico e por evento |
+| FIN-SEC-01E — Integridade e concorrência de estoque | ⬜ | Reserva, validação e proteção contra overselling |
+| FIN-SEC-01F — Cancelamento, expiração e restauração | ⬜ | Pix expirado, estorno, devolução |
+| FIN-SEC-01G — Hardening e documentação final | ⬜ | — |
+
+**FIN-SEC-01A (2026-08-27).** Auditoria sem alterar código. Reproduziu, em
+transação com rollback, que excluir um expositor apagava itens de pedido,
+splits, mensagens, envios e rastreio — deixando o pedido de pé com um total que
+nenhuma linha sustentava. Também confirmou que **o estoque nunca é validado nem
+decrementado** em ponto algum do sistema, e que não existe tabela de pagamentos:
+o pagamento vive em colunas `mercado_pago_*` dentro de `orders`.
+
+**FIN-SEC-01B (2026-08-28).** Corrigiu exclusivamente a destruição histórica.
+As FKs de `order_items`, `order_splits` e `order_shippings` para `expositores`
+passaram de `CASCADE` para `SET NULL`, e o nome do vendedor virou snapshot
+(`expositor_name`), gravado na compra e nunca recalculado — sem ele, renomear
+uma loja reescrevia pedidos antigos. `CASCADE` permanece onde é composição real:
+apagar o próprio pedido continua levando junto seus itens e splits.
+
+Um `OrderItem` agora responde sozinho pelas cinco perguntas do fato comercial —
+o quê, por quanto, quantos, total e de quem — sem depender de produto, oferta ou
+expositor vivos.
+
+A revisão pré-commit corrigiu três consumidores que a nullable tornou
+incorretos — o mais grave deles uma brecha de autorização: a página do pedido é
+pública, e `null === null` deixava um visitante anônimo alcançar o chat de um
+split cujo vendedor fora excluído. Histórico preservado não é permissão
+preservada.
+
+Estoque, atomicidade do pagamento e regra de retenção **seguem abertos** nas
+fases seguintes. Detalhes, decisões e matriz de achados em
+[`FIN_SEC_01_INTEGRIDADE_COMERCIAL.md`](FIN_SEC_01_INTEGRIDADE_COMERCIAL.md).
 
 ---
 

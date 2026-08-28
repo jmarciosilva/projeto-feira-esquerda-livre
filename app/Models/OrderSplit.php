@@ -14,6 +14,7 @@ class OrderSplit extends Model
     protected $fillable = [
         'order_id',
         'expositor_id',
+        'expositor_name',
         'gross_amount',
         'commission_percent',
         'commission_amount',

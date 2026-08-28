@@ -15,7 +15,7 @@
         </div>
         <div class="min-w-0">
             <p class="text-sm font-bold truncate" style="color:#3D3000;">Chat do Pedido</p>
-            <p class="text-xs text-gray-500 truncate">{{ $split->expositor->name }}</p>
+            <p class="text-xs text-gray-500 truncate">{{ $split->expositor?->name ?? $split->expositor_name ?? 'Loja' }}</p>
         </div>
     </div>
 

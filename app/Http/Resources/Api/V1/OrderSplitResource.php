@@ -2,10 +2,11 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Models\OrderSplit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin \App\Models\OrderSplit */
+/** @mixin OrderSplit */
 class OrderSplitResource extends JsonResource
 {
     public function toArray(Request $request): array
@@ -23,12 +24,19 @@ class OrderSplitResource extends JsonResource
                 'customer_whatsapp' => $this->order->customer_whatsapp,
                 'items' => OrderItemResource::collection($this->order->relationLoaded('items') ? $this->order->items : []),
             ]),
-            'expositor' => $this->whenLoaded('expositor', fn () => [
-                'id' => $this->expositor->id,
-                'name' => $this->expositor->name,
-                'whatsapp' => $this->expositor->whatsapp,
-                'pix_chave' => $this->expositor->pix_chave,
-                'pix_tipo' => $this->expositor->pix_tipo,
+            // O split e historico: ele sobrevive ao cadastro do vendedor. O
+            // nome vem do snapshot gravado na compra; os dados de contato e
+            // pagamento so existem enquanto a loja existir.
+            // `whenLoaded` omite a chave quando a relacao carregada e nula, e
+            // isso apagaria `expositor` do JSON para todo pedido de loja
+            // excluida — quebra de contrato para o app. A condicao passa a ser
+            // "a relacao foi carregada?", e o nome cai no snapshot.
+            'expositor' => $this->when($this->resource->relationLoaded('expositor'), fn () => [
+                'id' => $this->expositor?->id,
+                'name' => $this->expositor?->name ?? $this->expositor_name,
+                'whatsapp' => $this->expositor?->whatsapp,
+                'pix_chave' => $this->expositor?->pix_chave,
+                'pix_tipo' => $this->expositor?->pix_tipo,
             ]),
             'shipping' => $this->whenLoaded('shipping', fn () => $this->shipping ? [
                 'status' => $this->shipping->status?->value,

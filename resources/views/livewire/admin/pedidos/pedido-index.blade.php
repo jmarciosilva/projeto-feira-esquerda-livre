@@ -45,7 +45,7 @@
                             <div class="flex flex-wrap items-center gap-1 mb-1">
                                 <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
                                       style="{{ $split->status->value === 'confirmado' ? 'background:#dcfce7; color:#166534;' : 'background:#fef9c3; color:#854d0e;' }}">
-                                    {{ $split->expositor?->name }}
+                                    {{ $split->expositor?->name ?? $split->expositor_name ?? 'Loja removida' }}
                                 </span>
                                 @if($sh)
                                 <span class="inline-flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded-full

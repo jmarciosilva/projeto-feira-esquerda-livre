@@ -57,6 +57,9 @@ class OrderService
                     'product_id' => $item->product_id,
                     'product_offer_id' => $item->product_offer_id,
                     'expositor_id' => $item->expositor_id,
+                    // Snapshot do vendedor, gravado uma vez e nunca recalculado:
+                    // renomear ou excluir a loja depois nao reescreve o pedido.
+                    'expositor_name' => $item->expositor?->name,
                     'product_name' => $item->product?->name ?? 'Item removido',
                     'unit_price' => $item->price_snapshot,
                     'quantity' => $item->quantity,
@@ -71,6 +74,7 @@ class OrderService
                 OrderSplit::create([
                     'order_id' => $order->id,
                     'expositor_id' => $expositorId,
+                    'expositor_name' => $storeItems->first()->expositor?->name,
                     'gross_amount' => $gross,
                     'commission_percent' => $commission,
                     'commission_amount' => $commissionAmount,

@@ -19,8 +19,10 @@ class PedidoMensagemController extends Controller
     private function authorizeAccess(Request $request, OrderSplit $split): void
     {
         $userId = $request->user()->id;
+        // Split cujo expositor foi excluido tem `expositor_id` nulo desde a
+        // FIN-SEC-01B: ninguem herda o papel de lojista dele.
         $isCustomer = $split->order->user_id === $userId;
-        $isLojista = $split->expositor->user_id === $userId;
+        $isLojista = $split->expositor !== null && $split->expositor->user_id === $userId;
 
         abort_unless($isCustomer || $isLojista, 403);
     }
