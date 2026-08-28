@@ -2287,6 +2287,7 @@ O princípio que a sustenta:
 | FIN-SEC-01A — Auditoria e invariantes | ✅ Concluída | Matriz de riscos, mapa de FKs, reprodução dos cenários |
 | FIN-SEC-01B — Preservação histórica e FKs | ✅ Implementada | `SET NULL` nas FKs comerciais + snapshot do vendedor |
 | FIN-SEC-01C — Snapshot comercial imutável | ✅ Pronta para revisão | Frete por loja congelado e origem confiável do valor |
+| FIN-SEC-01C.1 — Eliminação do F-13 | ✅ Pronta para revisão | Frete do checkout da API decidido pelo servidor |
 | FIN-SEC-01D — Ciclo de confirmação de pagamento | ⬜ | `applyPayment` atômico e por evento |
 | FIN-SEC-01E — Integridade e concorrência de estoque | ⬜ | Reserva, validação e proteção contra overselling |
 | FIN-SEC-01F — Cancelamento, expiração e restauração | ⬜ | Pix expirado, estorno, devolução |
@@ -2327,12 +2328,25 @@ No caminho apareceu um achado de segurança: o checkout web gravava o **preço d
 frete enviado pelo navegador**, e congelar aquilo seria congelar um número
 escolhido por quem paga a conta. O cliente passou a escolher qual cotação, nunca
 quanto ela custa. O mesmo problema na API (`shipping_total` vindo do payload)
-ficou registrado como **F-13**, aberto, porque corrigi-lo muda contrato público.
+ficou registrado como **F-13** — fechado logo em seguida, na 01C.1.
 
 A revisão pré-commit da 01C encontrou mais um problema financeiro: o frete de
 uma loja que saísse do carrinho por fora do checkout continuava sendo cobrado, e
 a soma dos splits deixava de fechar com o total. O total do frete passou a ser
 derivado das lojas que realmente entram no pedido.
+
+**FIN-SEC-01C.1 (2026-08-28).** Fecha o F-13. O checkout da API aceitava
+`shipping_total` do payload e obedecia — `0` e `99999` passavam. Agora o cliente
+informa **qual** serviço escolheu por loja e o servidor recota para saber o
+preço, reaproveitando a cotação que a API já oferecia em `/frete/cotacao`. A
+cotação virou serviço compartilhado entre web e API, porque uma regra econômica
+em dois lugares acaba divergindo em um deles — foi o que aconteceu.
+
+A revisão da 01C.1 exercitou sete modos de falha do provedor — timeout, 500,
+resposta vazia, preço ausente, inválido e negativo — e confirmou que nenhum
+deles vira frete zero: na dúvida sobre o valor, o pedido não é criado. Corrigiu
+também uma ambiguidade em que duas escolhas de frete para a mesma loja eram
+resolvidas silenciosamente pela última.
 
 Estoque, atomicidade do pagamento e regra de retenção **seguem abertos** nas
 fases seguintes. Detalhes, decisões e matriz de achados em

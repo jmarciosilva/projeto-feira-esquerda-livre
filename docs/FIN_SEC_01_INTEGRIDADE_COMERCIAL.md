@@ -31,6 +31,7 @@ setembro a loja mude de nome, o produto saia do ar e a oferta seja removida.
 | **FIN-SEC-01A** | ✅ Concluída | Auditoria, matriz de riscos e invariantes |
 | **FIN-SEC-01B** | ✅ Implementada | Preservação histórica e correção das FKs comerciais |
 | **FIN-SEC-01C** | ✅ Pronta para revisão | Snapshot comercial imutável — frete por loja e origem confiável |
+| **FIN-SEC-01C.1** | ✅ Pronta para revisão | Eliminação do F-13 — frete confiável no checkout da API |
 | FIN-SEC-01D | ⬜ Não iniciada | Ciclo de confirmação de pagamento atômico e por evento |
 | FIN-SEC-01E | ⬜ Não iniciada | Integridade e concorrência de estoque |
 | FIN-SEC-01F | ⬜ Não iniciada | Cancelamento, expiração e restauração |
@@ -76,7 +77,7 @@ sustentasse**. Classificado como **BLOCKER BEFORE PRODUCTION**.
 | F-10 | Sem Pix expirado, estorno, devolução ou troca | MEDIUM | 01F |
 | F-11 | Domínio financeiro acoplado ao Mercado Pago | MEDIUM | 01D |
 | F-12 | Nenhum model usa SoftDeletes | DOCUMENTED DEBT | — |
-| F-13 | `POST /api/v1/checkout` aceita `shipping_total` do payload do cliente sem recotar no servidor | HIGH — **preexistente, aberto** | trilha de pagamento/frete |
+| ~~F-13~~ | `POST /api/v1/checkout` aceitava `shipping_total` do payload do cliente | ~~HIGH~~ | **RESOLVIDO na 01C.1** |
 
 ---
 
@@ -375,8 +376,154 @@ app manda o número final. Corrigir exige decidir se o servidor recota ou se
 passa a validar contra uma cotação previamente emitida, o que **muda o contrato
 público da API** e pertence à trilha de pagamento/frete.
 
-Registrado como **F-13 — HIGH, preexistente**. No fluxo web o problema está
-fechado; na API, não.
+Registrado como **F-13 — HIGH, preexistente**. No fluxo web o problema estava
+fechado; na API, não — o que foi corrigido em seguida, na FIN-SEC-01C.1, logo
+abaixo.
+
+---
+
+## FIN-SEC-01C.1 — Eliminação do F-13
+
+A 01C congelou o frete. Esta microfase garante que estamos congelando **o frete
+verdadeiro** também no checkout da API — onde o valor ainda vinha do cliente.
+
+### A vulnerabilidade
+
+`POST /api/v1/checkout` validava `shipping_total` apenas como
+`nullable|numeric|min:0` e o persistia. Validar o formato nunca respondeu à
+pergunta que importa, que não é *"o número é válido?"* e sim **"quem decidiu
+esse número?"**.
+
+```text
+shipping_total=0      -> aceito | cobrado 0.00
+shipping_total=0.01   -> aceito | cobrado 0.01
+shipping_total=99999  -> aceito | cobrado 99999.00
+shipping_total=-10    -> HTTP 422   (único limite existente)
+```
+
+### A solução
+
+A auditoria encontrou o caminho já pronto: a API **já tem**
+`POST /api/v1/frete/cotacao`, que reaproveita o mesmo controller do checkout
+web. O servidor sempre soube cotar — o checkout é que não usava isso.
+
+O payload passou a informar **qual serviço** foi escolhido por loja, e o preço
+vem de uma recotação feita no servidor, com o endereço que o cliente selecionou
+e os itens que estão de fato no carrinho:
+
+```json
+{
+  "delivery_type": "entrega",
+  "customer_address_id": 12,
+  "shipping_options": [
+    { "expositor_id": 3, "service_id": "PAC-01" }
+  ]
+}
+```
+
+A cotação foi extraída para `CartShippingQuoter`, usado pelas **duas**
+superfícies — o mesmo princípio que resolveu a D-3 na CAT-DOM-01: uma regra
+econômica em dois lugares acaba divergindo em um deles, e foi exatamente o que
+aconteceu aqui.
+
+### Contrato da API
+
+| Campo | Antes | Depois |
+|---|---|---|
+| `shipping_options` | não existia | **obrigatório** em entrega com item físico |
+| `shipping_total` | decidia o valor cobrado | **depreciado** — não decide nada; se enviado e divergente do cotado, o pedido é recusado |
+
+A recusa por divergência é deliberada: melhor barrar um app desatualizado do que
+cobrar do cliente um valor diferente do que ele viu na tela.
+
+### Decisão registrada
+
+| # | Decisão |
+|---|---|
+| **D-FIN-11** | Nenhum valor de frete enviado pelo cliente é autoridade econômica. O cliente escolhe o serviço; o servidor conhece o preço; o pedido registra o fato |
+
+### Provas
+
+| Tentativa | Resultado |
+|---|---|
+| `shipping_total` = 0 · 0,01 · 99999 | **422**, pedido não criado |
+| Sem `shipping_total`, com escolha válida | cobrado o valor cotado (25,00) |
+| `service_id` inexistente | **422** |
+| Sem `shipping_options` (app antigo) | **422** |
+| Loja fora do carrinho no payload | ignorada; frete só da loja comprada |
+| Duas lojas | 25,00 + 25,00 = 50,00, com `Σ shipping_amount = shipping_total` |
+| Retirada com `shipping_total` = 99999 | frete 0,00 |
+
+O checkout web também ganhou teste de regressão: a refatoração para o serviço
+compartilhado não quebrou a cotação nem a seleção da opção real.
+
+### O que muda para o snapshot
+
+```text
+antes:  Web confiável · API o cliente controla
+depois: Web confiável · API confiável
+```
+
+`orders.shipping_total` e `order_splits.shipping_amount` passam a ser fatos de
+origem verificada nas duas superfícies.
+
+---
+
+### Revisão pré-commit da 01C.1
+
+A revisão não perguntou se o F-13 tinha sido corrigido, e sim se **a correção
+criou alguma nova forma de manipular o frete**. Um achado, corrigido.
+
+| # | Achado | Severidade |
+|---|---|---|
+| **R-1** | **Loja repetida no payload era resolvida silenciosamente.** Com duas escolhas válidas para a mesma loja — PAC a 25,00 e SEDEX a 45,00 —, o servidor ficava com a última e criava o pedido. O cliente decidia, por ambiguidade, qual frete pagar | MEDIUM |
+
+Corrigido com `distinct` no `expositor_id`: em campo econômico, ambiguidade se
+recusa, não se resolve.
+
+> Nota de método: o primeiro teste dessa duplicidade **passou por acidente** — o
+> segundo `service_id` do payload não existia na cotação, e a recusa vinha daí,
+> não da duplicidade. Refeito com duas opções reais, ele falhou, como devia.
+> Teste que passa pelo motivo errado não prova nada.
+
+### O que a revisão confirmou
+
+**Fail closed em toda a cadeia.** Nenhum caminho transforma falha de cotação em
+frete zero. Sete modos de falha foram exercitados — timeout, HTTP 500, resposta
+vazia, formato inesperado, preço ausente, preço não numérico e preço negativo —
+e em todos o pedido **não é criado**. O `resolvePriceAndError` já tratava preço
+inválido, e preço zero vindo do provedor é considerado indisponível: o único
+zero legítimo nasce de um pedido sem item despachável.
+
+**Cobertura obrigatória.** Toda loja com item físico no carrinho precisa de
+exatamente uma opção válida. Loja sem escolha, loja acrescentada ao carrinho
+depois da escolha e falha em uma das lojas de um pedido multi-loja: todas as
+três recusam o pedido **inteiro**, sem `Order`, `OrderItem` ou `OrderSplit`
+parciais.
+
+**Escopo do `service_id`.** A arquitetura usa **um provedor por vez**
+(`SiteSetting.frete_provedor`), então não existe o cenário de dois provedores
+com o mesmo identificador respondendo simultaneamente. E a busca é sempre dentro
+das cotações **daquela loja** — mandar o serviço de outra loja não casa, e, se
+casar por coincidência de código, o preço usado é o da loja certa.
+
+**Sem IDOR de endereço.** O endereço é resolvido por `$user->addresses()`, então
+o de outro cliente simplesmente não é encontrado.
+
+**Recotação reflete o carrinho do momento**, não a escolha antiga: mudar a
+quantidade antes do checkout muda o que é cotado (verificado inspecionando o
+payload enviado ao provedor).
+
+**HTTP fora da transação.** A cotação acontece antes de `createFromCart`; nenhuma
+conexão externa é esperada com transação de banco aberta.
+
+### Dívida registrada
+
+**Latência e custo do checkout da API.** A recotação é sequencial: uma chamada ao
+provedor por loja com item físico. Um pedido de N lojas faz N chamadas em série
+no momento da compra. É o preço de ter um valor confiável, e paralelizar é
+otimização que não deve ser feita sacrificando o fail closed — fica como dívida,
+não como bloqueio.
 
 ---
 

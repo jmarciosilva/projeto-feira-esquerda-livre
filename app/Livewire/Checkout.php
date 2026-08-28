@@ -8,8 +8,7 @@ use App\Models\SiteSetting;
 use App\Services\CartService;
 use App\Services\MercadoPagoService;
 use App\Services\OrderService;
-use App\Services\Shipping\FrenetService;
-use App\Services\Shipping\MelhorEnvioService;
+use App\Services\Shipping\CartShippingQuoter;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -196,7 +195,7 @@ class Checkout extends Component
 
     // ─── Frete e endereço ─────────────────────────────────────────────────
 
-    public function calculateShipping(MelhorEnvioService $melhorEnvio, FrenetService $frenet, CartService $cart): void
+    public function calculateShipping(CartShippingQuoter $quoter, CartService $cart): void
     {
         if ($this->delivery_type !== 'entrega') {
             $this->addError('shipping_destination_zipcode', 'Selecione entrega em casa para consultar frete.');
@@ -210,29 +209,15 @@ class Checkout extends Component
             'shipping_destination_zipcode' => 'CEP de entrega',
         ]);
 
-        // Provedor de frete escolhido manualmente no admin (padrão: Melhor Envio).
-        $shipping = SiteSetting::instance()->frete_provedor === 'frenet' ? $frenet : $melhorEnvio;
-
         $this->shipping_quotes = [];
         $this->selected_shipping_options = [];
 
-        foreach ($cart->grouped() as $expositorId => $storeItems) {
-            $store = $storeItems->first()?->expositor;
-
-            if (! $store) {
-                continue;
-            }
-
-            $physicalItems = $storeItems->filter(fn ($item) => ! ($item->product?->is_digital));
-
-            if ($physicalItems->isEmpty()) {
-                continue;
-            }
-
-            $this->shipping_quotes[$expositorId] = collect(
-                $shipping->quoteForStore($store, $this->shipping_destination_zipcode, $physicalItems)
-            )->map->toArray()->all();
-        }
+        // Mesma cotacao que o checkout da API usa: uma fonte so, para as duas
+        // superficies responderem com a mesma autoridade.
+        $this->shipping_quotes = $quoter->porLoja(
+            $cart->grouped(),
+            $this->shipping_destination_zipcode,
+        );
     }
 
     /**

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\CartService;
 use App\Services\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -185,6 +186,51 @@ class SnapshotComercialTest extends TestCase
                 'delivery_time' => 3,
             ])
             ->assertSet('selected_shipping_options', []);
+    }
+
+    public function test_checkout_web_continua_cotando_e_aceitando_a_opcao_real(): void
+    {
+        SiteSetting::instance()->update([
+            'frete_provedor' => 'frenet',
+            'frenet_ativo' => true,
+            'frenet_token' => 'token-de-teste',
+        ]);
+
+        Http::fake([
+            'api.frenet.com.br/shipping/quote' => Http::response([
+                'ShippingSevicesArray' => [[
+                    'ServiceCode' => 'PAC-01',
+                    'Carrier' => 'Correios',
+                    'ServiceDescription' => 'PAC',
+                    'ShippingPrice' => 25.0,
+                    'DeliveryTime' => '5',
+                    'Error' => false,
+                ]],
+            ]),
+        ]);
+
+        ['expositor' => $expositor, 'offer' => $offer] = $this->loja('Loja Web', 100);
+        $cliente = User::factory()->create();
+        $this->actingAs($cliente);
+        app(CartService::class)->add($offer, 1);
+
+        // A cotação do web passou a vir do mesmo serviço que a API usa; este
+        // teste falha se aquela refatoração tiver quebrado a tela.
+        $componente = Livewire::actingAs($cliente)
+            ->test(Checkout::class)
+            ->set('delivery_type', 'entrega')
+            ->set('shipping_destination_zipcode', '04567000')
+            ->call('calculateShipping');
+
+        $cotacoes = $componente->get('shipping_quotes');
+        $this->assertArrayHasKey($expositor->id, $cotacoes);
+        $this->assertSame('PAC-01', $cotacoes[$expositor->id][0]['service_id']);
+
+        // E a seleção da opção real continua funcionando, com o preço do servidor.
+        $componente->call('selectShippingOption', $expositor->id, ['service_id' => 'PAC-01', 'price' => 0.01]);
+
+        $escolhidas = $componente->get('selected_shipping_options');
+        $this->assertSame(25.0, $escolhidas[$expositor->id]['price']);
     }
 
     public function test_frete_de_duas_lojas_nao_e_duplicado_nem_somado_errado(): void
