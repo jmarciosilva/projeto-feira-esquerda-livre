@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Modality;
 use App\Enums\PriceType;
+use App\Exceptions\OfertaComReservaAtiva;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -39,6 +40,7 @@ class ProductOffer extends Model
         'length',
         'has_stock',
         'stock_quantity',
+        'reserved_quantity',
         'is_active',
         'is_featured',
         'sort_order',
@@ -68,6 +70,43 @@ class ProductOffer extends Model
     public function expositor(): BelongsTo
     {
         return $this->belongsTo(Expositor::class);
+    }
+
+    protected static function booted(): void
+    {
+        // Última linha de defesa, e não o controle de concorrência: quem
+        // precisa apagar uma oferta deve passar por `DeleteProductOffer`, que
+        // faz a leitura sob lock. Este guarda existe para que nenhum caminho
+        // futuro — comando, painel novo, tinker — consiga apagar uma oferta que
+        // ainda deve unidades a um pedido só porque esqueceu da regra.
+        static::deleting(function (ProductOffer $offer) {
+            $reservado = (int) static::query()
+                ->whereKey($offer->getKey())
+                ->value('reserved_quantity');
+
+            if ($reservado > 0) {
+                throw new OfertaComReservaAtiva(
+                    $offer->product?->name ?? 'Esta oferta',
+                    $reservado,
+                );
+            }
+        });
+    }
+
+    /**
+     * Quantas unidades ainda podem ser vendidas.
+     *
+     * `null` quando a oferta não controla estoque — as duas formas de dizer
+     * ilimitado que o cadastro sempre teve: `has_stock` falso ou quantidade em
+     * branco.
+     */
+    public function disponivel(): ?int
+    {
+        if (! $this->has_stock || $this->stock_quantity === null) {
+            return null;
+        }
+
+        return max(0, (int) $this->stock_quantity - (int) $this->reserved_quantity);
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductOffer;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * O único lugar onde um cadastro do lojista vira produto + oferta.
@@ -89,6 +90,8 @@ final class SaveProductWithOffer
                 return $offer->setRelation('product', $product);
             }
 
+            $this->recusarEstoqueAbaixoDoComprometido($offer, $dadosDaOferta);
+
             // `expositor_id` fica FORA dos dois updates, de propósito: o dono de
             // uma oferta existente nunca é recalculado a partir de quem está
             // salvando. É a mesma proteção da SEC-02, agora no lugar certo.
@@ -97,6 +100,42 @@ final class SaveProductWithOffer
 
             return $offer->refresh();
         });
+    }
+
+    /**
+     * O lojista não pode declarar menos estoque do que já vendeu.
+     *
+     * Baixar o físico para menos do que está comprometido criaria um disponível
+     * negativo — unidades prometidas a pedidos que já existem e que ninguém
+     * poderia atender. Aumentar continua livre, e não mexe nas reservas.
+     *
+     * A recusa é de validação, e não a `EstoqueInsuficiente` do checkout: quem
+     * está do outro lado é o lojista corrigindo um campo, não um cliente vendo
+     * a peça acabar. Ele precisa do erro embaixo do campo — 422 na API, mensagem
+     * no formulário — e do número que explica por que aquele valor não cabe.
+     *
+     * @param  array<string, mixed>  $dadosDaOferta
+     *
+     * @throws ValidationException
+     */
+    private function recusarEstoqueAbaixoDoComprometido(ProductOffer $offer, array $dadosDaOferta): void
+    {
+        $novoFisico = $dadosDaOferta['stock_quantity'] ?? null;
+        $comprometido = (int) $offer->reserved_quantity;
+
+        if ($novoFisico === null || $comprometido === 0) {
+            return;
+        }
+
+        if ((int) $novoFisico < $comprometido) {
+            throw ValidationException::withMessages([
+                'stock_quantity' => [sprintf(
+                    '%d %s já estão comprometidas por pedidos em aberto; o estoque não pode ficar abaixo disso.',
+                    $comprometido,
+                    $comprometido === 1 ? 'unidade' : 'unidades',
+                )],
+            ]);
+        }
     }
 
     /**

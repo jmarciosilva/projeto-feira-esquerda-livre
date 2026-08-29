@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Stock\ReleaseOrderStock;
 use App\Enums\UserRole;
 use App\Livewire\Lojista\Pedidos\PedidoChat;
 use App\Livewire\Lojista\Pedidos\PedidoIndex;
@@ -158,6 +159,12 @@ class PreservacaoHistoricaTest extends TestCase
         $item = $order->items->first();
 
         $nomeDoProduto = $item->product_name;
+
+        // Desde a FIN-SEC-01E a oferta só pode sair enquanto ainda deve
+        // unidades a um pedido em aberto se a reserva for devolvida antes — é
+        // o caminho do cancelamento. O que este teste investiga vem depois: o
+        // que sobra no pedido quando o mundo vivo desaparece.
+        app(ReleaseOrderStock::class)($order);
 
         // Some tudo o que era vivo: oferta, produto e vendedor.
         $offer->delete();

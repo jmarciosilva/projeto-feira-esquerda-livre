@@ -2,6 +2,7 @@
 
 namespace App\Actions\Payments;
 
+use App\Actions\Stock\ConsumeOrderStock;
 use App\DTO\PaymentConfirmation;
 use App\Enums\OrderSplitStatus;
 use App\Enums\OrderStatus;
@@ -61,6 +62,13 @@ final class ConfirmOrderPayment
 
             $this->recusarPedidoTerminal($atual);
             $this->recusarValorDivergente($atual, $pagamento);
+
+            // A baixa acontece antes de o pedido virar pago: se nao houver
+            // estoque — caso de pedido anterior a FIN-SEC-01E, que nao reservou
+            // nada —, a confirmacao inteira falha fechada, e o pagamento
+            // recebido vira um conflito a tratar em vez de um pedido que
+            // ninguem consegue atender.
+            app(ConsumeOrderStock::class)($atual);
 
             $atual->forceFill([
                 'payment_provider' => $pagamento->provider,

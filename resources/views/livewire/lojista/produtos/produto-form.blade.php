@@ -314,8 +314,9 @@
                     <div>
                         <label class="block text-base font-semibold text-gray-700 mb-2">Quantidade em estoque</label>
                         <input wire:model="stock_quantity" type="number" min="0" placeholder="Deixe vazio se não controla"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000]"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000] @error('stock_quantity') border-red-400 @enderror"
                                style="min-height: 52px;">
+                        @error('stock_quantity')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
                     </div>
                     @endif
                 </div>

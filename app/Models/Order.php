@@ -55,6 +55,9 @@ class Order extends Model
             'total_amount'   => 'decimal:2',
             'payment_payload' => 'array',
             'paid_at'        => 'datetime',
+            'stock_reserved_at' => 'datetime',
+            'stock_consumed_at' => 'datetime',
+            'stock_released_at' => 'datetime',
         ];
     }
 

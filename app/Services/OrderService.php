@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Actions\Stock\ReserveOrderStock;
 use App\CustomerIntelligence\Enums\EventName;
 use App\CustomerIntelligence\Facades\CustomerIntelligence;
 use App\Enums\MarketplaceStatus;
@@ -112,6 +113,11 @@ class OrderService
                     'status' => 'pendente',
                 ]);
             }
+
+            // Compromete as unidades **dentro** da mesma transacao: reservar
+            // depois do commit reabriria a janela em que dois clientes levam a
+            // mesma peca. Estoque insuficiente aborta o pedido inteiro.
+            app(ReserveOrderStock::class)($order->load('items.offer.product'));
 
             $cart->clear();
 

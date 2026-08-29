@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Lojista\Produtos;
 
+use App\Actions\Catalog\DeleteProductOffer;
+use App\Exceptions\OfertaComReservaAtiva;
 use App\Models\ProductOffer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -52,7 +54,16 @@ class ProdutoIndex extends Component
     public function delete(int $id): void
     {
         $offer = $this->ofertasDoExpositor()->findOrFail($id);
-        $offer->delete();
+
+        try {
+            app(DeleteProductOffer::class)($offer);
+        } catch (OfertaComReservaAtiva $reservada) {
+            // Ha pedidos pendentes segurando unidades desta oferta. O lojista
+            // precisa saber disso e da saida que existe — desativar.
+            session()->flash('error', $reservada->mensagemParaOLojista());
+
+            return;
+        }
 
         session()->flash('success', 'Item removido da sua loja.');
     }

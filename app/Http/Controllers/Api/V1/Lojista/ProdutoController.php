@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Lojista;
 
+use App\Actions\Catalog\DeleteProductOffer;
 use App\Actions\Catalog\SaveProductWithOffer;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lojista\ProdutoRequest;
@@ -96,7 +97,9 @@ class ProdutoController extends Controller
     {
         $offer = $this->authorizeProduct($request, $product);
 
-        $offer->delete();
+        // A recusa por reserva ativa sai como 409 pelo `render()` da propria
+        // excecao: e negativa comercial, nao falha do servidor.
+        app(DeleteProductOffer::class)($offer);
 
         return response()->noContent();
     }

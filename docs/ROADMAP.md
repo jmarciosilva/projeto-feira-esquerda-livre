@@ -2289,7 +2289,7 @@ O princípio que a sustenta:
 | FIN-SEC-01C — Snapshot comercial imutável | ✅ Pronta para revisão | Frete por loja congelado e origem confiável do valor |
 | FIN-SEC-01C.1 — Eliminação do F-13 | ✅ Pronta para revisão | Frete do checkout da API decidido pelo servidor |
 | FIN-SEC-01D — Ciclo de confirmação de pagamento | ✅ Pronta para revisão | Confirmação atômica, idempotente e por evento |
-| FIN-SEC-01E — Integridade e concorrência de estoque | ⬜ | Reserva, validação e proteção contra overselling |
+| FIN-SEC-01E — Integridade e concorrência de estoque | ✅ Pronta para revisão | Reserva no checkout, consumo no pagamento e lock no banco |
 | FIN-SEC-01F — Cancelamento, expiração e restauração | ⬜ | Pix expirado, estorno, devolução |
 | FIN-SEC-01G — Hardening e documentação final | ⬜ | — |
 
@@ -2363,7 +2363,24 @@ valor, em vez de suficiência. Fica registrada uma dívida operacional: pedidos
 digitais pagos enquanto o F-03 existia podem estar sem matrícula, e a
 reconciliação é tarefa própria.
 
-Estoque e regra de retenção **seguem abertos** nas fases seguintes. Detalhes, decisões e matriz de achados em
+**FIN-SEC-01E (2026-08-28).** Fecha o **F-02**, que era blocker de produção. O
+estoque era um número que ninguém consultava: dois clientes compravam a mesma
+última peça **sem sequer precisar de concorrência**. Agora o checkout compromete
+(`reserved_quantity`), o pagamento consome e o cancelamento devolve — tudo sob
+`lockForUpdate` em ordem determinística, dentro das transações que já existiam.
+
+`stock_quantity` continua sendo o físico, para não fazer a tela do lojista
+mentir; o disponível é a diferença. Produto digital não disputa unidade. Pedidos
+anteriores à fase não ganham reserva retroativa: disputam o estoque no pagamento
+e, se não houver, a confirmação falha fechada.
+
+A revisão pré-commit acrescentou uma regra: oferta com reserva ativa **não pode
+ser excluída** (D-FIN-24). Enquanto deve unidades, ela é o recurso operacional
+que o pagamento e o cancelamento usam para baixar ou devolver; apagá-la deixaria
+o pedido reservado apontando para o nada. Desativar continua liberado, e é a
+saída oferecida ao lojista na própria recusa.
+
+A regra de retenção **segue aberta** nas fases seguintes. Detalhes, decisões e matriz de achados em
 [`FIN_SEC_01_INTEGRIDADE_COMERCIAL.md`](FIN_SEC_01_INTEGRIDADE_COMERCIAL.md).
 
 ---

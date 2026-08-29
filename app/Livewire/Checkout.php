@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\CustomerIntelligence\Enums\EventName;
 use App\CustomerIntelligence\Facades\CustomerIntelligence;
+use App\Exceptions\EstoqueInsuficiente;
 use App\Models\SiteSetting;
 use App\Services\CartService;
 use App\Services\MercadoPagoService;
@@ -373,25 +374,34 @@ class Checkout extends Component
             report($exception);
         }
 
-        $order = $orderService->createFromCart([
-            'customer_name' => $this->customer_name,
-            'customer_whatsapp' => $this->customer_whatsapp,
-            'customer_email' => $this->customer_email ?: null,
-            'delivery_type' => $this->delivery_type,
-            'customer_address_id' => $address?->id,
-            'address_cep' => $address?->cep,
-            'address_rua' => $address?->rua,
-            'address_numero' => $address?->numero,
-            'address_complemento' => $address?->complemento,
-            'address_bairro' => $address?->bairro,
-            'address_cidade' => $address?->cidade,
-            'address_estado' => $address?->estado,
-            'shipping_total' => $this->shippingTotal(),
-            'shipping_note' => $this->shippingNote(),
-            // Congela o frete loja a loja, e nao so a soma: o split precisa
-            // saber quanto daquela venda foi transporte.
-            'shipping_por_expositor' => $this->fretePorExpositor(),
-        ], $cart);
+        try {
+            $order = $orderService->createFromCart([
+                'customer_name' => $this->customer_name,
+                'customer_whatsapp' => $this->customer_whatsapp,
+                'customer_email' => $this->customer_email ?: null,
+                'delivery_type' => $this->delivery_type,
+                'customer_address_id' => $address?->id,
+                'address_cep' => $address?->cep,
+                'address_rua' => $address?->rua,
+                'address_numero' => $address?->numero,
+                'address_complemento' => $address?->complemento,
+                'address_bairro' => $address?->bairro,
+                'address_cidade' => $address?->cidade,
+                'address_estado' => $address?->estado,
+                'shipping_total' => $this->shippingTotal(),
+                'shipping_note' => $this->shippingNote(),
+                // Congela o frete loja a loja, e nao so a soma: o split precisa
+                // saber quanto daquela venda foi transporte.
+                'shipping_por_expositor' => $this->fretePorExpositor(),
+            ], $cart);
+        } catch (EstoqueInsuficiente $esgotou) {
+            // Alguem levou a ultima peca entre a vitrine e o botao de finalizar.
+            // O cliente precisa saber o que aconteceu, nao ver uma exception.
+            session()->flash('error', $esgotou->mensagemParaOCliente());
+            $this->step = 'resumo';
+
+            return;
+        }
 
         $this->orderReference = $order->reference;
         $this->orderTotalAmount = (float) $order->total_amount;

@@ -33,7 +33,7 @@ setembro a loja mude de nome, o produto saia do ar e a oferta seja removida.
 | **FIN-SEC-01C** | ✅ Pronta para revisão | Snapshot comercial imutável — frete por loja e origem confiável |
 | **FIN-SEC-01C.1** | ✅ Pronta para revisão | Eliminação do F-13 — frete confiável no checkout da API |
 | **FIN-SEC-01D** | ✅ Pronta para revisão | Ciclo de confirmação de pagamento atômico, idempotente e por evento |
-| FIN-SEC-01E | ⬜ Não iniciada | Integridade e concorrência de estoque |
+| **FIN-SEC-01E** | ✅ Pronta para revisão | Integridade e concorrência de estoque |
 | FIN-SEC-01F | ⬜ Não iniciada | Cancelamento, expiração e restauração |
 | FIN-SEC-01G | ⬜ Não iniciada | Hardening, MySQL real e documentação final |
 
@@ -66,7 +66,7 @@ sustentasse**. Classificado como **BLOCKER BEFORE PRODUCTION**.
 | ID | Achado | Severidade | Fase |
 |---|---|---|---|
 | F-01 | `DELETE` de expositor destrói histórico comercial | BLOCKER | **01B** |
-| F-02 | Estoque nunca validado, decrementado ou reservado; overselling ilimitado | BLOCKER | 01E |
+| ~~F-02~~ | Estoque nunca validado, decrementado ou reservado; overselling ilimitado | ~~BLOCKER~~ | **RESOLVIDO na 01E** |
 | ~~F-03~~ | `splits()->update()` em massa não disparava `OrderSplitConfirmed` — matrícula AVA não ocorria no pagamento online | ~~HIGH~~ | **RESOLVIDO na 01D** |
 | F-04 | Sem snapshot do nome do expositor | HIGH | **01B** |
 | ~~F-05~~ | `applyPayment` não era transacional | ~~HIGH~~ | **RESOLVIDO na 01D** |
@@ -700,6 +700,189 @@ matriculado** até o lojista confirmar à mão. A correção vale dali para fren
 
 A reconciliação é tarefa própria, e precisa ser auditável, com `--dry-run`,
 idempotente e restrita a pedidos comprovadamente pagos. Não foi feita aqui.
+
+---
+
+## FIN-SEC-01E — Integridade e concorrência de estoque
+
+### O que a auditoria encontrou
+
+`stock_quantity` era um número que o lojista digitava e que **ninguém consultava
+para decidir uma venda**. Não havia validação, baixa, reserva nem lock em ponto
+algum do sistema.
+
+O achado central dispensa concorrência para se manifestar:
+
+```text
+estoque = 1
+cliente A finaliza  → pedido criado
+cliente B finaliza  → pedido criado
+estoque = 1
+```
+
+Dois pedidos, uma unidade, **sequencialmente**. Reproduzido em teste antes de
+qualquer correção, junto com: oferta esgotada vendendo, pedido de 2 com estoque
+1 aceito, e nenhuma das seis combinações de `has_stock`/`stock_quantity`
+impedindo a venda.
+
+### O modelo: físico + comprometido
+
+```text
+stock_quantity     estoque físico — o que existe, e o que o lojista edita
+reserved_quantity  comprometido por pedidos ainda não pagos   (novo)
+disponível         stock_quantity − reserved_quantity
+```
+
+`stock_quantity` **continua significando o físico**. Transformá-lo em
+"disponível" seria mais curto, mas faria a tela do lojista mentir: ele digita 10
+porque tem 10, e com Pix pendente precisa enxergar a diferença entre ter 10 e
+ter 10 com 3 já saindo.
+
+Ilimitado continua sendo ilimitado: `has_stock` falso ou `stock_quantity` nulo —
+as duas formas que o cadastro já oferecia — não reservam nem consomem nada.
+
+### O ciclo
+
+| Momento | O que acontece | Onde |
+|---|---|---|
+| Carrinho | **nada** — carrinho não reserva | — |
+| Checkout | `reserved_quantity += qty` | dentro da transação de `createFromCart` |
+| Pagamento | `stock_quantity -= qty` e `reserved_quantity -= qty` | dentro da transação de `ConfirmOrderPayment` |
+| Cancelamento | `reserved_quantity -= qty` | `ReleaseOrderStock`, pronta para a 01F |
+
+As três operações travam as ofertas com `lockForUpdate` **em ordem crescente de
+id**. A ordenação não é estética: dois pedidos que travam as mesmas duas ofertas
+em ordens opostas se bloqueiam em círculo, e o banco mata uma das transações por
+deadlock. Subindo sempre por `id`, a segunda apenas espera.
+
+### Prova de que a marca do pedido resolve o legado
+
+O status do pedido sozinho **não** distingue um `aguardando_pagamento` criado
+hoje — que reservou — de um criado antes desta fase — que não reservou. Por isso
+o `Order` ganhou `stock_reserved_at`, `stock_consumed_at` e `stock_released_at`.
+A **ausência** da marca é o que identifica um pedido legado: sem backfill, sem
+inferência por data de deploy, e com evidência persistida para provar que cada
+transição aconteceu no máximo uma vez.
+
+### Decisões registradas
+
+| # | Decisão |
+|---|---|
+| **D-FIN-17** | Estoque pertence à `ProductOffer`, não ao `Product` |
+| **D-FIN-18** | Carrinho não reserva estoque |
+| **D-FIN-19** | Reserva é criada atomicamente com o pedido |
+| **D-FIN-20** | Pagamento consome uma reserva existente; pedido legado disputa o estoque atual |
+| **D-FIN-21** | Toda transição de estoque é idempotente |
+| **D-FIN-22** | Concorrência é resolvida no banco, não por validação prévia de UI |
+| **D-FIN-23** | Produto digital não participa do estoque físico |
+| **D-FIN-24** | Oferta com reserva ativa não pode ser fisicamente excluída; desativar continua liberado |
+
+### Invariantes
+
+| # | Invariante | Situação |
+|---|---|---|
+| EST-INV-01 | Disponível nunca é negativo | ✔ |
+| EST-INV-02 | Reserva nunca supera o físico | ✔ |
+| EST-INV-03 | Cada pedido reserva no máximo uma vez | ✔ `stock_reserved_at` |
+| EST-INV-04 | Cada reserva é consumida no máximo uma vez | ✔ `stock_consumed_at` |
+| EST-INV-05 | Cada reserva é liberada no máximo uma vez | ✔ `stock_released_at` |
+| EST-INV-06 | Reserva de um vendedor não afeta oferta de outro | ✔ chave é `product_offer_id` |
+| EST-INV-07 | Produto digital não consome estoque físico | ✔ |
+| EST-INV-08 | Falha transacional não deixa reserva parcial | ✔ |
+| EST-INV-09 | Pedido histórico não é reescrito por estoque atual | ✔ |
+| **EST-INV-10** | Pedido anterior à adoção de reservas nunca é considerado reservado retroativamente | ✔ |
+| **EST-INV-11** | Toda reserva ativa mantém uma `ProductOffer` operacionalmente referenciável até ser consumida ou liberada | ✔ |
+
+### Pedidos anteriores à fase
+
+Política decidida: **não têm reserva e não a ganham retroativamente**. Ao chegar
+o pagamento, o pedido **disputa** o estoque que existir naquele momento, sob
+lock. Havendo estoque, consome e confirma; não havendo, a confirmação inteira
+falha fechada — pedido não confirmado, splits não confirmados, nenhuma baixa
+parcial.
+
+O pagamento fica recebido no gateway e registrado como conflito operacional, sem
+estado de domínio próprio. Criar um enum às pressas seria pior; a limitação está
+registrada como dívida da 01F.
+
+### Experiência do cliente
+
+Falha de estoque vira recado, não exceção: *"Tapete de crochê esgotou enquanto
+você finalizava a compra"* no checkout web, e erro de validação com a mesma
+mensagem na API. As duas superfícies passam pela mesma autoridade — não existe
+web protegido e API livre.
+
+### O lojista não invalida reservas
+
+Reduzir o físico para menos do que já está comprometido é recusado: criaria
+disponível negativo, com unidades prometidas a pedidos existentes. Aumentar
+continua livre e não mexe nas reservas.
+
+### Concorrência, no MySQL real
+
+```text
+T1: lock adquirido, disponivel=1
+T2: BLOQUEADA por 2s — o lock e efetivo
+T1: reservou 1 e liberou o lock
+T2: releu -> stock=1 reserved=1 disponivel=0
+T2: recusa o pedido — overselling impedido
+```
+
+### R-1 — a oferta comprometida não pode ser apagada
+
+A primeira versão desta fase tratava a exclusão de uma oferta com reserva ativa
+como perda de rastreabilidade, a resolver depois. Era leitura curta demais.
+
+Enquanto deve unidades, a `ProductOffer` **não é só um registro de catálogo**: é o
+recurso operacional de que `ConsumeOrderStock` e `ReleaseOrderStock` precisam
+para baixar ou devolver aquelas unidades. Apagada a linha, a FK
+`order_items.product_offer_id` vira `NULL` por `SET NULL` e o pedido reservado
+passa a apontar para o nada: o pagamento posterior não acha o que consumir, o
+cancelamento não acha o que liberar. E a obrigação **não pode ser assumida em
+silêncio** por outra oferta do mesmo produto — seria outro vendedor, outro preço,
+outra relação comercial.
+
+A recusa vive em `DeleteProductOffer`, e não em cada superfície. Ler
+`reserved_quantity` e depois apagar são dois momentos, e entre eles cabe um
+checkout inteiro:
+
+```text
+T1 exclusão lê reserved = 0
+T2 checkout cria o pedido e reserva 1
+T1 exclusão apaga a oferta
+```
+
+Por isso a leitura acontece sob `lockForUpdate`, dentro da mesma transação que
+apaga. Provado em MySQL real nas duas ordens possíveis: com o checkout na
+frente, a exclusão esperou o lock e releu `reserved = 2`, recusando; com a
+exclusão na frente, o checkout esperou e, ao entrar, já não encontrou a oferta.
+Não existe o estado "pedido reservado + oferta inexistente".
+
+O modelo guarda a mesma regra em `deleting`, como última linha de defesa — não
+como controle de concorrência. É o que impede um comando, um painel novo ou um
+`tinker` de apagar uma oferta comprometida só por não conhecer a regra.
+
+**Desativar continua liberado**, e é a saída oferecida ao lojista na própria
+mensagem de recusa: `is_active = false` tira a oferta da vitrine por
+`scopeVigente()` e **preserva** a linha e a reserva. Nem `ConsumeOrderStock` nem
+`ReleaseOrderStock` passam por `scopeVigente()`, justamente porque um pedido
+existente tem direito à oferta que comprometeu suas unidades, mesmo que ela já
+não esteja à venda.
+
+Fora do alcance desta regra, e registrado com honestidade: `product_offers`
+cascateia de `products` e de `expositores` no banco. Apagar um produto ou um
+expositor levaria a oferta junto **sem passar por PHP nenhum**. Hoje isso não é
+alcançável pela aplicação — nenhuma superfície exclui produto ou expositor —, e
+mexer nessas FKs é decisão de ciclo de vida de catálogo, não de estoque.
+
+### Dívidas para a FIN-SEC-01F
+
+| Item | Por quê |
+|---|---|
+| **Chamar `ReleaseOrderStock`** | A operação existe e é idempotente; falta decidir os gatilhos — cancelamento, expiração |
+| **Expiração de Pix** | O domínio não sabe quando um pedido deixa de ser pagável. O Mercado Pago **fornece** `date_of_expiration`, mas o serviço não o solicita nem o lê; o payload cru fica em `orders.payment_payload` sem consumidor |
+| **Reserva presa** | Pedido abandonado retém estoque até alguém liberar |
+| **Pagamento sem estoque** | Refund, substituição, reposição ou revisão humana |
 
 ---
 

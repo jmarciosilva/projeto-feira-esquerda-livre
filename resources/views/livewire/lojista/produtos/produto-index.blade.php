@@ -3,6 +3,10 @@
     <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 text-base font-medium">{{ session('success') }}</div>
     @endif
 
+    @if(session('error'))
+    <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-base font-medium">{{ session('error') }}</div>
+    @endif
+
     <div class="flex flex-col sm:flex-row gap-3 mb-4">
         <input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar por nome..."
                class="flex-1 min-w-0 px-4 py-3 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-[#E8A000]">

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Stock\ReleaseOrderStock;
 use App\Enums\UserRole;
 use App\Livewire\Checkout;
 use App\Models\Expositor;
@@ -328,6 +329,13 @@ class SnapshotComercialTest extends TestCase
         $expositor->update(['name' => 'Nome Novo']);
         $offer->update(['price' => 999]);
         SiteSetting::instance()->update(['comissao_percentual' => 45]);
+
+        // Desde a FIN-SEC-01E a oferta só pode sair enquanto ainda deve
+        // unidades a um pedido em aberto se a reserva for devolvida antes — é
+        // o caminho do cancelamento. O que este teste investiga vem depois: o
+        // que sobra no pedido quando o mundo vivo desaparece.
+        app(ReleaseOrderStock::class)($order);
+
         $offer->delete();
         Product::whereKey($productId)->delete();
         $expositor->delete();
