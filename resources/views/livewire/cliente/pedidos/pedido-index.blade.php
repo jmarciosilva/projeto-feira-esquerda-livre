@@ -1,4 +1,12 @@
 <div>
+    @if(session('success'))
+    <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 text-base font-medium">{{ session('success') }}</div>
+    @endif
+
+    @if(session('error'))
+    <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-base font-medium">{{ session('error') }}</div>
+    @endif
+
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-base">
@@ -33,6 +41,14 @@
                                style="border-color:#E8A000; color:#C47A00; min-height:40px; display:inline-flex; align-items:center;">
                                 Ver detalhes
                             </a>
+                            @if($order->status === \App\Enums\OrderStatus::AguardandoPagamento)
+                            <button wire:click="cancelar({{ $order->id }})"
+                                    wire:confirm="Cancelar o pedido #{{ $order->reference }}?"
+                                    class="ml-2 px-3 py-2 rounded-lg text-sm font-semibold border-2 border-gray-200 text-gray-600 hover:bg-gray-50"
+                                    style="min-height:40px;">
+                                Cancelar
+                            </button>
+                            @endif
                         </td>
                     </tr>
                     @empty

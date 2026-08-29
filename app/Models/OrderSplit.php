@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\OrderSplitStatus;
 use App\Events\OrderSplitConfirmed;
+use App\Exceptions\SplitRevertidoNaoReconfirma;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -74,6 +75,14 @@ class OrderSplit extends Model
     {
         if ($this->status === OrderSplitStatus::Confirmado) {
             return;
+        }
+
+        // Revertido e terminal. Sem esta guarda, o botao do lojista ou a rota
+        // `PATCH /pedidos/{split}/confirmar-pagamento` reconfirmariam um split
+        // cujo pagamento foi desfeito — e cada confirmacao redispara
+        // `OrderSplitConfirmed`, que matricula aluno e emite evento.
+        if ($this->status === OrderSplitStatus::Revertido) {
+            throw new SplitRevertidoNaoReconfirma($this);
         }
 
         $this->update([

@@ -196,9 +196,12 @@ class AdminUserGovernanceTest extends TestCase
             ->get(route('admin.pedidos.index'))
             ->assertOk();
 
+        // A permissao continua sendo `pedidos.atualizar_status`; o que mudou na
+        // FIN-SEC-01F-B foi a operacao que ela protege — `updateStatus`, que
+        // escrevia qualquer estado, deu lugar a acoes com nome proprio.
         Livewire::actingAs($supervisor)
             ->test(PedidoIndex::class)
-            ->call('updateStatus', $order->id, 'concluido')
+            ->call('cancelar', $order->id)
             ->assertForbidden();
     }
 

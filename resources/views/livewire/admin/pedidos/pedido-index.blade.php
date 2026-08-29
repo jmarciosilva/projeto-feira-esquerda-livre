@@ -44,7 +44,7 @@
                             @php $sh = $order->shippings->where('order_split_id', $split->id)->first(); @endphp
                             <div class="flex flex-wrap items-center gap-1 mb-1">
                                 <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
-                                      style="{{ $split->status->value === 'confirmado' ? 'background:#dcfce7; color:#166534;' : 'background:#fef9c3; color:#854d0e;' }}">
+                                      style="{{ $split->status->badge() }}">
                                     {{ $split->expositor?->name ?? $split->expositor_name ?? 'Loja removida' }}
                                 </span>
                                 @if($sh)
@@ -71,12 +71,13 @@
                         </td>
                         <td class="py-3 px-2 text-right">
                             @can('pedidos.atualizar_status')
-                            <select wire:change="updateStatus({{ $order->id }}, $event.target.value)"
-                                    class="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#52b788]">
-                                @foreach($statuses as $status)
-                                <option value="{{ $status->value }}" @selected($order->status === $status)>{{ $status->label() }}</option>
-                                @endforeach
-                            </select>
+                            @if($order->status === \App\Enums\OrderStatus::AguardandoPagamento)
+                            <button wire:click="cancelar({{ $order->id }})"
+                                    wire:confirm="Cancelar o pedido #{{ $order->reference }}? O estoque reservado volta para a loja."
+                                    class="px-3 py-1.5 border border-red-200 text-red-700 rounded-lg text-xs font-semibold hover:bg-red-50">
+                                Cancelar
+                            </button>
+                            @endif
                             @endcan
                             <a href="{{ route('pedido.show', $order->reference) }}" target="_blank"
                                class="ml-2 text-xs font-semibold text-gray-500 hover:text-gray-700">Ver</a>

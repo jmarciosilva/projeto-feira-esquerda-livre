@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Admin\Pedidos;
 
+use App\Actions\Orders\CancelOrder;
 use App\Enums\OrderStatus;
+use App\Exceptions\TransicaoDePedidoInvalida;
 use App\Livewire\Admin\Concerns\AuthorizesAdminActions;
 use App\Models\Order;
 use Illuminate\View\View;
@@ -26,14 +28,31 @@ class PedidoIndex extends Component
         $this->resetPage();
     }
 
-    public function updateStatus(int $orderId, string $status): void
+    /**
+     * Cancela um pedido ainda nao pago.
+     *
+     * Substitui o `updateStatus` generico, que escrevia qualquer estado em
+     * qualquer pedido com um `update` cru: era possivel marcar um pedido como
+     * pago sem pagamento, concluir um cancelado, ou cancelar sem devolver o
+     * estoque reservado. Estado nao e escolha de formulario — `Concluido`,
+     * `PagamentoConfirmado`, `Expirado` e `Estornado` nascem dos eventos e
+     * actions que os produzem, nunca de um select.
+     */
+    public function cancelar(int $orderId): void
     {
         $this->authorizeAdminAction('pedidos.atualizar_status');
 
         $order = Order::findOrFail($orderId);
-        $order->update(['status' => $status]);
 
-        session()->flash('success', 'Status do pedido #' . $order->reference . ' atualizado.');
+        try {
+            app(CancelOrder::class)($order);
+        } catch (TransicaoDePedidoInvalida $recusada) {
+            session()->flash('error', $recusada->mensagem());
+
+            return;
+        }
+
+        session()->flash('success', 'Pedido #' . $order->reference . ' cancelado e estoque devolvido.');
     }
 
     public function render(): View

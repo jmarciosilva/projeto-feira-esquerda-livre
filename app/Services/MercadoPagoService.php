@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Actions\Orders\CancelOrder;
 use App\Actions\Payments\ConfirmOrderPayment;
 use App\DTO\PaymentConfirmation;
 use App\Enums\OrderStatus;
+use App\Exceptions\TransicaoDePedidoInvalida;
 use App\Models\Order;
 use App\Models\SiteSetting;
 use Illuminate\Http\Client\RequestException;
@@ -138,6 +140,14 @@ class MercadoPagoService
         }
     }
 
+    private const EVENTO_APROVACAO = 'aprovacao';
+
+    private const EVENTO_REVERSAO = 'reversao';
+
+    private const EVENTO_CANCELAMENTO = 'cancelamento';
+
+    private const EVENTO_DESCONHECIDO = 'desconhecido';
+
     /**
      * Traduz a resposta do Mercado Pago para o domínio.
      *
@@ -145,6 +155,18 @@ class MercadoPagoService
      * guardar a resposta crua para auditoria. Ele **não** decide que um pedido
      * passou a estar pago — essa transição pertence a `ConfirmOrderPayment`,
      * que é a mesma para qualquer gateway e roda atômica e uma única vez.
+     *
+     * ## Roteamento por natureza, e não por identidade (FIN-SEC-01F-A)
+     *
+     * Até aqui a única pergunta feita era "este id é diferente do que pagou o
+     * pedido?", e qualquer resposta afirmativa desviava a notificação para o
+     * rastro de auditoria. A pergunta protegia o caso certo — um segundo
+     * `approved` não pode sobrescrever o pagamento que quitou o pedido — mas
+     * confundia **identidade do recurso** com **natureza do evento**: uma
+     * reversão legítima do pagamento vigente caía no mesmo desvio e sumia.
+     *
+     * Agora a natureza decide o fluxo, e a identidade decide se o evento
+     * pertence a este pedido. São perguntas diferentes, e as duas são feitas.
      *
      * @param  array<string, mixed>  $payment
      */
@@ -165,45 +187,243 @@ class MercadoPagoService
         $status = (string) ($payment['status'] ?? 'unknown');
         $paymentId = isset($payment['id']) ? (string) $payment['id'] : null;
 
-        // Notificação de um pagamento diferente, para um pedido que já foi
-        // quitado por outro: o payload é guardado como rastro de auditoria, mas
-        // o id e o status do pagamento que de fato pagou o pedido permanecem.
-        // Sobrescrevê-los faria o pedido apontar para o pagamento errado.
-        $jaQuitadoPorOutro = $order->status === OrderStatus::PagamentoConfirmado
+        return match ($this->naturezaDoEvento($status, $order)) {
+            self::EVENTO_APROVACAO => $this->rotearAprovacao($order, $payment, $paymentId, $status),
+            // O recurso buscado em `getPayment()` **é** o pagamento; por isso,
+            // e só por isso, o próprio id serve de correlação quando o payload
+            // não traz `payment_id`.
+            self::EVENTO_REVERSAO => $this->rotearReversao(
+                $order,
+                $payment,
+                isset($payment['payment_id']) ? (string) $payment['payment_id'] : $paymentId,
+                $status,
+            ),
+            self::EVENTO_CANCELAMENTO => $this->rotearCancelamento($order, $payment, $paymentId, $status),
+            default => $this->apenasRegistrar($order, $payment, $paymentId, $status),
+        };
+    }
+
+    /**
+     * Aplica um recurso de **refund**, que é distinto de um pagamento.
+     *
+     * `GET /v1/payments/{payment_id}/refunds/{refund_id}` devolve um objeto
+     * cujo `id` identifica o estorno e cujo `payment_id` identifica o pagamento
+     * revertido. Confundir os dois seria assumir `refund.id === payment.id`,
+     * que é falso — e correlacionar por um id errado é pior do que não
+     * correlacionar. Sem `payment_id`, **fail-closed**: nada acontece.
+     *
+     * @param  array<string, mixed>  $refund
+     */
+    public function applyRefund(array $refund): ?Order
+    {
+        $pagamentoRevertido = isset($refund['payment_id']) ? (string) $refund['payment_id'] : null;
+
+        if ($pagamentoRevertido === null) {
+            return null;
+        }
+
+        $order = Order::where('mercado_pago_payment_id', $pagamentoRevertido)->first();
+
+        if (! $order) {
+            return null;
+        }
+
+        return $this->rotearReversao($order, $refund, $pagamentoRevertido, 'refunded');
+    }
+
+    /**
+     * Aplica uma notificação de chargeback.
+     *
+     * O chargeback é recurso próprio, com tópico próprio, e sua notificação
+     * **não carrega `external_reference`**. Quem liga o evento ao pedido é
+     * `data.payment_id` — e é por ele, nunca por `data.id`, que o pedido é
+     * localizado: `data.id` identifica o chargeback, não o pagamento.
+     *
+     * @param  array<string, mixed>  $notificacao  campos mínimos já extraídos
+     */
+    public function applyChargeback(array $notificacao): ?Order
+    {
+        $chargebackId = isset($notificacao['id']) ? (string) $notificacao['id'] : null;
+        $paymentId = isset($notificacao['payment_id']) ? (string) $notificacao['payment_id'] : null;
+
+        if ($paymentId === null) {
+            // Sem o vínculo com o pagamento não há o que correlacionar, e
+            // adivinhar seria pior do que não agir.
+            return null;
+        }
+
+        $order = Order::where('mercado_pago_payment_id', $paymentId)->first();
+
+        if (! $order) {
+            return null;
+        }
+
+        return $this->rotearReversao(
+            $order,
+            ['chargeback_id' => $chargebackId, 'payment_id' => $paymentId],
+            $paymentId,
+            'charged_back',
+        );
+    }
+
+    /**
+     * Reversão e cancelamento chegam sob o mesmo `cancelled` do gateway; o que
+     * os separa é o pedido já ter sido pago ou não. Cancelar o que nunca foi
+     * pago encerra uma intenção de compra; "cancelar" o que já foi pago é
+     * reversão financeira, e não pode seguir pelo mesmo caminho.
+     */
+    private function naturezaDoEvento(string $status, Order $order): string
+    {
+        $jaPago = $order->status === OrderStatus::PagamentoConfirmado
+            || $order->paid_at !== null;
+
+        return match (true) {
+            $status === 'approved' => self::EVENTO_APROVACAO,
+            in_array($status, ['refunded', 'charged_back'], true) => self::EVENTO_REVERSAO,
+            $status === 'cancelled' && $jaPago => self::EVENTO_REVERSAO,
+            $status === 'cancelled' => self::EVENTO_CANCELAMENTO,
+            default => self::EVENTO_DESCONHECIDO,
+        };
+    }
+
+    /**
+     * Aprovação. Aqui mora, intacta, a proteção da FIN-SEC-01D.
+     *
+     * @param  array<string, mixed>  $payment
+     */
+    private function rotearAprovacao(Order $order, array $payment, ?string $paymentId, string $status): Order
+    {
+        if ($this->ehOutroPagamento($order, $paymentId)) {
+            // Segundo `approved` para um pedido já quitado por outro pagamento:
+            // o payload vira rastro de auditoria e nada mais. Sobrescrever o id
+            // faria o pedido apontar para o pagamento errado, e reconfirmar
+            // consumiria estoque e confirmaria splits de novo.
+            return $this->guardarRastro($order, $payment, 'payment_ignorado_'.$paymentId);
+        }
+
+        $this->gravarPagamentoVigente($order, $payment, $paymentId, $status);
+
+        return $this->confirmar($order, $payment, $paymentId);
+    }
+
+    /**
+     * Reversão financeira — refund ou chargeback.
+     *
+     * A autoridade não é `external_reference`, que identifica o **pedido**: um
+     * pedido pode ter mais de uma tentativa de pagamento, e revertê-lo por
+     * causa de um pagamento que não foi o que o quitou destruiria uma venda
+     * válida. A autoridade é o pagamento revertido bater com o vigente.
+     *
+     * **Fail-closed** quer dizer: nenhuma mutação comercial ou financeira
+     * operacional. Nem status, nem split, nem estoque, nem matrícula, nem
+     * `paid_at`, `payment_status` ou autoridade de pagamento. O que acontece é
+     * uma escrita de auditoria em `payment_payload`, sob chave própria — o
+     * evento fica registrado justamente para poder ser investigado.
+     *
+     * Nesta subfase a reversão correlacionada é registrada e **não** transiciona
+     * o pedido: `OrderStatus::Estornado`, `OrderSplitStatus::Revertido` e a
+     * revogação da matrícula pertencem à 01F-D.
+     *
+     * Quem chama já resolveu a correlação — e cada chamador sabe de que tipo é
+     * o recurso que tem em mãos. Resolver aqui dentro obrigaria este método a
+     * adivinhar, e adivinhar produziria justamente o `refund.id === payment.id`
+     * que não se pode assumir.
+     *
+     * @param  array<string, mixed>  $payment
+     * @param  string|null  $pagamentoRevertido  id do pagamento revertido, já correlacionado
+     */
+    private function rotearReversao(Order $order, array $payment, ?string $pagamentoRevertido, string $status): Order
+    {
+        $vigente = $order->mercado_pago_payment_id;
+
+        if ($vigente === null || $pagamentoRevertido === null || $vigente !== $pagamentoRevertido) {
+            return $this->guardarRastro(
+                $order,
+                $payment,
+                'reversao_nao_relacionada_'.($pagamentoRevertido ?? 'sem_id'),
+            );
+        }
+
+        return $this->guardarRastro($order, $payment, 'reversao_'.$status.'_'.$pagamentoRevertido);
+    }
+
+    /**
+     * Cancelamento antes do pagamento: encerra a intenção de compra.
+     *
+     * O gateway informa o fato; quem transiciona é o domínio. Até a 01F-B este
+     * método escrevia `Cancelado` direto e deixava a reserva de estoque presa
+     * para sempre — o vazamento V-1. `CancelOrder` devolve as unidades na mesma
+     * transação em que encerra o pedido.
+     *
+     * Se o pedido já não puder ser cancelado — expirado, concluído —, a recusa
+     * é registrada em vez de virar erro: o gateway não tem culpa de chegar
+     * atrasado, e o estado do domínio prevalece.
+     *
+     * @param  array<string, mixed>  $payment
+     */
+    private function rotearCancelamento(Order $order, array $payment, ?string $paymentId, string $status): Order
+    {
+        $this->gravarPagamentoVigente($order, $payment, $paymentId, $status);
+
+        try {
+            return app(CancelOrder::class)($order->refresh());
+        } catch (TransicaoDePedidoInvalida $recusada) {
+            report($recusada);
+
+            return $this->guardarRastro($order, $payment, 'cancelamento_recusado_'.($paymentId ?? 'sem_id'));
+        }
+    }
+
+    /**
+     * Status que o domínio não roteia — `pending`, `in_process` e afins.
+     *
+     * @param  array<string, mixed>  $payment
+     */
+    private function apenasRegistrar(Order $order, array $payment, ?string $paymentId, string $status): Order
+    {
+        if ($this->ehOutroPagamento($order, $paymentId)) {
+            return $this->guardarRastro($order, $payment, 'payment_ignorado_'.$paymentId);
+        }
+
+        $this->gravarPagamentoVigente($order, $payment, $paymentId, $status);
+
+        return $order->refresh();
+    }
+
+    private function ehOutroPagamento(Order $order, ?string $paymentId): bool
+    {
+        return $order->status === OrderStatus::PagamentoConfirmado
             && $order->mercado_pago_payment_id !== null
             && $paymentId !== null
             && $order->mercado_pago_payment_id !== $paymentId;
+    }
 
-        $metadados = [
-            'payment_payload' => array_merge($order->payment_payload ?? [], [
-                $jaQuitadoPorOutro ? 'payment_ignorado_'.$paymentId : 'payment' => $payment,
-            ]),
-        ];
-
-        if (! $jaQuitadoPorOutro) {
-            $metadados += [
-                'payment_method' => 'mercado_pago',
-                'payment_provider' => 'mercado_pago',
-                'payment_status' => $status,
-                'mercado_pago_payment_id' => $paymentId,
-            ];
-        }
-
-        $order->forceFill($metadados)->save();
-
-        if ($jaQuitadoPorOutro) {
-            return $order->refresh();
-        }
-
-        if ($status === 'approved') {
-            return $this->confirmar($order, $payment, $paymentId);
-        }
-
-        if (in_array($status, ['cancelled', 'refunded', 'charged_back'], true)) {
-            $order->forceFill(['status' => OrderStatus::Cancelado])->save();
-        }
+    /**
+     * Guarda o payload sob uma chave própria, sem tocar em nada do domínio.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function guardarRastro(Order $order, array $payload, string $chave): Order
+    {
+        $order->forceFill([
+            'payment_payload' => array_merge($order->payment_payload ?? [], [$chave => $payload]),
+        ])->save();
 
         return $order->refresh();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payment
+     */
+    private function gravarPagamentoVigente(Order $order, array $payment, ?string $paymentId, string $status): void
+    {
+        $order->forceFill([
+            'payment_payload' => array_merge($order->payment_payload ?? [], ['payment' => $payment]),
+            'payment_method' => 'mercado_pago',
+            'payment_provider' => 'mercado_pago',
+            'payment_status' => $status,
+            'mercado_pago_payment_id' => $paymentId,
+        ])->save();
     }
 
     /**

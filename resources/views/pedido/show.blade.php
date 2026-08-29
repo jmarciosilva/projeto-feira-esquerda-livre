@@ -170,7 +170,7 @@
         <div class="bg-white rounded-2xl border border-gray-200 p-6">
             <div class="flex items-center justify-between gap-4 mb-4">
                 <h2 class="font-bold text-base" style="color:#3D3000;">{{ $nomeDaLoja }}</h2>
-                <span class="text-xs font-semibold px-2.5 py-1 rounded-full {{ $split->status->value === 'confirmado' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-full" style="{{ $split->status->badge() }}">
                     {{ $split->status->label() }}
                 </span>
             </div>

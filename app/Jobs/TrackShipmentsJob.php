@@ -2,7 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Enums\OrderStatus;
+use App\Actions\Orders\CompleteOrder;
+use App\Exceptions\TransicaoDePedidoInvalida;
 use App\Enums\ShippingStatus;
 use App\Enums\TrackingEventSource;
 use App\Models\OrderShipping;
@@ -92,8 +93,17 @@ class TrackShipmentsJob implements ShouldQueue
             ->where('status', '!=', ShippingStatus::Delivered->value)
             ->doesntExist();
 
-        if ($allDelivered && $order->status !== OrderStatus::Concluido) {
-            $order->update(['status' => OrderStatus::Concluido]);
+        if (! $allDelivered) {
+            return;
+        }
+
+        try {
+            // A condicao logistica e daqui; se o pedido ainda pode concluir e
+            // do dominio. Um pedido cancelado, expirado ou estornado cujo
+            // envio foi entregue nao volta a vida por causa disso.
+            app(CompleteOrder::class)($order);
+        } catch (TransicaoDePedidoInvalida $recusada) {
+            report($recusada);
         }
     }
 }

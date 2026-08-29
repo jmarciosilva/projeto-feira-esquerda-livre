@@ -31,7 +31,7 @@
                     <div class="flex justify-between gap-2">
                         <span class="text-gray-500">Situação</span>
                         <span class="font-semibold"
-                              style="{{ $split->status->value === 'confirmado' ? 'color:#166534;' : 'color:#854d0e;' }}">
+                              style="color: {{ $split->status === \App\Enums\OrderSplitStatus::Confirmado ? '#166534' : ($split->status === \App\Enums\OrderSplitStatus::Revertido ? '#991b1b' : '#854d0e') }}">
                             {{ $split->status->label() }}
                         </span>
                     </div>

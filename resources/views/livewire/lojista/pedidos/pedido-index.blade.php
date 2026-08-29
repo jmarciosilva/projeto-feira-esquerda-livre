@@ -96,7 +96,7 @@
                         </td>
                         <td class="py-4 px-4 text-center">
                             <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold"
-                                  style="{{ $split->status->value === 'confirmado' ? 'background:#dcfce7; color:#166534;' : 'background:#fef9c3; color:#854d0e;' }}">
+                                  style="{{ $split->status->badge() }}">
                                 {{ $split->status->label() }}
                             </span>
                         </td>

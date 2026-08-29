@@ -8,6 +8,7 @@ use App\Services\MercadoPagoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class MercadoPagoPaymentController extends Controller
@@ -131,25 +132,59 @@ class MercadoPagoPaymentController extends Controller
         return redirect()->route('pedido.show', $order->reference)->with('success', $message);
     }
 
+    /** Tópicos que este webhook sabe rotear. Qualquer outro é registrado e ignorado. */
+    private const TOPICOS_DE_PAGAMENTO = ['payment', 'payments'];
+
+    private const TOPICO_DE_CHARGEBACK = 'topic_chargebacks_wh';
+
+    /**
+     * Recebe as notificações do Mercado Pago.
+     *
+     * A allowlist é explícita de propósito: aceitar qualquer tópico faria o
+     * webhook agir sobre eventos cujo formato ninguém verificou. O que fica de
+     * fora dela deixa de sumir em silêncio — até a FIN-SEC-01F-A, um chargeback
+     * sob tópico próprio recebia 200 OK e não deixava nem rastro de ter
+     * chegado, o que tornava impossível descobrir que ele existia.
+     *
+     * O log carrega **metadados, nunca o payload**: identificar o evento é
+     * suficiente para investigar, e o corpo cru pode trazer dado de pagador.
+     */
     public function webhook(Request $request, MercadoPagoService $mercadoPago): JsonResponse
     {
-        $paymentId = data_get($request->all(), 'data.id')
+        $topic = $request->input('type') ?: $request->input('topic');
+        $dataId = data_get($request->all(), 'data.id')
             ?: $request->input('id')
             ?: $request->input('payment_id');
 
-        $topic = $request->input('type') ?: $request->input('topic');
-
-        if (! $paymentId || ($topic && ! in_array($topic, ['payment', 'payments'], true))) {
-            return response()->json(['ok' => true]);
-        }
-
         try {
-            $mercadoPago->syncPayment((string) $paymentId);
+            if ($topic === self::TOPICO_DE_CHARGEBACK) {
+                // `data.id` é o chargeback; quem liga ao pedido é
+                // `data.payment_id`. Confundir os dois faria o domínio
+                // procurar um pagamento que não existe.
+                $mercadoPago->applyChargeback([
+                    'id' => $dataId,
+                    'payment_id' => data_get($request->all(), 'data.payment_id'),
+                ]);
+
+                return response()->json(['ok' => true]);
+            }
+
+            if ($dataId && (! $topic || in_array($topic, self::TOPICOS_DE_PAGAMENTO, true))) {
+                $mercadoPago->syncPayment((string) $dataId);
+
+                return response()->json(['ok' => true]);
+            }
         } catch (Throwable $exception) {
             report($exception);
 
             return response()->json(['ok' => false], 500);
         }
+
+        Log::info('mercado_pago.webhook.ignorado', [
+            'topic' => $topic,
+            'data_id' => $dataId,
+            'recebido_em' => now()->toIso8601String(),
+        ]);
 
         return response()->json(['ok' => true]);
     }
