@@ -119,6 +119,17 @@ class OrderService
             // mesma peca. Estoque insuficiente aborta o pedido inteiro.
             app(ReserveOrderStock::class)($order->load('items.offer.product'));
 
+            // A partir daqui existe estoque comprometido e **nenhuma** intenção
+            // de pagamento. A janela interna existe para esse intervalo: sem
+            // ela, um cliente que fecha a aba antes de iniciar o pagamento
+            // deixa a peça reservada para sempre, porque `payment_expires_at`
+            // só nasce quando o gateway informa um prazo — e nunca informou.
+            $order->forceFill([
+                'checkout_expires_at' => now()->addMinutes(
+                    (int) config('orders.checkout_reservation_minutes'),
+                ),
+            ])->save();
+
             $cart->clear();
 
             // Garante que usuários autenticados (incluindo admins que compram) tenham perfil de cliente

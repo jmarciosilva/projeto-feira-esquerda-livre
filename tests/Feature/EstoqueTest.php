@@ -415,6 +415,102 @@ class EstoqueTest extends TestCase
         $this->assertSame(1, AvaEnrollment::where('user_id', $cliente->id)->count());
     }
 
+    // ─── FIN-SEC-01E.1: desligar o controle não órfã a reserva ──────────────
+
+    public function test_lojista_nao_apaga_a_quantidade_com_reserva_ativa(): void
+    {
+        // A 01E fechou "baixar o número". Faltava "dizer que não há número":
+        // com `stock_quantity` nulo, `controlaEstoque()` passa a responder que
+        // a oferta não participa do estoque, e o comprometido ficava órfão —
+        // sem ninguém para devolvê-lo, e prendendo a oferta por D-FIN-24.
+        $offer = $this->oferta(['stock_quantity' => 10]);
+        $this->pedidoDe($offer, 3);
+
+        Sanctum::actingAs($offer->expositor->user);
+
+        $this->putJson("/api/v1/lojista/produtos/{$offer->product_id}", [
+            'item_type' => 'produto',
+            'name' => $offer->product->name,
+            'price' => 100,
+            'has_stock' => true,
+            'stock_quantity' => null,
+        ])->assertStatus(422)->assertJsonValidationErrors('stock_quantity');
+
+        $offer->refresh();
+
+        $this->assertSame(10, $offer->stock_quantity);
+        $this->assertSame(3, $offer->reserved_quantity);
+        $this->assertSame(7, $offer->disponivel());
+    }
+
+    public function test_lojista_nao_desliga_o_controle_com_reserva_ativa(): void
+    {
+        $offer = $this->oferta(['stock_quantity' => 10]);
+        $this->pedidoDe($offer, 2);
+
+        Sanctum::actingAs($offer->expositor->user);
+
+        $this->putJson("/api/v1/lojista/produtos/{$offer->product_id}", [
+            'item_type' => 'produto',
+            'name' => $offer->product->name,
+            'price' => 100,
+            'has_stock' => false,
+            'stock_quantity' => 10,
+        ])->assertStatus(422)->assertJsonValidationErrors('has_stock');
+
+        $offer->refresh();
+
+        $this->assertTrue((bool) $offer->has_stock);
+        $this->assertSame(2, $offer->reserved_quantity);
+    }
+
+    public function test_a_reserva_continua_devolvivel_depois_da_tentativa(): void
+    {
+        $offer = $this->oferta(['stock_quantity' => 10]);
+        $order = $this->pedidoDe($offer, 3);
+
+        Sanctum::actingAs($offer->expositor->user);
+        $this->putJson("/api/v1/lojista/produtos/{$offer->product_id}", [
+            'item_type' => 'produto',
+            'name' => $offer->product->name,
+            'price' => 100,
+            'has_stock' => false,
+            'stock_quantity' => null,
+        ])->assertStatus(422);
+
+        app(ReleaseOrderStock::class)($order);
+
+        $this->assertSame(0, $offer->fresh()->reserved_quantity);
+        $this->assertSame(10, $offer->fresh()->disponivel());
+    }
+
+    public function test_sem_reserva_o_lojista_volta_a_desligar_o_controle(): void
+    {
+        // A semântica de ilimitado não foi tocada: o que é proibido é desligar
+        // o controle **por cima** de unidades já prometidas.
+        $offer = $this->oferta(['stock_quantity' => 10]);
+        $order = $this->pedidoDe($offer, 3);
+
+        app(ReleaseOrderStock::class)($order);
+        $this->assertSame(0, $offer->fresh()->reserved_quantity);
+
+        Sanctum::actingAs($offer->expositor->user);
+
+        $this->putJson("/api/v1/lojista/produtos/{$offer->product_id}", [
+            'item_type' => 'produto',
+            'name' => $offer->product->name,
+            'price' => 100,
+            'has_stock' => false,
+            'stock_quantity' => null,
+        ])->assertOk();
+
+        $offer->refresh();
+
+        $this->assertFalse((bool) $offer->has_stock);
+        $this->assertNull($offer->stock_quantity);
+        $this->assertNull($offer->disponivel());
+    }
+
     // ─── R-1: oferta com reserva ativa não pode ser apagada ─────────────────
 
     public function test_oferta_sem_reserva_continua_podendo_ser_excluida(): void

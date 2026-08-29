@@ -886,6 +886,226 @@ mexer nessas FKs é decisão de ciclo de vida de catálogo, não de estoque.
 
 ---
 
+## FIN-SEC-01F-C — Expiração de pagamento
+
+### O problema
+
+A 01E entregou `ReleaseOrderStock` pronta e **sem chamador**, dizendo que
+decidir *quando* liberar era ciclo de vida do pedido. A 01F-B deu a ela o
+cancelamento. Faltava o caso mais comum de todos: ninguém cancela um Pix
+abandonado — ele simplesmente vence, e a peça ficava reservada para sempre.
+
+### `payment_expires_at`
+
+Coluna nova em `orders`, nulável, com índice composto
+`(status, payment_expires_at)`. Significa **o instante objetivo até o qual
+aquela intenção de pagamento vale**, informado pelo gateway.
+
+Não é idade do pedido, não é `created_at + N`, não é timeout da aplicação. E
+`NULL` **não quer dizer expirado**: quer dizer que a aplicação não tem evidência
+para expirar aquele pedido. Pedido manual fica assim para sempre, e o varredor
+não o alcança. Nenhum backfill: inventar prazo retroativo expiraria vendas que
+ninguém autorizou expirar.
+
+### Origem do timestamp
+
+`date_of_expiration` do Mercado Pago, normalizado no ponto único onde os dados
+do pagamento vigente são gravados. Três casos, deliberadamente distintos:
+
+| Gateway envia | Resultado |
+|---|---|
+| valor válido (ISO-8601 com offset) | normaliza e persiste |
+| campo ausente ou vazio | `NULL`, e não apaga prazo já conhecido |
+| valor inválido | `NULL` + log de metadado. **Nunca inventa instante** |
+
+A autoridade operacional passa a ser a coluna. `payment_payload` continua como
+evidência, mas nenhuma decisão de domínio o consulta — há teste afirmando que
+ter o prazo só dentro do JSON não expira nada.
+
+### `ExpireOrder`
+
+```text
+DB::transaction
+  → lockForUpdate(Order)
+  → relê o estado real
+  → idempotência: já Expirado devolve sem tocar em nada
+  → a matriz decide se pode
+  → sem prazo ou prazo futuro: no-op
+  → ReleaseOrderStock
+  → grava Expirado
+```
+
+A liberação vive **dentro** desta transação. Depois do commit não pode ser
+observável um pedido `Expirado` com `reserved_quantity` ainda comprometido por
+ele. Ordem de lock preservada: `Order → ProductOffers em id crescente`.
+
+### O varredor
+
+`orders:expire-payments`, agendado a cada cinco minutos com
+`withoutOverlapping()`, no `schedule:run` que a implantação já executa. A
+cadência acompanha a granularidade do prazo: o gateway informa vencimento em
+minutos, e uma varredura horária deixaria a última peça reservada por até uma
+hora depois de o Pix vencer.
+
+O comando **não escreve status**. Ele decide *quais* pedidos olhar; `ExpireOrder`
+decide *se* cada um pode expirar, sob lock. É essa divisão que torna seguras duas
+execuções simultâneas. Limite padrão de 200 por execução, uma transação por
+pedido — uma transação única para o lote seguraria locks de todas as ofertas
+até o fim da varredura, e uma falha no último desfaria os anteriores.
+
+A consulta compara direto contra a coluna. Qualquer `DATE()` ou `CAST()` em cima
+dela inutilizaria o índice. `EXPLAIN` em MySQL real:
+
+```text
+type=range | key=orders_status_payment_expires_at_index
+Extra=Using index condition
+```
+
+### Pagamento × expiração, em MySQL real
+
+```text
+1. expiry × payment   T2 bloqueada 2s; releu Expirado → não confirma, não consome
+2. payment × expiry   T2 bloqueada 2s; releu PagamentoConfirmado → não expira,
+                      não libera. Estoque consumido nunca volta
+3. expiry × expiry    B bloqueado 2s; releu Expirado → no-op. Uma única liberação
+```
+
+Estados impossíveis verificados: `PagamentoConfirmado + stock_released_at`,
+`Expirado + stock_consumed_at`, reserva negativa ou acima do físico. Nenhum
+ocorreu.
+
+### `approved` depois da expiração
+
+A matriz recusa, e o webhook não ganha exceção. O evento continua auditável em
+`payment_payload`.
+
+**Fica uma anomalia financeira**: o gateway capturou dinheiro e o pedido está
+`Expirado`, com o estoque possivelmente já vendido a outra pessoa. Isso exige
+reconciliação — estorno, reposição ou decisão humana — e pertence à
+**FIN-SEC-01F-D**. Não se resolve confirmando o pedido, nem estornando
+automaticamente.
+
+### Dois relógios, e por que não é um só
+
+Um pedido pendente pode estar em dois estágios muito diferentes, e cada um tem
+seu prazo:
+
+| Coluna | Significa | Quem é a autoridade |
+|---|---|---|
+| `payment_expires_at` | prazo objetivo de uma intenção de pagamento **que existe** | o gateway |
+| `checkout_expires_at` | quanto tempo a reserva fica de pé enquanto **não existe** intenção | a plataforma |
+
+**Precedência: `payment_expires_at` prevalece quando existe.** Um Pix com uma
+hora de validade não pode morrer aos trinta minutos porque a janela interna
+venceu — depois que a intenção externa nasce, a plataforma não tem autoridade
+para encerrar antes do prazo que o próprio gateway deu.
+
+#### Por que não preencher `payment_expires_at` com uma janela arbitrária
+
+Seria mais simples ter uma coluna só. Mas `payment_expires_at` vale justamente
+por ser evidência: escrever nela `created_at + 30min` quando nenhuma intenção
+foi criada é atribuir ao Mercado Pago uma informação que ele nunca deu. A partir
+daí ninguém mais consegue distinguir, olhando o dado, um prazo real de um
+palpite da aplicação — e a decisão de expirar passa a repousar sobre uma
+ficção. A janela interna é legítima porque a plataforma **é** a autoridade sobre
+o próprio checkout; ela só não é autoridade sobre o gateway.
+
+#### O caso que originou a coluna
+
+O checkout web não cria preferência: mostra o Payment Brick e espera o cliente
+submeter. Quem fecha a aba antes disso nunca gera intenção de pagamento — e,
+sem janela interna, segurava a peça para sempre, porque o varredor só enxergava
+prazo do gateway. Duração em `config/orders.php`, `checkout_reservation_minutes`,
+padrão de 30 minutos: cobre com folga quem vai buscar o cartão e não deixa a
+última peça presa por horas.
+
+#### O varredor virou duas consultas
+
+O `OR` entre as duas colunas parecia natural, e o `EXPLAIN` desaconselhou: com a
+disjunção atravessando colunas diferentes, o otimizador usa só o prefixo
+`status` e filtra o resto — varrendo todos os pedidos pendentes. Separadas, cada
+consulta usa o seu índice inteiro.
+
+Medido com 3.000 pedidos, em transação com `ROLLBACK`:
+
+```text
+com IS NOT NULL + ORDER BY id      ref   | índice errado | rows 2572 | filesort
+sem IS NOT NULL + ORDER BY prazo   range | índice certo  | rows  858 | filtered 100
+```
+
+`IS NOT NULL` era redundante — em SQL `NULL <= agora` não é verdadeiro — e
+atrapalhava o plano. As duas consultas **não** são simétricas de propósito: na
+janela interna, `payment_expires_at IS NULL` funciona como igualdade para o
+índice, então ordenar por `id` já não gera sort; ordenar pelo prazo
+acrescentaria um.
+
+#### A corrida entre criar a intenção e expirar
+
+A guarda de `createPreference` lê o estado antes da chamada HTTP, e entre uma
+coisa e outra cabe o varredor. A verificação é refeita **sob lock, na escrita** —
+depois que a rede terminou, pelo tempo de um `UPDATE`. Manter o lock durante o
+I/O externo prolongaria a contenção pelo tempo da internet, que é exatamente o
+que a FIN-SEC-01E existe para evitar. Provado em MySQL real: a persistência
+esperou o lock do varredor, releu `Expirado` e recusou — nenhuma preferência
+gravada sobre pedido encerrado.
+
+| # | Decisão |
+|---|---|
+| **D-FIN-29** | Prazo interno e prazo do gateway são colunas distintas; a segunda nunca recebe estimativa da aplicação |
+| **D-FIN-30** | Quando ambos existem, o prazo do gateway prevalece |
+
+| # | Invariante | Situação |
+|---|---|---|
+| EXP-INV-06 | Pedido sem intenção de pagamento não retém reserva além da janela de checkout | ✔ |
+| EXP-INV-07 | Intenção de pagamento nunca é gravada sobre pedido já encerrado | ✔ |
+
+### FIN-SEC-01E.1 — reserva órfã por desativação do controle
+
+Correção pequena, encontrada por pré-condição desta fase e registrada à parte
+porque **não é sobre expiração**.
+
+A 01E impedia o lojista de baixar `stock_quantity` abaixo do comprometido. Mas a
+checagem só rodava quando um número novo chegava, e desligar o controle de
+estoque não é baixar o número — é dizer que não há número. Como
+`controlaEstoque()` responde olhando `has_stock` e `stock_quantity`, a oferta
+saía do radar de `ConsumeOrderStock` e `ReleaseOrderStock`, e o
+`reserved_quantity` existente ficava **órfão**: sem ninguém para devolvê-lo, e
+prendendo a oferta para sempre, já que D-FIN-24 impede excluir oferta
+comprometida.
+
+Reproduzido nas quatro formas antes de corrigir. Agora, enquanto houver
+compromisso ativo, os três caminhos são recusados — reduzir abaixo do
+comprometido, zerar a quantidade e desligar `has_stock` —, com o comprometido
+relido sob lock. Sem compromisso, a semântica de ilimitado continua exatamente
+como sempre foi.
+
+| # | Decisão |
+|---|---|
+| **D-FIN-25** | O prazo de pagamento é evidência do gateway, nunca estimativa da aplicação |
+| **D-FIN-26** | `payment_expires_at` nulo significa "sem evidência", e nunca "expirado" |
+| **D-FIN-27** | Expirar e cancelar são estados distintos: o relógio e a decisão de alguém |
+| **D-FIN-28** | Enquanto houver reserva ativa, o controle de estoque da oferta não pode ser desligado |
+
+| # | Invariante | Situação |
+|---|---|---|
+| EXP-INV-01 | Pedido sem prazo nunca expira automaticamente | ✔ |
+| EXP-INV-02 | Expiração e liberação são atômicas | ✔ |
+| EXP-INV-03 | Estoque consumido nunca é liberado por expiração posterior | ✔ |
+| EXP-INV-04 | Pedido expirado nunca volta a ser confirmado | ✔ |
+| EXP-INV-05 | Duas execuções do varredor produzem uma única liberação | ✔ |
+| **EST-INV-12** | Reserva ativa mantém o controle de estoque da oferta ligado até ser consumida ou liberada | ✔ |
+
+### Em aberto ao fim da 01F-C
+
+| Item | Para |
+|---|---|
+| Reversão comercial — `Estornado`, split `Revertido`, `AvaEnrollment::Refunded` | 01F-D |
+| `PaymentConflict` — pagamento recebido sem estoque, e dinheiro sobre pedido expirado | 01F-D |
+| **V-10** — falha ao criar a intenção no gateway deixa pedido reservado e **sem prazo**, fora do alcance do varredor | 01F-D |
+| Sandbox real de refund | 01F-E |
+
+---
+
 ## O que a 01B deliberadamente não fez
 
 Estoque (01E), `applyPayment` transacional e por evento (01D), entidade de

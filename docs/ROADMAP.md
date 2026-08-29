@@ -2290,7 +2290,7 @@ O princípio que a sustenta:
 | FIN-SEC-01C.1 — Eliminação do F-13 | ✅ Pronta para revisão | Frete do checkout da API decidido pelo servidor |
 | FIN-SEC-01D — Ciclo de confirmação de pagamento | ✅ Pronta para revisão | Confirmação atômica, idempotente e por evento |
 | FIN-SEC-01E — Integridade e concorrência de estoque | ✅ Pronta para revisão | Reserva no checkout, consumo no pagamento e lock no banco |
-| FIN-SEC-01F — Cancelamento, expiração e restauração | ⬜ | Pix expirado, estorno, devolução |
+| FIN-SEC-01F — Cancelamento, expiração e restauração | 🟡 A/B/C prontas | Falta a reversão comercial e a reconciliação financeira (01F-D/E) |
 | FIN-SEC-01G — Hardening e documentação final | ⬜ | — |
 
 **FIN-SEC-01A (2026-08-27).** Auditoria sem alterar código. Reproduziu, em

@@ -6,6 +6,7 @@ use App\Actions\Stock\ConsumeOrderStock;
 use App\DTO\PaymentConfirmation;
 use App\Enums\OrderSplitStatus;
 use App\Enums\OrderStatus;
+use App\Exceptions\TransicaoDePedidoInvalida;
 use App\Models\Order;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -95,18 +96,22 @@ final class ConfirmOrderPayment
     /**
      * Um pedido cancelado não volta a viver porque um aprovado chegou atrasado.
      *
-     * Cancelamento é estado terminal: reabri-lo aqui, em silêncio, produziria um
-     * pedido pago que ninguém espera atender. O que fazer com um pagamento que
-     * chega depois do cancelamento — estornar, reabrir mediante decisão humana —
-     * é assunto do ciclo de cancelamento, na FIN-SEC-01F.
+     * Estado terminal é terminal: reabri-lo aqui, em silêncio, produziria um
+     * pedido pago que ninguém espera atender — e, no caso de um pedido expirado,
+     * um pedido pago cujo estoque já voltou para a prateleira e pode ter sido
+     * vendido a outra pessoa. O que fazer com o dinheiro que chega depois —
+     * estornar, reabrir mediante decisão humana — é reconciliação financeira,
+     * assunto da FIN-SEC-01F-D.
      */
     private function recusarPedidoTerminal(Order $order): void
     {
-        if ($order->status === OrderStatus::Cancelado) {
-            throw new RuntimeException(sprintf(
-                'O pedido %s está cancelado e não pode ser confirmado por um pagamento posterior.',
-                $order->reference,
-            ));
+        // A pergunta é feita à matriz, e não a uma lista escrita aqui. Enquanto
+        // esta guarda citava `Cancelado` pelo nome, os estados que a
+        // FIN-SEC-01F-B acrescentou — `Expirado` e `Estornado` — passavam
+        // direto: um Pix vencido, com o estoque já devolvido à prateleira,
+        // voltava a `PagamentoConfirmado` por um webhook atrasado.
+        if (! $order->status->podeIrPara(OrderStatus::PagamentoConfirmado)) {
+            throw new TransicaoDePedidoInvalida($order->status, OrderStatus::PagamentoConfirmado);
         }
     }
 

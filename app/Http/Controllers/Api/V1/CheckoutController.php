@@ -2,16 +2,19 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\Orders\CancelOrder;
 use App\Exceptions\EstoqueInsuficiente;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\CheckoutRequest;
 use App\Http\Resources\Api\V1\OrderResource;
 use App\Models\CustomerAddress;
+use App\Models\Order;
 use App\Services\CartService;
 use App\Services\MercadoPagoService;
 use App\Services\OrderService;
 use App\Services\Shipping\CartShippingQuoter;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -86,14 +89,55 @@ class CheckoutController extends Controller
         if ($mercadoPago->isEnabled()) {
             try {
                 $order = $mercadoPago->createPreference($order);
-            } catch (Throwable $exception) {
-                report($exception);
+            } catch (Throwable $falhaDoGateway) {
+                report($falhaDoGateway);
+
+                return $this->desfazerPedidoSemPagamento($order, $falhaDoGateway);
             }
         }
 
         return response()->json([
             'order' => new OrderResource($order->load(['items', 'splits.expositor'])),
         ], 201);
+    }
+
+    /**
+     * Compensa um pedido que nasceu sem intenção de pagamento (V-10).
+     *
+     * A criação do pedido é transacional; a chamada ao gateway não pode ser,
+     * porque manter locks de estoque abertos durante I/O de rede prolongaria a
+     * contenção pelo tempo da internet e envenenaria a concorrência que a
+     * FIN-SEC-01E construiu. A saída é compensar depois: transação A cria e
+     * reserva, a chamada externa falha, transação B cancela e devolve.
+     *
+     * O estado é `Cancelado`, e não `Expirado`: nada expirou, porque nenhuma
+     * intenção de pagamento chegou a existir. A distinção que a 01F-B
+     * estabeleceu vale aqui — expirar é o relógio agindo sobre algo válido.
+     *
+     * Sem isso, o pedido ficava `AguardandoPagamento` com estoque reservado e
+     * `payment_expires_at` nulo: fora do alcance do varredor da 01F-C, e
+     * portanto reservado para sempre.
+     */
+    private function desfazerPedidoSemPagamento(Order $order, Throwable $falhaDoGateway): JsonResponse
+    {
+        try {
+            app(CancelOrder::class)($order);
+        } catch (Throwable $falhaDaCompensacao) {
+            // Os dois erros são reportados, e a resposta não finge sucesso: o
+            // pedido ficou pendente segurando estoque e ninguém conseguiu
+            // desfazê-lo. Precisa de intervenção, e o log tem de dizer isso.
+            report($falhaDaCompensacao);
+
+            Log::critical('checkout.pedido_sem_pagamento_nao_compensado', [
+                'order_reference' => $order->reference,
+                'falha_gateway' => $falhaDoGateway->getMessage(),
+                'falha_compensacao' => $falhaDaCompensacao->getMessage(),
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Não foi possível iniciar o pagamento agora. Seu pedido foi cancelado e nada foi cobrado — tente novamente em alguns instantes.',
+        ], 502);
     }
 
     /**

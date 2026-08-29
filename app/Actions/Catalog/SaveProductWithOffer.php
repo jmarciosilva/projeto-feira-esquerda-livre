@@ -90,7 +90,7 @@ final class SaveProductWithOffer
                 return $offer->setRelation('product', $product);
             }
 
-            $this->recusarEstoqueAbaixoDoComprometido($offer, $dadosDaOferta);
+            $this->recusarMudancaQueOrfanaReserva($offer, $dadosDaOferta);
 
             // `expositor_id` fica FORA dos dois updates, de propósito: o dono de
             // uma oferta existente nunca é recalculado a partir de quem está
@@ -103,39 +103,91 @@ final class SaveProductWithOffer
     }
 
     /**
-     * O lojista não pode declarar menos estoque do que já vendeu.
+     * O lojista não pode desmanchar um compromisso que já assumiu.
+     *
+     * ## O que a FIN-SEC-01E já protegia
      *
      * Baixar o físico para menos do que está comprometido criaria um disponível
      * negativo — unidades prometidas a pedidos que já existem e que ninguém
      * poderia atender. Aumentar continua livre, e não mexe nas reservas.
      *
+     * ## O que faltava, e a 01F-C fechou (FIN-SEC-01E.1)
+     *
+     * Aquela checagem só rodava quando **um número novo chegava**. Desligar o
+     * controle de estoque não é baixar o número: é dizer que não há número. E
+     * `OperaEstoqueDoPedido::controlaEstoque()` decide se a oferta participa das
+     * operações de estoque olhando exatamente `has_stock` e `stock_quantity`.
+     *
+     * Com o controle desligado, a oferta saía do radar de `ConsumeOrderStock` e
+     * de `ReleaseOrderStock`, e o `reserved_quantity` que já existia ficava
+     * órfão — sem ninguém para devolvê-lo, e prendendo a oferta para sempre,
+     * porque D-FIN-24 impede excluir oferta comprometida.
+     *
+     * Por isso, enquanto houver compromisso ativo, os três caminhos são
+     * recusados: reduzir abaixo do comprometido, zerar a quantidade e desligar
+     * `has_stock`. Sem compromisso, a semântica de ilimitado continua exatamente
+     * como sempre foi — não é o controle de estoque que fica proibido, é
+     * desligá-lo por cima de unidades já prometidas.
+     *
      * A recusa é de validação, e não a `EstoqueInsuficiente` do checkout: quem
      * está do outro lado é o lojista corrigindo um campo, não um cliente vendo
      * a peça acabar. Ele precisa do erro embaixo do campo — 422 na API, mensagem
-     * no formulário — e do número que explica por que aquele valor não cabe.
+     * no formulário.
      *
      * @param  array<string, mixed>  $dadosDaOferta
      *
      * @throws ValidationException
      */
-    private function recusarEstoqueAbaixoDoComprometido(ProductOffer $offer, array $dadosDaOferta): void
+    private function recusarMudancaQueOrfanaReserva(ProductOffer $offer, array $dadosDaOferta): void
     {
-        $novoFisico = $dadosDaOferta['stock_quantity'] ?? null;
-        $comprometido = (int) $offer->reserved_quantity;
+        // O comprometido é relido sob lock: o valor que o formulário carregou
+        // pode ter envelhecido enquanto o lojista digitava, e entre a leitura e
+        // a escrita cabe um checkout inteiro. Trava apenas esta linha — não há
+        // ciclo possível com a ordem `Order → ProductOffers` das demais
+        // operações, porque aqui não existe pedido no caminho.
+        $comprometido = (int) ProductOffer::query()
+            ->whereKey($offer->getKey())
+            ->lockForUpdate()
+            ->value('reserved_quantity');
 
-        if ($novoFisico === null || $comprometido === 0) {
+        if ($comprometido === 0) {
             return;
         }
 
-        if ((int) $novoFisico < $comprometido) {
+        $desligouControle = array_key_exists('has_stock', $dadosDaOferta)
+            && ! $dadosDaOferta['has_stock'];
+
+        if ($desligouControle) {
             throw ValidationException::withMessages([
-                'stock_quantity' => [sprintf(
-                    '%d %s já estão comprometidas por pedidos em aberto; o estoque não pode ficar abaixo disso.',
-                    $comprometido,
-                    $comprometido === 1 ? 'unidade' : 'unidades',
-                )],
+                'has_stock' => [$this->motivoDoCompromisso($comprometido, 'o controle de estoque não pode ser desligado agora')],
             ]);
         }
+
+        // Ausente significa "não mexeu"; presente e nulo significa "apagou".
+        if (array_key_exists('stock_quantity', $dadosDaOferta) && $dadosDaOferta['stock_quantity'] === null) {
+            throw ValidationException::withMessages([
+                'stock_quantity' => [$this->motivoDoCompromisso($comprometido, 'a quantidade não pode ficar em branco agora')],
+            ]);
+        }
+
+        $novoFisico = $dadosDaOferta['stock_quantity'] ?? null;
+
+        if ($novoFisico !== null && (int) $novoFisico < $comprometido) {
+            throw ValidationException::withMessages([
+                'stock_quantity' => [$this->motivoDoCompromisso($comprometido, 'o estoque não pode ficar abaixo disso')],
+            ]);
+        }
+    }
+
+    private function motivoDoCompromisso(int $comprometido, string $consequencia): string
+    {
+        return sprintf(
+            '%d %s já %s comprometidas por pedidos em aberto; %s.',
+            $comprometido,
+            $comprometido === 1 ? 'unidade' : 'unidades',
+            $comprometido === 1 ? 'está' : 'estão',
+            $consequencia,
+        );
     }
 
     /**

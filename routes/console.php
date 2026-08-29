@@ -40,3 +40,13 @@ Schedule::call(function () {
         ->where('scheduled_at', '<=', now())
         ->each(fn ($c) => SendEmailCampaignJob::dispatch($c->id)->onQueue('email-marketing'));
 })->everyFiveMinutes()->name('dispatch-scheduled-campaigns');
+
+// FIN-SEC-01F-C — devolve ao estoque o que ficou preso em intenções de
+// pagamento vencidas. A cada cinco minutos, mesma cadencia do despacho de
+// campanhas: o prazo do gateway e informado em minutos, e uma varredura
+// horaria deixaria a ultima peca reservada por ate uma hora depois de o Pix
+// vencer. O comando roda pelo `schedule:run` ja existente na implantacao.
+Schedule::command('orders:expire-payments')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->name('expire-pending-payments');

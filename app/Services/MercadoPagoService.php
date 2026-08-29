@@ -11,7 +11,9 @@ use App\Models\Order;
 use App\Models\SiteSetting;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -27,10 +29,22 @@ class MercadoPagoService
             && filled($settings->mercado_pago_access_token);
     }
 
+    /**
+     * Cria no gateway a intenção de pagamento deste pedido.
+     *
+     * Só pedido ainda pagável ganha intenção. Sem esta guarda, os caminhos de
+     * repetição — `GET /api/v1/pedidos/{ref}/pagar` e `/pedido/{ref}/pagar` —
+     * criariam uma preferência para um pedido cancelado ou expirado, e o
+     * cliente veria uma tela de pagamento de algo que o domínio já encerrou.
+     */
     public function createPreference(Order $order): Order
     {
         $settings = SiteSetting::instance();
         $this->ensureConfigured($settings);
+
+        if (! $order->status->podeIrPara(OrderStatus::PagamentoConfirmado)) {
+            throw new TransicaoDePedidoInvalida($order->status, OrderStatus::PagamentoConfirmado);
+        }
 
         $order->loadMissing(['items.product', 'user']);
 
@@ -51,19 +65,37 @@ class MercadoPagoService
 
         $data = $response->json();
 
-        $order->forceFill([
-            'payment_method' => 'mercado_pago',
-            'payment_provider' => 'mercado_pago',
-            'payment_status' => 'pending',
-            'mercado_pago_preference_id' => $data['id'] ?? null,
-            'mercado_pago_init_point' => $data['init_point'] ?? null,
-            'mercado_pago_sandbox_init_point' => $data['sandbox_init_point'] ?? null,
-            'payment_payload' => array_merge($order->payment_payload ?? [], [
-                'preference' => $data,
-            ]),
-        ])->save();
+        // A guarda acima leu o estado **antes** da chamada HTTP, e entre uma
+        // coisa e outra cabe o varredor: um pedido cuja janela de checkout
+        // vencia durante a viagem pela rede pode ter virado `Expirado`, com o
+        // estoque ja devolvido. Gravar a preferencia por cima disso deixaria um
+        // pedido encerrado exibindo tela de pagamento.
+        //
+        // A verificacao e refeita sob lock, mas **so na escrita**: a transacao
+        // abre depois que a rede terminou, e dura o tempo de um UPDATE. Manter
+        // o lock durante o I/O externo prolongaria a contencao pelo tempo da
+        // internet, que e justamente o que a FIN-SEC-01E existe para evitar.
+        return DB::transaction(function () use ($order, $data) {
+            $atual = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
 
-        return $order->refresh();
+            if (! $atual->status->podeIrPara(OrderStatus::PagamentoConfirmado)) {
+                throw new TransicaoDePedidoInvalida($atual->status, OrderStatus::PagamentoConfirmado);
+            }
+
+            $atual->forceFill([
+                'payment_method' => 'mercado_pago',
+                'payment_provider' => 'mercado_pago',
+                'payment_status' => 'pending',
+                'mercado_pago_preference_id' => $data['id'] ?? null,
+                'mercado_pago_init_point' => $data['init_point'] ?? null,
+                'mercado_pago_sandbox_init_point' => $data['sandbox_init_point'] ?? null,
+                'payment_payload' => array_merge($atual->payment_payload ?? [], [
+                    'preference' => $data,
+                ]),
+            ])->save();
+
+            return $atual->refresh();
+        });
     }
 
     public function checkoutUrl(Order $order): string
@@ -417,13 +449,102 @@ class MercadoPagoService
      */
     private function gravarPagamentoVigente(Order $order, array $payment, ?string $paymentId, string $status): void
     {
-        $order->forceFill([
+        $campos = [
             'payment_payload' => array_merge($order->payment_payload ?? [], ['payment' => $payment]),
             'payment_method' => 'mercado_pago',
             'payment_provider' => 'mercado_pago',
             'payment_status' => $status,
             'mercado_pago_payment_id' => $paymentId,
-        ])->save();
+        ];
+
+        $prazo = $this->prazoDePagamento($payment);
+
+        // Só grava quando o gateway realmente informou um instante válido.
+        // Ausência não apaga o prazo que já estava lá — uma notificação
+        // posterior sem o campo não pode tornar imortal um Pix que vencia.
+        if ($prazo !== null) {
+            $campos['payment_expires_at'] = $prazo;
+        }
+
+        $order->forceFill($campos)->save();
+    }
+
+    /**
+     * Traduz `date_of_expiration` do gateway para o instante do domínio.
+     *
+     * A autoridade operacional da expiração passa a ser
+     * `orders.payment_expires_at`; `payment_payload` continua existindo como
+     * evidência, mas nenhuma decisão de domínio o consulta.
+     *
+     * Três casos, deliberadamente distintos:
+     *
+     * - **valor válido** — normaliza e persiste. O instante é inequívoco porque
+     *   o offset é exigido; o cast `datetime` guarda em UTC e devolve no fuso
+     *   da aplicação.
+     * - **campo ausente ou nulo** — `null`, e nada é gravado. Nem todo meio de
+     *   pagamento tem prazo, e a ausência é informação legítima.
+     * - **qualquer outra coisa** — `null`, com registro operacional.
+     *
+     * ## Por que o formato é exigido, e não apenas tentado
+     *
+     * `Carbon::parse()` **é** permissivo: aceita `"tomorrow"`, `"+1 day"` e
+     * outras expressões humanas, devolvendo um instante plausível sem reclamar.
+     * Isso é exatamente o que não se pode ter aqui — um campo corrompido, ou um
+     * dia trocado por outro serviço, viraria um prazo real e expiraria um
+     * pedido legítimo.
+     *
+     * Por isso o contrato é declarado: ISO-8601 com **offset explícito**, que é
+     * o que o Mercado Pago documenta (`2026-08-29T18:30:00.000-03:00`). Aceito
+     * as duas formas legítimas de escrever o offset — `-03:00` e `Z` —, e
+     * também a fração de segundo opcional, porque essas variações são todas
+     * ISO-8601 válidas e um gateway pode alternar entre elas. O que não passa é
+     * texto livre.
+     *
+     * @param  array<string, mixed>  $payment
+     */
+    private function prazoDePagamento(array $payment): ?Carbon
+    {
+        $bruto = $payment['date_of_expiration'] ?? null;
+
+        if (! is_string($bruto) || trim($bruto) === '') {
+            return null;
+        }
+
+        $bruto = trim($bruto);
+
+        // AAAA-MM-DDTHH:MM:SS[.frações](Z|±HH:MM|±HHMM)
+        $iso8601ComOffset = '/^\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?(Z|[+-]\\d{2}:?\\d{2})$/';
+
+        if (preg_match($iso8601ComOffset, $bruto) !== 1) {
+            $this->registrarPrazoRecusado($payment, 'fora do contrato ISO-8601 com offset');
+
+            return null;
+        }
+
+        try {
+            // Convertido para o fuso da aplicacao antes de persistir. O cast
+            // `datetime` grava a hora de parede que o objeto carrega e a rele
+            // assumindo `app.timezone`: um prazo em `Z` seria gravado em UTC e
+            // relido como horario local, deslocando o vencimento em horas.
+            // Converter aqui faz `Z` e `-03:00` chegarem ao mesmo instante.
+            return Carbon::parse($bruto)->setTimezone(config('app.timezone'));
+        } catch (Throwable $erroDeFormato) {
+            $this->registrarPrazoRecusado($payment, $erroDeFormato->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payment
+     */
+    private function registrarPrazoRecusado(array $payment, string $motivo): void
+    {
+        // Metadado apenas: o payload cru pode conter dado do pagador.
+        Log::warning('mercado_pago.expiracao.invalida', [
+            'payment_id' => isset($payment['id']) ? (string) $payment['id'] : null,
+            'motivo' => $motivo,
+        ]);
     }
 
     /**
