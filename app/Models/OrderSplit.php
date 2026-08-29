@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\OrderSplitStatus;
 use App\Events\OrderSplitConfirmed;
+use App\Events\OrderSplitReverted;
 use App\Exceptions\SplitRevertidoNaoReconfirma;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,6 +25,7 @@ class OrderSplit extends Model
         'shipping_amount',
         'status',
         'confirmed_at',
+        'reverted_at',
     ];
 
     protected function casts(): array
@@ -36,6 +38,7 @@ class OrderSplit extends Model
             'net_amount'          => 'decimal:2',
             'shipping_amount'     => 'decimal:2',
             'confirmed_at'        => 'datetime',
+            'reverted_at'         => 'datetime',
         ];
     }
 
@@ -91,5 +94,48 @@ class OrderSplit extends Model
         ]);
 
         DB::afterCommit(fn () => event(new OrderSplitConfirmed($this)));
+    }
+
+    /**
+     * Transicao do split para revertido: o pagamento que sustentava este repasse
+     * foi desfeito.
+     *
+     * ## O que esta transicao **nao** apaga
+     *
+     * `confirmed_at` continua onde estava. Ele responde "quando este repasse
+     * passou a ser devido?", e a resposta segue verdadeira depois da reversao —
+     * exatamente como `paid_at` no pedido. Quando deixou de ser devido e outra
+     * pergunta, e por isso e outra coluna.
+     *
+     * ## Idempotencia
+     *
+     * Refund reentregue pelo gateway chega aqui duas vezes. A segunda encontra
+     * o split ja `Revertido` e nao faz nada: nao remarca `reverted_at`, e
+     * sobretudo nao redispara `OrderSplitReverted`, cujo listener revoga acesso.
+     *
+     * ## Pendente tambem reverte
+     *
+     * Um split que nunca chegou a confirmar — porque o pagamento falhou no meio,
+     * ou porque a reversao chegou antes da confirmacao terminar de propagar —
+     * nao pode ficar `Pendente` num pedido estornado, aparecendo ao lojista como
+     * repasse a caminho. Ele vai para `Revertido` sem disparar efeito nenhum,
+     * porque nao ha acesso concedido para revogar.
+     */
+    public function reverter(): void
+    {
+        if ($this->status === OrderSplitStatus::Revertido) {
+            return;
+        }
+
+        $eraConfirmado = $this->status === OrderSplitStatus::Confirmado;
+
+        $this->update([
+            'status' => OrderSplitStatus::Revertido,
+            'reverted_at' => now(),
+        ]);
+
+        if ($eraConfirmado) {
+            DB::afterCommit(fn () => event(new OrderSplitReverted($this)));
+        }
     }
 }

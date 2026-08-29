@@ -351,6 +351,10 @@ class CicloPedidoTest extends TestCase
             'cancelado nao conclui' => [OrderStatus::Cancelado, OrderStatus::Concluido],
             'expirado nao conclui' => [OrderStatus::Expirado, OrderStatus::Concluido],
             'estornado nao conclui' => [OrderStatus::Estornado, OrderStatus::Concluido],
+            // Estornar exige ter havido dinheiro. Nenhum destes teve.
+            'aguardando nao estorna' => [OrderStatus::AguardandoPagamento, OrderStatus::Estornado],
+            'cancelado nao estorna' => [OrderStatus::Cancelado, OrderStatus::Estornado],
+            'expirado nao estorna' => [OrderStatus::Expirado, OrderStatus::Estornado],
         ];
     }
 
@@ -362,7 +366,14 @@ class CicloPedidoTest extends TestCase
         $this->assertTrue(OrderStatus::PagamentoConfirmado->podeIrPara(OrderStatus::Concluido));
         $this->assertTrue(OrderStatus::PagamentoConfirmado->podeIrPara(OrderStatus::Estornado));
 
-        foreach ([OrderStatus::Cancelado, OrderStatus::Expirado, OrderStatus::Estornado, OrderStatus::Concluido] as $terminal) {
+        // FIN-SEC-01F-D: uma compra entregue pode ser estornada depois. A
+        // evidência logística disso não vive aqui — vive em
+        // `order_shippings.delivered_at` —, e por isso a transição não apaga
+        // nada. Ver a nota em `OrderStatus::destinosPermitidos()`.
+        $this->assertTrue(OrderStatus::Concluido->podeIrPara(OrderStatus::Estornado));
+        $this->assertFalse(OrderStatus::Concluido->ehTerminal());
+
+        foreach ([OrderStatus::Cancelado, OrderStatus::Expirado, OrderStatus::Estornado] as $terminal) {
             $this->assertTrue($terminal->ehTerminal());
             $this->assertSame([], $terminal->destinosPermitidos());
         }

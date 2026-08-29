@@ -6,10 +6,11 @@ use App\Actions\Stock\ConsumeOrderStock;
 use App\DTO\PaymentConfirmation;
 use App\Enums\OrderSplitStatus;
 use App\Enums\OrderStatus;
+use App\Exceptions\EstoqueInsuficiente;
 use App\Exceptions\TransicaoDePedidoInvalida;
+use App\Exceptions\ValorDePagamentoDivergente;
 use App\Models\Order;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 /**
  * A transição de domínio "este pedido foi pago".
@@ -39,9 +40,12 @@ final class ConfirmOrderPayment
     /**
      * @return Order o pedido no estado final — pago agora, ou já pago antes
      *
-     * @throws RuntimeException quando o pedido está cancelado, o pagamento vem
-     *                          sem valor confiável, ou o valor aprovado não
-     *                          corresponde ao total do pedido
+     * @throws TransicaoDePedidoInvalida quando o pedido já está encerrado
+     * @throws ValorDePagamentoDivergente quando o pagamento vem sem valor
+     *                                    confiável, ou o valor aprovado não
+     *                                    corresponde ao total do pedido
+     * @throws EstoqueInsuficiente quando um pedido sem reserva
+     *                             não encontra estoque
      */
     public function __invoke(Order $order, PaymentConfirmation $pagamento): Order
     {
@@ -132,23 +136,16 @@ final class ConfirmOrderPayment
      */
     private function recusarValorDivergente(Order $order, PaymentConfirmation $pagamento): void
     {
+        $esperado = $this->emCentavos((float) $order->total_amount);
+
         if ($pagamento->amount === null || $pagamento->amount < 0) {
-            throw new RuntimeException(sprintf(
-                'Pagamento aprovado para o pedido %s sem valor confiável — confirmação recusada.',
-                $order->reference,
-            ));
+            throw ValorDePagamentoDivergente::semValorConfiavel($order->reference, $esperado);
         }
 
         $pago = $this->emCentavos($pagamento->amount);
-        $esperado = $this->emCentavos((float) $order->total_amount);
 
         if ($pago !== $esperado) {
-            throw new RuntimeException(sprintf(
-                'Pagamento de %d centavos não corresponde ao pedido %s, de %d centavos.',
-                $pago,
-                $order->reference,
-                $esperado,
-            ));
+            throw ValorDePagamentoDivergente::naoCorresponde($order->reference, $pago, $esperado);
         }
     }
 

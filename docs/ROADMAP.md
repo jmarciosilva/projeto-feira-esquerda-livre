@@ -2290,7 +2290,9 @@ O princípio que a sustenta:
 | FIN-SEC-01C.1 — Eliminação do F-13 | ✅ Pronta para revisão | Frete do checkout da API decidido pelo servidor |
 | FIN-SEC-01D — Ciclo de confirmação de pagamento | ✅ Pronta para revisão | Confirmação atômica, idempotente e por evento |
 | FIN-SEC-01E — Integridade e concorrência de estoque | ✅ Pronta para revisão | Reserva no checkout, consumo no pagamento e lock no banco |
-| FIN-SEC-01F — Cancelamento, expiração e restauração | 🟡 A/B/C prontas | Falta a reversão comercial e a reconciliação financeira (01F-D/E) |
+| FIN-SEC-01F-A…C.2 — Cancelamento, expiração e restauração | ✅ Pronta para revisão | Roteamento de eventos, estados, cancelamento e expiração |
+| FIN-SEC-01F-D — Reversão financeira e conflitos | ✅ Pronta para revisão | `Estornado`, split `Revertido`, acesso digital revogado e `payment_conflicts` |
+| FIN-SEC-01F-E — Reconciliação | ⬜ | Sandbox real de refund, fila de conflitos e ciclo do chargeback |
 | FIN-SEC-01G — Hardening e documentação final | ⬜ | — |
 
 **FIN-SEC-01A (2026-08-27).** Auditoria sem alterar código. Reproduziu, em
@@ -2379,6 +2381,40 @@ ser excluída** (D-FIN-24). Enquanto deve unidades, ela é o recurso operacional
 que o pagamento e o cancelamento usam para baixar ou devolver; apagá-la deixaria
 o pedido reservado apontando para o nada. Desativar continua liberado, e é a
 saída oferecida ao lojista na própria recusa.
+
+**FIN-SEC-01F-D (2026-08-29).** O ciclo terminava no pagamento; agora fecha
+depois dele. Refund total correlacionado leva o pedido a `Estornado`, o split a
+`Revertido` e a matrícula do AVA a `Refunded` — uma transição só, atômica, com o
+efeito digital saindo depois do commit.
+
+Três coisas que a reversão deliberadamente **não** faz. Não repõe estoque: o
+caminho comum de um estorno é pago → enviado → entregue → refund, e o produto
+continua com o cliente (D-FIN-31). Não apaga `paid_at`, que responde "quando foi
+pago?" e segue verdadeiro (D-FIN-32). E não sobrescreve
+`mercado_pago_payment_id` com id de estorno ou chargeback — são identidades
+diferentes (D-FIN-35).
+
+`Concluido → Estornado` passou a ser permitido depois de a auditoria mostrar que
+a evidência de entrega não vive em `orders.status`: ela vive em
+`order_shippings.delivered_at`, e o estorno não a toca. A separação entre estado
+logístico e financeiro já existia — só não estava escrita (D-FIN-36).
+
+Nasceu `payment_conflicts`, que fecha o V-6. Um pagamento aprovado sobre um
+pedido sem estoque disparava o rollback da confirmação, e o rollback levava junto
+a única evidência de que o dinheiro havia chegado. O conflito é gravado **depois**
+do rollback, em transação própria, com chave única por evento (D-FIN-33). Refund
+parcial e chargeback aberto vão para lá em vez de virar estado falso: devolver
+R$ 30 de um pedido de R$ 100 não é estorno (D-FIN-34), e uma contestação que a
+loja ainda pode ganhar não é dinheiro perdido (D-FIN-37).
+
+O MySQL real mostrou um bug que o SQLite não expõe: sob `REPEATABLE READ`, a
+releitura após uma violação de unicidade consultava um snapshot anterior ao
+commit do vencedor. `lockForUpdate()` resolve — não por concorrência, por
+visibilidade.
+
+Fica em aberto, e é decisão de produto: o certificado já emitido continua
+baixável por matrícula revogada, porque a superfície de download checa posse e
+conclusão, nunca `status`.
 
 A regra de retenção **segue aberta** nas fases seguintes. Detalhes, decisões e matriz de achados em
 [`FIN_SEC_01_INTEGRIDADE_COMERCIAL.md`](FIN_SEC_01_INTEGRIDADE_COMERCIAL.md).

@@ -66,6 +66,43 @@ class AvaEnrollmentService
     }
 
     /**
+     * Revoga o acesso concedido por um repasse que foi desfeito.
+     *
+     * Chamado pelo listener `HandleAvaEnrollmentOnSplitReverted`, ou seja,
+     * **depois do commit** da reversão: revogar acesso sobre uma transição que
+     * ainda pode sofrer rollback trancaria o aluno fora de um curso que continua
+     * pago.
+     *
+     * ## O que é revogado, e o que não é
+     *
+     * Revogado: o direito **atual** de acesso. `AvaEnrollmentStatus::Refunded`
+     * responde `isAccessible() === false`, e com isso o player, os materiais e a
+     * API de aprendizado passam a recusar — cada um já consultava
+     * `isAccessible()` antes desta fase.
+     *
+     * Preservado, e de propósito: `progress`, `completion_percent`,
+     * `completed_at`, `certificate_path` e `enrolled_at`. Nada disso deixou de
+     * ter acontecido porque o dinheiro voltou. Apagar o progresso de quem
+     * estudou seria reescrever história para simplificar um estado, e é
+     * exatamente o que a trilha FIN-SEC existe para não fazer.
+     *
+     * ## Idempotência
+     *
+     * Só matrícula `Active` transiciona. Refund reentregue encontra `Refunded` e
+     * não faz nada; e uma matrícula já `Cancelled` ou `Expired` por outro motivo
+     * não é sobrescrita — o motivo pelo qual o acesso terminou é informação.
+     */
+    public function revokeFromOrderSplit(OrderSplit $split): void
+    {
+        AvaEnrollment::query()
+            ->where('order_split_id', $split->id)
+            ->where('status', AvaEnrollmentStatus::Active->value)
+            ->get()
+            ->each
+            ->update(['status' => AvaEnrollmentStatus::Refunded]);
+    }
+
+    /**
      * Cria uma matrícula diretamente (admin, cortesia, etc.).
      */
     public function enroll(User $user, AvaCourse $course, ?OrderSplit $split = null): AvaEnrollment

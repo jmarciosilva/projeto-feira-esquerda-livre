@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Events\OrderSplitConfirmed;
+use App\Events\OrderSplitReverted;
 use App\Listeners\HandleAvaEnrollmentOnSplitConfirmed;
+use App\Listeners\HandleAvaEnrollmentOnSplitReverted;
 use App\Listeners\TrackOrderSplitConfirmedEvent;
 use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Event;
@@ -20,6 +22,7 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(OrderSplitConfirmed::class, HandleAvaEnrollmentOnSplitConfirmed::class);
         Event::listen(OrderSplitConfirmed::class, TrackOrderSplitConfirmedEvent::class);
+        Event::listen(OrderSplitReverted::class, HandleAvaEnrollmentOnSplitReverted::class);
 
         $this->applyMailConfigFromDatabase();
     }

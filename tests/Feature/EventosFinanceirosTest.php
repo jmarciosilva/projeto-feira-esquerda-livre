@@ -192,8 +192,10 @@ class EventosFinanceirosTest extends TestCase
         $this->assertArrayHasKey('reversao_refunded_911', $order->payment_payload);
         $this->assertArrayNotHasKey('payment_ignorado_911', $order->payment_payload);
 
-        // A transição comercial é da 01F-D: aqui o pedido ainda não muda.
-        $this->assertSame(OrderStatus::PagamentoConfirmado, $order->status);
+        // Desde a 01F-D a reversão correlacionada também transiciona. O que
+        // **não** muda é o estoque: dinheiro que volta não traz produto de
+        // volta (D-FIN-31).
+        $this->assertSame(OrderStatus::Estornado, $order->status);
         $this->assertNotNull($order->paid_at);
         $this->assertSame(9, $offer->fresh()->stock_quantity);
     }
@@ -209,9 +211,16 @@ class EventosFinanceirosTest extends TestCase
 
         $order->refresh();
 
+        // O id continua sendo o do **pagamento**, nunca o do estorno (D-FIN-35),
+        // e o payload do pagamento original segue intacto sob `payment`.
         $this->assertSame('912', $order->mercado_pago_payment_id);
-        $this->assertSame('approved', $order->payment_status);
         $this->assertSame('approved', $order->payment_payload['payment']['status']);
+
+        // `payment_status` acompanha o gateway — a situação corrente daquele
+        // pagamento passou mesmo a ser `refunded`. Quem responde "houve
+        // pagamento?" é `paid_at`, que não é apagado (D-FIN-32).
+        $this->assertSame('refunded', $order->payment_status);
+        $this->assertNotNull($order->paid_at);
     }
 
     // ─── C — refund de outro pagamento ──────────────────────────────────────
@@ -450,15 +459,26 @@ class EventosFinanceirosTest extends TestCase
 
         $order->refresh();
 
+        // O que esta prova protege desde a 01F-B continua igual: o gateway
+        // chegando atrasado sobre um pedido encerrado não vira erro, e o estado
+        // do domínio prevalece.
         $this->assertSame(OrderStatus::Concluido, $order->status);
-        $this->assertArrayHasKey('cancelamento_recusado_972', $order->payment_payload);
+
+        // A rota mudou na 01F-D.1. Um pedido `Concluido` não é candidato a
+        // `CancelOrder` — ele passou por pagamento —, e o desencontro vai para
+        // a fila de reconciliação em vez do rastro de cancelamento recusado.
+        $this->assertArrayHasKey('cancelamento_apos_pagamento_972', $order->payment_payload);
+        $this->assertArrayNotHasKey('cancelamento_recusado_972', $order->payment_payload);
     }
 
-    public function test_cancelled_sobre_pedido_pago_e_tratado_como_reversao(): void
+    public function test_cancelled_sobre_pedido_pago_nao_segue_pelo_cancelamento(): void
     {
-        // O gateway usa `cancelled` para os dois casos. Cancelar o que nunca
-        // foi pago encerra uma intenção; "cancelar" o que já foi pago é
-        // reversão financeira, e não pode destruir a venda por este caminho.
+        // O gateway usa `cancelled` para os dois casos, e o que os separa é o
+        // pedido já ter sido pago. Este não pode seguir por `CancelOrder`: a
+        // unidade não volta para a prateleira, porque o produto já saiu.
+        //
+        // Para onde ele **vai** — nem cancelamento, nem reversão — é assunto da
+        // 01F-D.1, provado em `CancelamentoAposPagamentoTest`.
         $offer = $this->oferta();
         $order = $this->pedido($offer, 1);
 
@@ -468,7 +488,9 @@ class EventosFinanceirosTest extends TestCase
 
         $order->refresh();
 
-        $this->assertSame(OrderStatus::PagamentoConfirmado, $order->status);
-        $this->assertArrayHasKey('reversao_cancelled_981', $order->payment_payload);
+        $this->assertNotSame(OrderStatus::Cancelado, $order->status);
+        $this->assertArrayNotHasKey('cancelamento_recusado_981', $order->payment_payload);
+        $this->assertSame(9, $offer->fresh()->stock_quantity);
+        $this->assertNotNull($order->paid_at);
     }
 }

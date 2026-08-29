@@ -34,7 +34,9 @@ setembro a loja mude de nome, o produto saia do ar e a oferta seja removida.
 | **FIN-SEC-01C.1** | ✅ Pronta para revisão | Eliminação do F-13 — frete confiável no checkout da API |
 | **FIN-SEC-01D** | ✅ Pronta para revisão | Ciclo de confirmação de pagamento atômico, idempotente e por evento |
 | **FIN-SEC-01E** | ✅ Pronta para revisão | Integridade e concorrência de estoque |
-| FIN-SEC-01F | ⬜ Não iniciada | Cancelamento, expiração e restauração |
+| **FIN-SEC-01F-A…C.2** | ✅ Pronta para revisão | Roteamento de eventos, estados, cancelamento e expiração |
+| **FIN-SEC-01F-D** | ✅ Pronta para revisão | Reversão financeira, conflitos de pagamento e pós-pagamento |
+| FIN-SEC-01F-E | ⬜ Não iniciada | Sandbox real de refund, fila de conflitos e ciclo do chargeback |
 | FIN-SEC-01G | ⬜ Não iniciada | Hardening, MySQL real e documentação final |
 
 ---
@@ -1102,6 +1104,271 @@ como sempre foi.
 | Reversão comercial — `Estornado`, split `Revertido`, `AvaEnrollment::Refunded` | 01F-D |
 | `PaymentConflict` — pagamento recebido sem estoque, e dinheiro sobre pedido expirado | 01F-D |
 | **V-10** — falha ao criar a intenção no gateway deixa pedido reservado e **sem prazo**, fora do alcance do varredor | 01F-D |
+| Sandbox real de refund | 01F-E |
+
+---
+
+## FIN-SEC-01F-D — Reversão financeira, conflitos de pagamento e pós-pagamento
+
+### O problema
+
+O ciclo terminava no pagamento. Depois dele, o domínio não sabia dizer nada:
+
+```text
+pago → entregue → refund → ???
+```
+
+Quatro achados da auditoria descreviam o mesmo buraco por quatro ângulos:
+
+| Achado | O que acontecia |
+|---|---|
+| **V-2** | `refunded` chegava, era registrado, e o pedido seguia `PagamentoConfirmado` |
+| **V-5** | O split continuava `Confirmado` — o vendedor figurando como tendo a receber por uma venda desfeita |
+| **V-6** | Pagamento aprovado sem estoque para atender **não deixava evidência nenhuma** |
+| **V-8** | O aluno mantinha acesso ao curso depois de o dinheiro voltar |
+
+### As duas perguntas que precisavam de resposta antes do código
+
+A fase começou com dois gates: se qualquer um deles exigisse mudança
+estrutural, o certo era parar e propor, não remendar a matriz para fechar
+teste. Os dois se resolveram — mas por motivos que precisam ficar escritos,
+porque a resposta fácil dos dois era a errada.
+
+#### `Concluido` é logístico ou financeiro?
+
+A pergunta importa porque `Concluido → Estornado` parecia misturar duas
+dimensões num campo só, e apagar a informação de que o pedido foi entregue.
+
+Não apaga, e a auditoria mostrou por quê: **a dimensão logística já mora em
+outro lugar**. `order_shippings.status`, `order_shippings.delivered_at` e
+`order_tracking_events` guardam o que foi enviado, por quem e quando chegou.
+`orders.status = Concluido` é uma *projeção* disso — `TrackShipmentsJob` é o
+único escritor, e só escreve quando todos os envios estão `Delivered`.
+
+| Pergunta | Responde | Sobrevive ao estorno |
+|---|---|---|
+| foi entregue? | `order_shippings.delivered_at` | ✔ |
+| foi pago? | `orders.paid_at` | ✔ |
+| o dinheiro voltou? | `orders.reversed_at` | — (nasce aqui) |
+| as unidades saíram? | `orders.stock_consumed_at` | ✔ |
+
+A separação entre estado operacional e financeiro **já existia**; ela só não
+estava dita. Por isso a fase não criou `financial_status`: criar seria duplicar
+uma dimensão que já tem tabela própria.
+
+#### Refund parcial cabe em `Estornado`?
+
+Não, e forçar seria o erro mais caro da fase: devolver R$ 30 de um pedido de
+R$ 100 viraria `Estornado`, reverteria o repasse inteiro do vendedor e
+revogaria o acesso do aluno — por causa de trinta reais.
+
+Pior: o caso passava despercebido. Numa devolução parcial o Mercado Pago
+mantém `status: approved` e informa o que voltou em
+`transaction_amount_refunded`. Roteado como aprovação, o evento caía no early
+return idempotente de `ConfirmOrderPayment` e **sumia**.
+
+A resposta é a terceira opção: registrar conflito durável e não transicionar
+nada. Um estado falso é pior do que uma linha numa fila de reconciliação.
+
+### `ReverseOrderPayment`
+
+Espelha `ConfirmOrderPayment`: atômica, idempotente, sem conhecer gateway
+nenhum. Trava o pedido, pergunta à matriz, escreve `Estornado`, reverte os
+splits, e o evento pós-commit revoga o acesso digital.
+
+O que ela **preserva**, e por que cada coisa:
+
+| Campo | Continua | Porque responde |
+|---|---|---|
+| `paid_at` | intacto | "quando foi pago?" — segue verdadeiro |
+| `mercado_pago_payment_id` | intacto | identidade do pagamento, não do estorno |
+| `stock_consumed_at` | intacto | as unidades saíram mesmo |
+| `payment_payload['payment']` | intacto | evidência do pagamento original |
+| `splits[].confirmed_at` | intacto | "quando o repasse passou a ser devido?" |
+
+`reversed_at` e `reverted_at` são colunas novas justamente para que nada disso
+precise ser sobrescrito.
+
+### Reversão financeira não é devolução física
+
+`ReverseOrderPayment` **não** repõe `stock_quantity`. O caminho comum de um
+estorno é:
+
+```text
+pago → estoque consumido → produto enviado → cliente recebe → refund
+```
+
+O dinheiro volta; o produto continua com o cliente. Repor criaria unidades que
+não existem na prateleira, e a próxima pessoa levaria um pedido inatendível —
+o mesmo dano que a 01E passou a impedir pelo outro lado.
+
+Repor exige evidência de retorno logístico. `order_shippings` tem
+`ShippingStatus::Returned`, mas nada liga hoje uma devolução física a uma
+reversão financeira, e inventar esse vínculo seria pior do que não ter.
+
+### `payment_conflicts` — o fechamento do V-6
+
+A transação de `ConfirmOrderPayment` existe de propósito: ou o pedido vira pago
+inteiro, ou nada acontece. A consequência não intencional era que **a falha
+também sumia** — o rollback levava junto a evidência de que o gateway havia
+capturado dinheiro.
+
+Por isso a regra que governa a tabela inteira:
+
+> O conflito nunca é gravado dentro da transação que ele documenta.
+
+`RegisterPaymentConflict` é chamada depois do rollback, em transação própria.
+
+| Tipo | Nasce quando |
+|---|---|
+| `insufficient_stock` | gateway aprovou e não havia unidades |
+| `payment_after_expiration` | aprovação sobre pedido `Expirado` — o estoque **já voltou** e pode ter sido vendido |
+| `payment_after_terminal` | aprovação sobre pedido `Cancelado` ou `Estornado` |
+| `amount_mismatch` | valor aprovado ≠ valor do pedido |
+| `unmatched_reversal` | reversão de outro pagamento, ou sobre pedido nunca pago |
+| `partial_refund_unsupported` | devolução parcial, que o domínio não sabe representar |
+| `chargeback_unverified` | contestação aberta, desfecho desconhecido |
+| `unexpected_cancellation_after_payment` | gateway diz `cancelled`, domínio já tem pagamento confirmado |
+
+`payment_after_expiration` é tipo próprio e não detalhe: quem reconcilia precisa
+saber que o estoque já voltou antes de decidir o que fazer com o dinheiro.
+
+**FK `RESTRICT`, não `CASCADE`.** `order_items` e `order_splits` usam CASCADE
+porque são composição. Um conflito financeiro não é: ele registra que dinheiro
+se moveu, que é exatamente a informação que precisa sobreviver a qualquer
+limpeza. Um pedido com conflito registrado não pode ser apagado.
+
+### Chargeback aberto não é dinheiro perdido
+
+A notificação de `topic_chargebacks_wh` diz que existe contestação; não diz como
+ela terminou. Um chargeback pode ser disputado e revertido — e `Estornado` não
+tem volta. Tratar a abertura como desfecho estornaria o pedido, reverteria o
+repasse e revogaria o acesso do aluno por causa de uma contestação que a loja
+ainda vai ganhar.
+
+```text
+topic_chargebacks_wh    → conflito durável, nenhuma transição
+payment.status = charged_back → reversão de verdade
+```
+
+A segunda linha é o gateway afirmando o estado do **pagamento**, que é evidência.
+A correlação da 01F-A continua intacta: `data.payment_id` liga ao pedido, nunca
+`data.id`.
+
+### FIN-SEC-01F-D.1 — `cancelled` depois do pagamento não prova estorno
+
+Correção cirúrgica sobre a 01F-D, que lia o caso mais grave da forma mais
+destrutiva possível.
+
+O Mercado Pago usa `cancelled` para situações diferentes, e a 01F-D separava
+apenas duas: pedido não pago seguia por `CancelOrder`; pedido pago seguia por
+`ReverseOrderPayment`. A segunda leitura estava errada.
+
+`cancelled` diz que o pagamento não vale mais. Não diz que o dinheiro voltou,
+nem quanto, nem quando. Reversão tem status próprio (`refunded`), valor
+(`transaction_amount_refunded`) e recurso próprio; `cancelled` não traz nenhum
+dos três. Tomá-lo por estorno levava um pedido pago — possivelmente entregue —
+a `Estornado`, revertia o repasse do vendedor e revogava o acesso do aluno a
+partir de um evento que não sustenta nenhuma dessas conclusões. E `Estornado` é
+terminal: o erro não teria desfazimento.
+
+São três destinos, e não dois:
+
+```text
+cancelled antes da confirmação financeira  →  cancelamento comercial normal
+cancelled depois da confirmação financeira →  inconsistência → PaymentConflict
+refunded comprovado                        →  reversão financeira
+```
+
+O terceiro caso registra `unexpected_cancellation_after_payment` e **não
+transiciona nada**: nem pedido, nem split, nem matrícula, nem estoque, nem
+`paid_at`, nem `reversed_at`. As duas alternativas são piores — estornar destrói
+uma venda válida sem prova; ignorar deixa a plataforma cobrando um pedido que o
+gateway já não reconhece, sem ninguém saber.
+
+Um pedido já `Estornado` que recebe `cancelled` continua caindo na reversão
+idempotente, sem abrir conflito: ali o gateway está repetindo o que o domínio já
+sabe, e encher a fila de reconciliação de casos reconciliados a tornaria inútil.
+
+### Acesso digital: revogar o direito, não apagar a história
+
+`AvaEnrollmentStatus::Refunded` já existia e responde `isAccessible() === false`
+— o player, os materiais e a API de aprendizado passam a recusar, e cada um deles
+já consultava `isAccessible()` antes desta fase.
+
+Preservado de propósito: `progress`, `completion_percent`, `completed_at`,
+`certificate_path`, `enrolled_at`. Nada disso deixou de ter acontecido porque o
+dinheiro voltou.
+
+### Concorrência, no MySQL real
+
+Quatro disputas, cada uma com um lado segurando o lock por 2s:
+
+```text
+1. refund × refund        B bloqueado 1.8s; releu Estornado → no-op.
+                          Um único reversed_at, um único reverted_at
+2. confirmação × reversão B bloqueado 2.0s; releu PagamentoConfirmado →
+                          reverteu sobre a confirmação inteira, nunca metade
+3. reversão × confirmação reversão recusada (nunca pago); confirmação seguiu
+                          normal depois do lock
+4. reversão × approved    approved recusado — Estornado não ressuscita
+```
+
+Estados impossíveis verificados, todos com zero ocorrências: `Estornado` sem
+`paid_at`, `Estornado` com `stock_released_at`, split `Revertido` sem
+`reverted_at` ou sem `confirmed_at`, reserva negativa ou acima do físico.
+
+#### Um bug que só o MySQL mostrou
+
+Oito entregas simultâneas do mesmo evento de conflito, e uma delas estourava
+`ModelNotFoundException`. A causa é MVCC: em `REPEATABLE READ` o snapshot da
+transação é fixado na primeira leitura, e o `INSERT` vencedor commita depois
+disso — a releitura após a violação de unicidade consultava um snapshot em que a
+linha que acabara de derrubar o `INSERT` ainda não existia.
+
+`lockForUpdate()` na releitura resolve, e não por concorrência: **por
+visibilidade**. Uma leitura travada ignora o snapshot e lê a versão corrente. O
+SQLite da suíte não expõe o caso, porque não tem MVCC.
+
+### Decisões
+
+| Decisão | |
+|---|---|
+| **D-FIN-31** | Reversão financeira não implica retorno físico; restock exige evidência logística que o domínio ainda não tem |
+| **D-FIN-32** | `paid_at` é histórico e não é apagado; a reversão usa coluna própria |
+| **D-FIN-33** | Conflito financeiro é persistente, idempotente e gravado fora da transação que falhou |
+| **D-FIN-34** | Refund parcial não vira estorno total; sem modelo suficiente, registra conflito |
+| **D-FIN-35** | Payment id, refund id e chargeback id são identidades distintas |
+| **D-FIN-36** | `Concluido` é projeção logística; a evidência de entrega vive em `order_shippings` e sobrevive ao estorno |
+| **D-FIN-37** | Chargeback aberto não é reversão; só o desfecho no pagamento reverte |
+| **D-FIN-38** | Revogar acesso digital não apaga progresso, conclusão nem certificado emitido |
+| **D-FIN-39** | `cancelled` após pagamento confirmado não prova reversão financeira: vira conflito, nunca `Estornado` |
+
+### Invariantes
+
+| Invariante | | |
+|---|---|---|
+| REV-INV-01 | Reversão nunca aumenta `stock_quantity` | ✔ |
+| REV-INV-02 | `Estornado` implica `paid_at` preenchido | ✔ |
+| REV-INV-03 | `mercado_pago_payment_id` nunca recebe id de estorno ou chargeback | ✔ |
+| REV-INV-04 | Duas entregas do mesmo refund produzem uma reversão | ✔ |
+| REV-INV-05 | Split `Revertido` é terminal e não volta a `Confirmado` | ✔ |
+| REV-INV-06 | `Estornado` e `Cancelado` nunca voltam a `PagamentoConfirmado` | ✔ |
+| CONF-INV-01 | Conflito sobrevive ao rollback que o produziu | ✔ |
+| CONF-INV-02 | Mesmo evento não gera dois conflitos | ✔ |
+| CONF-INV-03 | Pedido com conflito não pode ser apagado | ✔ |
+| CONF-INV-04 | Refund parcial nunca produz `Estornado` | ✔ |
+| CONF-INV-05 | `cancelled` sobre pedido pago nunca produz `Estornado` nem reverte split | ✔ |
+| AVA-INV-01 | Revogação não apaga progresso nem conclusão | ✔ |
+
+### Em aberto ao fim da 01F-D
+
+| Item | Para |
+|---|---|
+| Certificado já emitido continua baixável por matrícula `Refunded` — `AvaCertificadoController` e a API checam posse e conclusão, nunca `status`. Revogar validade comercial de certificado é decisão de produto, não de integridade | decisão + 01F-E |
+| Representação real de refund parcial (pedido parcialmente devolvido, split proporcional) | FIN-DOM-01 |
+| Superfície administrativa da fila de `payment_conflicts` | 01F-E |
+| Ciclo próprio do chargeback (aberto / disputado / perdido) | 01F-E |
 | Sandbox real de refund | 01F-E |
 
 ---

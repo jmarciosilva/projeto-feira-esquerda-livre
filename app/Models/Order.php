@@ -43,6 +43,7 @@ class Order extends Model
         'status',
         'notes',
         'paid_at',
+        'reversed_at',
     ];
 
     protected function casts(): array
@@ -55,6 +56,7 @@ class Order extends Model
             'total_amount'   => 'decimal:2',
             'payment_payload' => 'array',
             'paid_at'        => 'datetime',
+            'reversed_at'    => 'datetime',
             'payment_expires_at' => 'datetime',
             'checkout_expires_at' => 'datetime',
             'stock_reserved_at' => 'datetime',
@@ -98,6 +100,19 @@ class Order extends Model
     public function shippings(): HasMany
     {
         return $this->hasMany(OrderShipping::class);
+    }
+
+    /**
+     * Desencontros entre o dinheiro e este pedido, pendentes de reconciliação.
+     *
+     * Sem `cascadeOnDelete`, ao contrário de `items` e `splits`: o conflito não
+     * é composição do pedido, é evidência de que dinheiro se moveu. A FK é
+     * `RESTRICT`, e apagar um pedido com conflito registrado é recusado pelo
+     * banco de propósito.
+     */
+    public function paymentConflicts(): HasMany
+    {
+        return $this->hasMany(PaymentConflict::class);
     }
 
     public function scopeStatus(Builder $query, OrderStatus $status): Builder
