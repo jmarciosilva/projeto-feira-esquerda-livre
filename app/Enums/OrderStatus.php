@@ -125,4 +125,28 @@ enum OrderStatus: string
     {
         return in_array($destino, $this->destinosPermitidos(), true);
     }
+
+    /**
+     * O dinheiro deste pedido entrou, e ainda não voltou.
+     *
+     * ## Por que não dá para perguntar isso a `ehTerminal()`
+     *
+     * São perguntas diferentes, e confundi-las foi o achado G-1 da
+     * FIN-SEC-01G.1. `ehTerminal()` responde "o pedido ainda anda?" — e
+     * `AguardandoPagamento` anda. Usá-la para autorizar a confirmação de um
+     * repasse autorizava, junto, o pedido que **ninguém pagou**.
+     *
+     * Esta responde outra coisa: "existe autoridade financeira aqui?".
+     * `Estornado` também é diferente de `Concluido` por este critério, embora os
+     * dois tenham `paid_at` preenchido — num deles o dinheiro voltou.
+     *
+     * Quem confirma repasse, matricula aluno ou reconhece receita pergunta aqui.
+     */
+    public function temPagamentoConfirmado(): bool
+    {
+        return match ($this) {
+            self::PagamentoConfirmado, self::Concluido => true,
+            default => false,
+        };
+    }
 }

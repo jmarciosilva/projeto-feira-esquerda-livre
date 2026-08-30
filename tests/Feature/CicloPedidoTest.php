@@ -413,7 +413,14 @@ class CicloPedidoTest extends TestCase
         $order = $this->pedido($this->oferta(), 1);
         $split = $order->splits->first();
 
-        $split->confirmar();
+        // Sobre pedido pago: desde a FIN-SEC-01G.1 a confirmacao de repasse
+        // exige autoridade financeira, e nao apenas pedido nao encerrado.
+        Order::whereKey($order->getKey())->update([
+            'status' => OrderStatus::PagamentoConfirmado->value,
+            'paid_at' => now(),
+        ]);
+
+        $split->fresh()->confirmar();
 
         $this->assertSame(OrderSplitStatus::Confirmado, $split->fresh()->status);
     }

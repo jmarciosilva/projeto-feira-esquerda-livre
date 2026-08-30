@@ -419,10 +419,18 @@ class ConfirmacaoDePagamentoTest extends TestCase
         $order = $this->pedido([100.0]);
         $split = $order->splits->first();
 
+        // Pedido pago: a confirmacao de repasse exige autoridade financeira
+        // desde a FIN-SEC-01G.1.
+        Order::whereKey($order->getKey())->update([
+            'status' => OrderStatus::PagamentoConfirmado->value,
+            'paid_at' => now(),
+        ]);
+
         Event::fake([OrderSplitConfirmed::class]);
 
         // O lojista clica duas vezes, ou dois requests chegam juntos. O evento
         // representa a transicao pendente → confirmado, nao a chamada do metodo.
+        $split = $split->fresh();
         $split->confirmar();
         $split->confirmar();
 
@@ -654,8 +662,17 @@ class ConfirmacaoDePagamentoTest extends TestCase
         $order = $this->pedido([100.0]);
         $split = $order->splits->first();
 
+        // Sobre pedido pago com repasse ainda pendente. A FIN-SEC-01G.1 fechou
+        // o caminho manual sobre pedido **nao** pago, que era o G-1; o evento
+        // segue saindo quando ha autoridade financeira.
+        Order::whereKey($order->getKey())->update([
+            'status' => OrderStatus::PagamentoConfirmado->value,
+            'paid_at' => now(),
+        ]);
+
         Event::fake([OrderSplitConfirmed::class]);
 
+        $split = $split->fresh();
         $split->confirmar();
 
         Event::assertDispatched(OrderSplitConfirmed::class, 1);

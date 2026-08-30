@@ -5,7 +5,7 @@ namespace App\Actions\Payments;
 use App\Enums\PaymentConflictType;
 use App\Models\Order;
 use App\Models\PaymentConflict;
-use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -32,20 +32,37 @@ use Illuminate\Support\Facades\DB;
  * remarcar `created_at` nem reabrir um conflito já resolvido.
  *
  * `firstOrCreate` resolve o caso normal; o `try` em volta cobre a corrida real
- * entre duas entregas simultâneas, em que os dois `SELECT` não acham nada e o
- * banco recusa o segundo `INSERT`. A resposta certa aí é reler, não estourar.
+ * entre entregas simultâneas, em que os `SELECT` não acham nada e o banco
+ * recusa o `INSERT` do segundo. A resposta certa aí é reler, não estourar.
  *
- * ## Por que a releitura é travada
+ * ## Por que a recuperação vive **fora** da transação (FIN-SEC-01G)
  *
- * `lockForUpdate()` não está aí por concorrência — está por **visibilidade**.
- * Em MySQL, `REPEATABLE READ` fixa o snapshot da transação na primeira leitura,
- * e o `INSERT` do vencedor commitou depois disso: uma releitura comum consulta
- * aquele snapshot e não encontra a linha que acabou de derrubar o nosso
- * `INSERT`, transformando a corrida num `ModelNotFoundException`. Uma leitura
- * travada ignora o snapshot e lê a versão corrente.
+ * O InnoDB tem mais de uma forma de recusar o perdedor, e elas não são
+ * equivalentes:
  *
- * Reproduzido em MySQL real com cinco entregas simultâneas do mesmo evento; o
- * SQLite da suíte não expõe o caso, porque não tem MVCC.
+ * - **1062, chave duplicada** — a transação sobrevive, e uma releitura
+ *   resolveria de dentro dela;
+ * - **1213, deadlock** — o MySQL **desfaz a transação inteira** para quebrar o
+ *   ciclo. Não há transação para reler de dentro;
+ * - **1205, lock wait timeout** — a instrução falha e a transação fica em
+ *   estado que não se deve presumir.
+ *
+ * A 01F-D tratava só a primeira, capturando `UniqueConstraintViolationException`
+ * dentro da transação. Com oito entregas simultâneas do mesmo evento — provado
+ * em `tests/Concurrency/prove.sh` —, uma delas chega como deadlock e escapava
+ * como `QueryException` crua.
+ *
+ * Capturar `QueryException` do lado de fora cobre as três de uma vez: a
+ * transação já terminou (commitada ou desfeita), e a releitura em autocommit
+ * abre um snapshot novo, que enxerga o commit do vencedor. Sem
+ * `lockForUpdate()`: fora de transação não há snapshot velho para furar.
+ *
+ * O rethrow importa tanto quanto o retorno. Se a linha **não** estiver lá, a
+ * falha não era colisão — era falha de verdade, e engoli-la esconderia um
+ * conflito financeiro que ninguém registrou.
+ *
+ * O SQLite da suíte não expõe nada disso, porque não tem MVCC nem deadlock de
+ * linha. Por isso a prova mora em `tests/Concurrency/`.
  */
 final class RegisterPaymentConflict
 {
@@ -86,15 +103,19 @@ final class RegisterPaymentConflict
             'context' => $context,
         ];
 
-        return DB::transaction(function () use ($chave, $atributos) {
-            try {
-                return PaymentConflict::firstOrCreate($chave, $atributos);
-            } catch (UniqueConstraintViolationException) {
-                // Duas entregas simultâneas do mesmo evento: a outra ganhou o
-                // INSERT. A linha dela é a resposta certa — e só uma leitura
-                // travada enxerga um commit posterior ao nosso snapshot.
-                return PaymentConflict::where($chave)->lockForUpdate()->firstOrFail();
+        try {
+            return DB::transaction(fn () => PaymentConflict::firstOrCreate($chave, $atributos));
+        } catch (QueryException $colisao) {
+            // Entregas simultâneas do mesmo evento: outra ganhou o INSERT. A
+            // linha dela é a resposta certa.
+            $registrado = PaymentConflict::where($chave)->first();
+
+            if ($registrado !== null) {
+                return $registrado;
             }
-        });
+
+            // Não havia colisão nenhuma — o banco falhou de verdade.
+            throw $colisao;
+        }
     }
 }

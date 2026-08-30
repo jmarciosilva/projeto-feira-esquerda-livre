@@ -2292,8 +2292,28 @@ O princípio que a sustenta:
 | FIN-SEC-01E — Integridade e concorrência de estoque | ✅ Pronta para revisão | Reserva no checkout, consumo no pagamento e lock no banco |
 | FIN-SEC-01F-A…C.2 — Cancelamento, expiração e restauração | ✅ Pronta para revisão | Roteamento de eventos, estados, cancelamento e expiração |
 | FIN-SEC-01F-D — Reversão financeira e conflitos | ✅ Pronta para revisão | `Estornado`, split `Revertido`, acesso digital revogado e `payment_conflicts` |
-| FIN-SEC-01F-E — Reconciliação | ⬜ | Sandbox real de refund, fila de conflitos e ciclo do chargeback |
-| FIN-SEC-01G — Hardening e documentação final | ⬜ | — |
+| FIN-SEC-01G — Hardening e fechamento | ✅ Pronta para revisão | Auditoria de writers, prova de concorrência versionada e checklist de produção |
+| FIN-SEC-01G.1 — Autoridade de confirmação de repasse | ✅ Pronta para revisão | Split só confirma sobre pedido com pagamento confirmado |
+| **FIN-SEC-01 — trilha completa** | ✅ **CONCLUÍDA** | Integridade comercial e financeira do ciclo pedido/pagamento/estoque/reversão |
+
+As dívidas que sobraram estão em **Dívidas / Follow-ups**, logo abaixo. Nenhuma
+delas é blocker de integridade, e por isso não existe uma FIN-SEC-01H: abrir
+subfase só para guardar dívida manteria a trilha aberta por contabilidade, e
+não por técnica.
+
+### Dívidas / Follow-ups da FIN-SEC-01
+
+| Item | Classificação | Destino |
+|---|---|---|
+| F-06 — assinatura do webhook Mercado Pago | security debt | hardening próprio ou troca de gateway |
+| F-07 — `DELETE Product` apaga curso, matrículas e progresso | product debt | fase própria do AVA |
+| F-09 — colisão de slug | product debt | CAT-DOM-02 |
+| F-11 — acoplamento ao Mercado Pago | arquitetura | FIN-DOM-01 |
+| F-12 — SoftDeletes | arquitetura | fase própria |
+| Certificado baixável após matrícula revogada | product debt | decisão de produto |
+| Botão de confirmação manual de repasse | product debt | decisão de produto |
+| Admin da fila de `payment_conflicts` | product debt | quando houver volume |
+| Refund parcial real, ciclo do chargeback, repasse e retenção | domínio financeiro | FIN-DOM-01 |
 
 **FIN-SEC-01A (2026-08-27).** Auditoria sem alterar código. Reproduziu, em
 transação com rollback, que excluir um expositor apagava itens de pedido,
@@ -2416,7 +2436,68 @@ Fica em aberto, e é decisão de produto: o certificado já emitido continua
 baixável por matrícula revogada, porque a superfície de download checa posse e
 conclusão, nunca `status`.
 
-A regra de retenção **segue aberta** nas fases seguintes. Detalhes, decisões e matriz de achados em
+**FIN-SEC-01G (2026-08-29).** Fechamento da trilha. Não construiu domínio novo:
+auditou quem escreve cada campo financeiro, provou a matriz de estados e os
+invariantes de estoque, e validou migrations, FKs, timezone, fila e scheduler
+contra MySQL real.
+
+Dois defeitos foram encontrados e fechados. O primeiro estava aberto desde antes
+da trilha: `OrderSplit::confirmar()` olhava só para o próprio split, então num
+pedido `Cancelado` ou `Expirado` — onde o split segue `Pendente` — o botão do
+lojista tornava devido o repasse de uma venda encerrada e **matriculava o aluno
+num curso que ninguém pagou**. A guarda passou a perguntar à matriz
+(`ehTerminal()`), e vive no domínio porque são duas as superfícies que confirmam
+(D-FIN-40). Naquele momento, a confirmação manual sobre pedido ainda pagável
+**permaneceu** permitida, no entendimento de que era dinheiro recebido fora do
+gateway. Esse critério não sobreviveu à revisão seguinte — ver FIN-SEC-01G.1,
+logo abaixo, que o substituiu (D-FIN-45).
+
+O segundo só apareceu sob oito processos simultâneos: o InnoDB recusa o perdedor
+de mais de uma forma, e um *deadlock* desfaz a transação inteira — não dá para
+recuperar de dentro dela. A recuperação do registro de conflito passou para fora
+da transação (D-FIN-43).
+
+A prova de concorrência deixou de ser artesanal. `tests/Concurrency/prove.sh`
+roda doze disputas em processos paralelos contra um banco descartável e confere
+onze invariantes; o SQLite da suíte não prova lock de linha, e por isso a prova
+não podia morar no PHPUnit (D-FIN-44).
+
+Fica registrado que **a fila não é autoridade financeira** — nenhum listener é
+`ShouldQueue`, e toda integridade vive em transação de banco (D-FIN-41) — e que
+**o scheduler é requisito operacional**, porque sem ele reservas de Pix vencido
+não são liberadas (D-FIN-42).
+
+Dívidas transferidas com risco e mitigação escritos: assinatura de webhook
+(F-06, mitigada por o corpo não ser fonte de verdade), `DELETE Product` sobre
+histórico do AVA (F-07), refund parcial real, ciclo do chargeback e admin de
+conflitos. Nenhuma permite perda de dinheiro, duplo consumo, ressurreição de
+estado terminal ou fabricação de estoque.
+
+**FIN-SEC-01G.1 (2026-08-29).** A guarda da G tinha fechado o buraco pela
+metade. Ela usava `ehTerminal()`, e com isso barrava `Cancelado`, `Expirado` e
+`Estornado` — deixando passar `AguardandoPagamento`, que é o caso mais comum de
+todos: um pedido que simplesmente ainda não foi pago. "Não encerrado" nunca quis
+dizer "pago".
+
+A pergunta passou a ser sobre autoridade financeira
+(`OrderStatus::temPagamentoConfirmado()`): só `PagamentoConfirmado` e
+`Concluido` sustentam um repasse devido. `Estornado` tem `paid_at` preenchido e
+mesmo assim fica de fora, porque o dinheiro voltou (D-FIN-45).
+
+A auditoria da superfície manual explicou por que fechá-la não tira função de
+ninguém: `ConfirmOrderPayment` confirma todos os splits pendentes na mesma
+transação em que o pedido vira pago, então depois dela não sobra split pendente.
+O botão nasceu em junho de 2026, antes de existir gateway — e nunca transicionou
+`orders.status`, só o split. Mesmo no desenho original ele produzia o par
+incoerente *split confirmado + pedido aguardando pagamento*.
+
+Doze testes existentes usavam esse caminho como fixture para chegar a
+"split confirmado" sobre pedido não pago. Passaram a semear pedido pago, que é o
+estado que o domínio de fato aceita.
+
+**FIN-SEC-01 está concluída.** A regra de retenção, o ledger e o repasse ao
+lojista pertencem à FIN-DOM-01; as demais dívidas estão classificadas em
+**Dívidas / Follow-ups**. Detalhes, decisões e matriz de achados em
 [`FIN_SEC_01_INTEGRIDADE_COMERCIAL.md`](FIN_SEC_01_INTEGRIDADE_COMERCIAL.md).
 
 ---

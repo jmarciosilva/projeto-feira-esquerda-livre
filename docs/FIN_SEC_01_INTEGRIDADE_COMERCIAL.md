@@ -36,8 +36,14 @@ setembro a loja mude de nome, o produto saia do ar e a oferta seja removida.
 | **FIN-SEC-01E** | ✅ Pronta para revisão | Integridade e concorrência de estoque |
 | **FIN-SEC-01F-A…C.2** | ✅ Pronta para revisão | Roteamento de eventos, estados, cancelamento e expiração |
 | **FIN-SEC-01F-D** | ✅ Pronta para revisão | Reversão financeira, conflitos de pagamento e pós-pagamento |
-| FIN-SEC-01F-E | ⬜ Não iniciada | Sandbox real de refund, fila de conflitos e ciclo do chargeback |
-| FIN-SEC-01G | ⬜ Não iniciada | Hardening, MySQL real e documentação final |
+| **FIN-SEC-01G** | ✅ Pronta para revisão | Hardening, prova de concorrência versionada e fechamento |
+| **FIN-SEC-01G.1** | ✅ Pronta para revisão | Autoridade financeira na confirmação de repasse |
+
+A trilha fecha aqui. As subfases `01F-E` e `01H`, que apareceram nos relatórios
+anteriores como destino de dívidas, **não existem**: cada dívida foi
+classificada em *Dívidas residuais*, ao fim da seção da 01G. Manter uma
+subfase aberta só para guardar pendência prolongaria a trilha por
+contabilidade, não por técnica.
 
 ---
 
@@ -1104,7 +1110,7 @@ como sempre foi.
 | Reversão comercial — `Estornado`, split `Revertido`, `AvaEnrollment::Refunded` | 01F-D |
 | `PaymentConflict` — pagamento recebido sem estoque, e dinheiro sobre pedido expirado | 01F-D |
 | **V-10** — falha ao criar a intenção no gateway deixa pedido reservado e **sem prazo**, fora do alcance do varredor | 01F-D |
-| Sandbox real de refund | 01F-E |
+| Sandbox real de refund | ver *Dívidas residuais* (01G) |
 
 ---
 
@@ -1365,11 +1371,359 @@ SQLite da suíte não expõe o caso, porque não tem MVCC.
 
 | Item | Para |
 |---|---|
-| Certificado já emitido continua baixável por matrícula `Refunded` — `AvaCertificadoController` e a API checam posse e conclusão, nunca `status`. Revogar validade comercial de certificado é decisão de produto, não de integridade | decisão + 01F-E |
+| Certificado já emitido continua baixável por matrícula `Refunded` — `AvaCertificadoController` e a API checam posse e conclusão, nunca `status`. Revogar validade comercial de certificado é decisão de produto, não de integridade | product debt |
 | Representação real de refund parcial (pedido parcialmente devolvido, split proporcional) | FIN-DOM-01 |
-| Superfície administrativa da fila de `payment_conflicts` | 01F-E |
-| Ciclo próprio do chargeback (aberto / disputado / perdido) | 01F-E |
-| Sandbox real de refund | 01F-E |
+| Superfície administrativa da fila de `payment_conflicts` | product debt |
+| Ciclo próprio do chargeback (aberto / disputado / perdido) | FIN-DOM-01 |
+| Sandbox real de refund | ver *Dívidas residuais* (01G) |
+
+---
+
+## FIN-SEC-01G — Hardening e fechamento
+
+Baseline `6f355b0`. Esta fase não construiu domínio novo: ela perguntou se o que
+foi construído entre a 01A e a 01F-D.1 aguenta MySQL e produção — e respondeu
+com auditoria, prova e dois defeitos fechados.
+
+### Writers dos campos críticos
+
+Varredura completa de quem escreve cada campo financeiro/comercial.
+
+| Campo | Quem escreve | Autoridade |
+|---|---|---|
+| `orders.status` | `CancelOrder`, `CompleteOrder`, `ExpireOrder`, `ConfirmOrderPayment`, `ReverseOrderPayment` | matriz de `OrderStatus` |
+| `orders.paid_at` | só `ConfirmOrderPayment` | — |
+| `orders.reversed_at` | só `ReverseOrderPayment` | — |
+| `orders.stock_*_at` | `ReserveOrderStock`, `ConsumeOrderStock`, `ReleaseOrderStock` | — |
+| `order_splits.status` | `OrderSplit::confirmar()` / `reverter()` | guardas do próprio método |
+| `product_offers.stock_quantity` / `reserved_quantity` | as três actions de estoque e `SaveProductWithOffer` | lock por oferta |
+| `ava_enrollments.status` | só `AvaEnrollmentService` | evento pós-commit |
+
+Nenhum `DB::table()->update()`, nenhum `forceFill` solto, nenhum update em massa
+fora das actions. As duas superfícies de lojista que escrevem estoque
+(`ProdutoForm`, `ProdutoController`) montam payload e delegam a
+`SaveProductWithOffer`.
+
+`Livewire\Checkout` escreve `payment_status = 'pending'` num pedido recém-criado
+— metadado do meio de pagamento escolhido, não transição: nenhuma decisão de
+domínio lê aquele campo.
+
+### G-1 — repasse confirmado sem que o dinheiro tivesse entrado
+
+O único defeito de integridade encontrado, e ele estava aberto desde antes da
+trilha.
+
+`OrderSplit::confirmar()` olhava só para o próprio split. Num pedido que não
+pagou, o split permanece `Pendente`, então a guarda de `Revertido` não
+alcançava:
+
+```text
+pedido sem pagamento → split ainda Pendente → lojista clica "confirmar"
+→ split Confirmado → OrderSplitConfirmed → aluno matriculado
+```
+
+Acesso a curso pago, sem pagamento, a um clique — pelo painel ou por
+`PATCH /api/v1/lojista/pedidos/{split}/confirmar-pagamento`.
+
+#### A primeira guarda fechou pela metade
+
+A correção inicial usou `OrderStatus::ehTerminal()`, e com isso barrou
+`Cancelado`, `Expirado` e `Estornado` — deixando `AguardandoPagamento` passar.
+Era o caso mais comum de todos: um pedido que simplesmente ainda não foi pago.
+**"Não encerrado" nunca quis dizer "pago"**, e usar a classificação
+terminal/não-terminal para autorizar dinheiro confundia duas perguntas
+diferentes.
+
+A FIN-SEC-01G.1 trocou a pergunta pela que importa:
+
+```php
+if (! $this->order?->status->temPagamentoConfirmado()) {
+    throw new SplitDePedidoNaoPago($this);
+}
+```
+
+`temPagamentoConfirmado()` responde por `PagamentoConfirmado` e `Concluido`, e
+só. `Estornado` também tem `paid_at` preenchido e mesmo assim fica de fora — o
+dinheiro voltou.
+
+#### Por que isso não tira função de ninguém
+
+A pergunta óbvia é se a guarda não estaria matando a confirmação manual de
+pagamento recebido fora do gateway. Não está, e a auditoria mostrou por quê:
+`ConfirmOrderPayment` confirma **todos** os splits pendentes na mesma transação
+em que o pedido passa a pago. Depois dela não sobra split pendente para alguém
+confirmar à mão.
+
+O botão nasceu em junho de 2026, no commit que criou o sistema de pedidos,
+quando não havia gateway nenhum e todo pagamento era offline. Mas ele nunca
+transicionou `orders.status` — só o split. Ou seja: mesmo no desenho original,
+o caminho manual produzia o par incoerente *split `Confirmado` + pedido
+`Aguardando Pagamento`*. O que a G.1 fecha é um caminho que só conseguia
+produzir estado inválido.
+
+A superfície continua no ar, agora restrita ao estado financeiro válido. Retirá-la
+é decisão de produto, não de integridade, e está registrada como dívida.
+
+#### E `PagamentoConfirmado`/`Concluido` com split pendente?
+
+Também são estados que a arquitetura atual não produz, pela mesma razão. São
+permitidos porque não antecipam pagamento nenhum — o dinheiro já entrou —, e
+recusá-los transformaria uma linha de dado legado num beco sem saída
+operacional.
+
+### G-2 — deadlock não é chave duplicada
+
+A prova de concorrência, com oito entregas simultâneas do mesmo evento, mostrou
+o que cinco não mostravam: o InnoDB tem mais de uma forma de recusar o perdedor.
+
+| Erro | O que o MySQL faz | Como o Laravel entrega |
+|---|---|---|
+| 1062 chave duplicada | transação sobrevive | `UniqueConstraintViolationException` |
+| 1213 deadlock | **desfaz a transação inteira** | `QueryException` |
+| 1205 lock wait timeout | instrução falha | `QueryException` |
+
+A 01F-D tratava só a primeira, e recuperava **de dentro** da transação. Num
+deadlock não há transação para reler de dentro. A recuperação passou para fora:
+a transação já terminou, e a releitura em autocommit abre snapshot novo, que
+enxerga o commit do vencedor. Se a linha não estiver lá, o erro sobe — não era
+colisão, era falha de verdade, e engoli-la esconderia um conflito financeiro.
+
+Consequência prática antes da correção: uma das entregas registrava `report()`
+em vez da linha. Como as outras sete gravavam, evidência não se perdia — mas o
+caminho não era confiável para conflitos distintos em corrida.
+
+### `tests/Concurrency/` — a prova deixa de ser artesanal
+
+Até aqui cada fase provava concorrência com scripts descartáveis, recriados e
+apagados. A 01G deixa isso commitado e reproduzível:
+
+```bash
+bash tests/Concurrency/prove.sh
+```
+
+Sobe banco descartável, roda doze disputas em processos paralelos, confere onze
+invariantes sobre o que ficou, derruba o banco. Sai `0` ou `1`.
+
+Não é PHPUnit porque não pode ser: a suíte roda em SQLite, que não tem lock de
+linha nem MVCC — `lockForUpdate()` vira no-op e toda prova passaria por
+acidente. E mesmo em MySQL, processo único não observa um lado bloqueado
+enquanto o outro trabalha.
+
+```text
+checkout × checkout          última peça vai para um só
+checkout × alteração         lojista não zera sob reserva viva
+checkout × exclusão          OfertaComReservaAtiva
+pagamento × pagamento        uma confirmação, um paid_at
+pagamento × cancelamento     recuou ao reler o estado
+pagamento × expiração        estoque consumido não volta
+expiração × expiração        uma liberação
+refund × refund              uma reversão
+refund × confirmação         Estornado não ressuscita
+confirmação × refund         reverteu a confirmação inteira, nunca metade
+approved tardio × Estornado  recusado
+conflito × 8 simultâneos     uma linha
+```
+
+Os dois achados que só o MySQL mostrou — o snapshot da 01F-D e o deadlock da
+01G — são a justificativa desta pasta existir.
+
+### Invariantes de estoque, e quem os garante
+
+```text
+disponível = stock_quantity - reserved_quantity
+```
+
+Duas delas não dependem de código nenhum: `stock_quantity` e `reserved_quantity`
+são `INT UNSIGNED` e o servidor roda em `STRICT_TRANS_TABLES`. Um decremento
+abaixo de zero **erra** — `ERROR 1690 out of range` —, não trunca. Valor
+negativo não é improvável: é impossível.
+
+| Invariante | Garantido por |
+|---|---|
+| `reserved_quantity >= 0` | schema + `STRICT_TRANS_TABLES` |
+| `stock_quantity >= 0` | schema + `STRICT_TRANS_TABLES` |
+| `reserved_quantity <= stock_quantity` | `ReserveOrderStock` sob lock |
+| reserva existe enquanto o pedido está pendente | `ReserveOrderStock` na criação |
+| pagamento consome a reserva | `ConsumeOrderStock` na mesma transação |
+| cancelamento/expiração liberam | `CancelOrder` / `ExpireOrder` na mesma transação |
+| refund **não** repõe físico | `ReverseOrderPayment` (D-FIN-31) |
+| oferta com reserva não é apagada | `DeleteProductOffer` (D-FIN-24) |
+| controle não desliga sob reserva | `SaveProductWithOffer` (D-FIN-28) |
+
+### Foreign keys — o que sobrevive a uma exclusão
+
+| Direção | Regra | Consequência |
+|---|---|---|
+| `payment_conflicts.order_id` → `orders` | **RESTRICT** | pedido com conflito não é apagável |
+| `order_items`/`order_splits`/`order_shippings` → `expositores` | SET NULL | vendedor sai, venda permanece |
+| `order_items.product_id` / `product_offer_id` | SET NULL | catálogo muda, pedido permanece |
+| `ava_enrollments.order_split_id` | SET NULL | matrícula sobrevive ao split |
+| `order_items`/`order_splits` → `orders` | CASCADE | composição real |
+| `ava_courses` → `products`, `ava_enrollments` → `ava_courses`/`users` | CASCADE | **F-07, em aberto** |
+
+Nenhuma superfície da aplicação apaga `Order`, `Expositor`, `Product` ou `User`.
+Os dois caminhos de exclusão de produto passam por `DeleteProductOffer`, que
+apaga a **oferta** e recusa se houver reserva viva. F-07 continua alcançável
+apenas por SQL manual — o que o mantém como dívida, não como buraco operacional.
+
+### Timezone
+
+Todas as comparações de prazo usam `now()` do PHP nos dois lados, ligado como
+parâmetro. Nenhuma consulta usa `NOW()` do SQL. O servidor MySQL está em UTC e a
+aplicação em `America/Sao_Paulo`; como nenhum lado da comparação nasce no banco,
+o fuso do servidor é irrelevante. `prazoDePagamento()` já converte o offset do
+gateway para o fuso da aplicação antes de persistir (01F-C).
+
+### Webhook — o que protege hoje, e o que falta
+
+Não há validação de assinatura. **F-06 permanece aberta**, e a 01G não improvisa
+uma: a assinatura do Mercado Pago exige um segredo por webhook, configurado no
+painel deles, e um campo de configuração que o projeto não tem.
+
+O que segura a fraude, hoje, é a arquitetura do fluxo: o webhook **não confia no
+corpo**. Ele lê `data.id` e chama `getPayment($id)` — requisição autenticada à
+API do Mercado Pago, sobre TLS, com o access token. A verdade vem de lá. Um
+payload forjado só consegue fazer a aplicação reconsultar um pagamento que, se
+não for do lojista, não casa com `external_reference` e não vira nada.
+
+A exceção é o tópico de chargeback, que não busca o recurso: ele confia em
+`data.id` e `data.payment_id`. Desde a 01F-D.1 aquele caminho **não transiciona
+nada** — grava rastro e abre conflito. O pior que um forjador consegue é injetar
+ruído na fila de reconciliação de um pedido cujo payment id ele adivinhe.
+
+Risco residual: baixo, e limitado a ruído. Mitigação atual documentada. Fase
+Classificação: **security debt**, a ser tratada por hardening próprio ou pela
+fase que trocar/endurecer a integração — não é blocker de integridade comercial.
+
+### Fila e scheduler
+
+**A fila não é autoridade financeira.** Nenhum listener implementa
+`ShouldQueue`: `OrderSplitConfirmed` e `OrderSplitReverted` rodam síncronos,
+depois do commit. Toda a integridade — pedido, split, estoque, conflito — vive
+dentro de transações de banco. Com o worker parado, o dinheiro continua correto;
+o que atrasa são efeitos secundários.
+
+O scheduler, esse, **é requisito operacional**: sem `schedule:run`,
+`orders:expire-payments` não roda e reservas de Pix vencido ficam presas até
+alguém pagar ou cancelar. Registrado a cada cinco minutos, com
+`withoutOverlapping`.
+
+### Verificações de produção
+
+| Verificação | Resultado |
+|---|---|
+| `migrate` + `migrate:status` em MySQL descartável | 96 aplicadas, 0 pendentes |
+| rollback isolado + reapply das migrations da 01F | limpo nos dois sentidos |
+| `config:cache`, `route:cache`, `view:cache` | os três passam |
+| `composer validate` | válido |
+| `composer audit` | nenhuma vulnerabilidade |
+| `npm run build` | 57 módulos, sem erro |
+| `sql_mode` | `STRICT_TRANS_TABLES` ativo |
+
+### Decisões
+
+| Decisão | |
+|---|---|
+| **D-FIN-40** | **[SUPERADA POR D-FIN-45]** Decisão original da 01G: a confirmação manual de repasse era recusada em estado terminal, e `AguardandoPagamento` seguia permitido. A 01G.1 mostrou que "não encerrado" não implica "pago" e trocou o critério |
+| **D-FIN-41** | A fila não é autoridade financeira: integridade vive em transação de banco, e efeito secundário pode esperar o worker |
+| **D-FIN-42** | O scheduler é requisito operacional de produção, não conveniência |
+| **D-FIN-43** | Recuperação de colisão de conflito acontece fora da transação, porque um deadlock a desfaz por inteiro |
+| **D-FIN-44** | Prova de concorrência mora em `tests/Concurrency/`, executável e versionada; o SQLite da suíte não prova lock |
+| **D-FIN-45** | Confirmação de repasse segue a autoridade financeira do pedido, e não a classificação terminal/não-terminal |
+
+### Invariantes
+
+| Invariante | | |
+|---|---|---|
+| SEC-INV-01 | Nenhum campo financeiro é escrito fora das actions de domínio | ✔ |
+| SEC-INV-02 | Nenhum `OrderSplit` é confirmado sem que o pedido tenha atingido estado financeiramente confirmado | ✔ |
+| SEC-INV-03 | Conflito duplicado sob deadlock devolve a linha existente ou falha alto | ✔ |
+| SEC-INV-04 | Estoque negativo é impossível no schema, não improvável no código | ✔ |
+| SEC-INV-05 | Nenhuma comparação de prazo depende do fuso do servidor de banco | ✔ |
+| SEC-INV-06 | Integridade financeira não depende de queue worker | ✔ |
+
+### Dívidas residuais
+
+Nenhuma delas é blocker da trilha, e por isso **não existe uma FIN-SEC-01H**:
+inventar uma subfase só para guardar dívida manteria a trilha aberta por
+contabilidade, não por técnica. Cada item vai para onde pertence.
+
+| Item | Risco hoje | Mitigação | Classificação |
+|---|---|---|---|
+| **F-06** assinatura de webhook | baixo — corpo não é fonte de verdade; só chargeback aceita payload, e ele não transiciona | verdade vem de `getPayment()` autenticado | security debt |
+| **F-07** `DELETE Product` apaga curso e progresso | médio | nenhuma superfície apaga Product; só SQL manual | fase própria do AVA |
+| Botão de confirmação manual de repasse | baixo — restrito a pedido pago desde a G.1, onde não sobra split pendente | guarda de autoridade financeira | product debt |
+| **F-08** Payment/Receivable | — | `OrderSplit` é cálculo histórico, não recebível (D-FIN-10) | FIN-DOM-01 |
+| **F-09** colisão de slug | baixo | fora do escopo financeiro | CAT-DOM-02 |
+| **F-11** acoplamento ao Mercado Pago | médio | domínio já isolado por `PaymentConfirmation` e pelas actions | FIN-DOM-01 |
+| **F-12** SoftDeletes | baixo | FKs históricas já protegem o que importa | fase própria |
+| Certificado baixável após revogação | baixo | acesso ao conteúdo já bloqueado; só o download não checa `status` | product debt |
+| Refund parcial real | médio | `partial_refund_unsupported` registra em vez de mentir | FIN-DOM-01 |
+| Ciclo do chargeback | médio | `chargeback_unverified` registra; só o desfecho no pagamento reverte | FIN-DOM-01 |
+| Admin de `payment_conflicts` | baixo | consulta SQL documentada acima | product debt |
+| Repasse, retenção, saldo | — | nada implementado, nada prometido | FIN-DOM-01 |
+
+### Observabilidade mínima
+
+Sem UI nova. Quem reconcilia consulta a fila direto:
+
+```sql
+SELECT c.id, c.type, c.external_reference, c.amount, c.created_at,
+       o.reference, o.status, o.paid_at, o.reversed_at
+FROM payment_conflicts c
+JOIN orders o ON o.id = c.order_id
+WHERE c.resolved_at IS NULL
+ORDER BY c.created_at;
+```
+
+Resolver é marcar `resolved_at`. A superfície administrativa é dívida
+consciente: uma tabela com sete tipos e uma coluna de resolução não justifica
+painel antes de existir volume.
+
+### Checklist de produção
+
+```text
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY definida, segredos fora do git
+HTTPS no endpoint do webhook
+php artisan migrate --force aplicado
+php artisan schedule:run no cron — OBRIGATÓRIO (expiração de pagamento)
+queue worker ativo — recomendado (e-mail, campanhas); não é autoridade financeira
+MySQL 8 com STRICT_TRANS_TABLES
+backup antes de migrar
+credenciais do Mercado Pago corretas, sandbox desligado
+notification_url apontando para o webhook público
+config:cache / route:cache / view:cache após o deploy
+```
+
+`.env.example` continua com `APP_ENV=local` e `APP_DEBUG=true`, que é o correto
+para um exemplo de desenvolvimento; a 01G não alterou `.env` real nem executou
+deploy.
+
+### Veredito
+
+Dentro do escopo desta trilha — integridade comercial e financeira do ciclo
+pedido/pagamento/estoque/reversão — **não há blocker aberto**. Os três defeitos
+encontrados na 01G/01G.1 foram fechados e provados:
+
+```text
+G-1   repasse confirmado sem que o dinheiro tivesse entrado
+G-2   deadlock tratado como se fosse chave duplicada
+G-1.1 a primeira guarda de G-1 confundia "não encerrado" com "pago"
+```
+
+Está provado que nenhum split de pedido não pago é confirmável por superfície
+manual ou API; que o fluxo automático de pagamento continua confirmando tudo;
+que nenhum acesso ao AVA nasce sem autoridade financeira; e que os invariantes
+de estoque, reversão e conflito seguem intactos em MySQL real.
+
+As dívidas listadas são de domínio financeiro futuro, de produto ou de fases
+próprias, e nenhuma delas permite perda de dinheiro, duplo consumo, ressurreição
+de estado terminal ou fabricação de estoque. Nenhuma subfase artificial foi
+aberta para guardá-las.
+
+**FIN-SEC-01 está concluída.**
 
 ---
 

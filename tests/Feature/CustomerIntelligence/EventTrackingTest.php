@@ -211,10 +211,14 @@ class EventTrackingTest extends TestCase
         $expositor = $this->makeExpositor();
         $product = $this->makeProduct($expositor);
 
+        // Pedido **pago**: desde a FIN-SEC-01G.1 um repasse so confirma sobre
+        // pedido com pagamento confirmado, e o evento rastreado aqui nasce
+        // justamente dessa confirmacao.
         $order = Order::create([
             'user_id' => $buyer->id,
             'reference' => 'TEST-'.uniqid(),
-            'status' => 'aguardando_pagamento',
+            'status' => 'pagamento_confirmado',
+            'paid_at' => now(),
             'delivery_type' => 'retirada',
             'customer_name' => $buyer->name,
             'customer_whatsapp' => '11999990000',

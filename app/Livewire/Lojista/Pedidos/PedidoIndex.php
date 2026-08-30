@@ -6,6 +6,8 @@ use App\CustomerIntelligence\Enums\EventName;
 use App\CustomerIntelligence\Facades\CustomerIntelligence;
 use App\Enums\ShippingStatus;
 use App\Enums\TrackingEventSource;
+use App\Exceptions\SplitDePedidoNaoPago;
+use App\Exceptions\SplitRevertidoNaoReconfirma;
 use App\Mail\ShipmentShippedMail;
 use App\Models\OrderShipping;
 use App\Models\OrderSplit;
@@ -33,12 +35,25 @@ class PedidoIndex extends Component
         $this->resetPage();
     }
 
+    /**
+     * Confirmação manual do lojista: dinheiro recebido fora do gateway.
+     *
+     * A recusa do domínio vira recado na tela, e não erro de servidor. São dois
+     * os motivos possíveis: o repasse já foi revertido, ou o pedido ainda não
+     * tem pagamento confirmado (FIN-SEC-01G.1).
+     */
     public function confirmar(int $splitId): void
     {
         $split = OrderSplit::where('expositor_id', auth()->user()->expositor->id)
             ->findOrFail($splitId);
 
-        $split->confirmar();
+        try {
+            $split->confirmar();
+        } catch (SplitRevertidoNaoReconfirma|SplitDePedidoNaoPago $recusada) {
+            session()->flash('error', $recusada->mensagem());
+
+            return;
+        }
 
         session()->flash('success', 'Pagamento confirmado para o pedido #' . $split->order->reference . '.');
     }

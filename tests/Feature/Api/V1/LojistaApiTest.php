@@ -139,7 +139,10 @@ class LojistaApiTest extends TestCase
             'items_total' => 89.9,
             'shipping_total' => 0,
             'total_amount' => 89.9,
-            'status' => 'aguardando_pagamento',
+            // Pago: a rota de confirmacao de repasse exige autoridade
+            // financeira desde a FIN-SEC-01G.1.
+            'status' => 'pagamento_confirmado',
+            'paid_at' => now(),
         ]);
 
         OrderItem::create([

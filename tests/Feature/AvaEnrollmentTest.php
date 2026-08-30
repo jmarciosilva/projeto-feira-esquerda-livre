@@ -67,10 +67,15 @@ class AvaEnrollmentTest extends TestCase
 
     private function makeOrderSplitForProduct(User $buyer, Product $product, Expositor $expositor): OrderSplit
     {
+        // Pedido **pago**: matricula nasce da confirmacao do repasse, e desde a
+        // FIN-SEC-01G.1 um repasse so confirma sobre pedido com pagamento
+        // confirmado. Semear como `aguardando_pagamento` descrevia um estado
+        // que o dominio nao aceita — e era exatamente o buraco G-1.
         $order = Order::create([
             'user_id'            => $buyer->id,
             'reference'          => 'TEST-' . uniqid(),
-            'status'             => 'aguardando_pagamento',
+            'status'             => 'pagamento_confirmado',
+            'paid_at'            => now(),
             'delivery_type'      => 'entrega',
             'customer_name'      => $buyer->name,
             'customer_whatsapp'  => '11999990000',

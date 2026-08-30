@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\OrderSplitStatus;
 use App\Events\OrderSplitConfirmed;
 use App\Events\OrderSplitReverted;
+use App\Exceptions\SplitDePedidoNaoPago;
 use App\Exceptions\SplitRevertidoNaoReconfirma;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -86,6 +87,19 @@ class OrderSplit extends Model
         // `OrderSplitConfirmed`, que matricula aluno e emite evento.
         if ($this->status === OrderSplitStatus::Revertido) {
             throw new SplitRevertidoNaoReconfirma($this);
+        }
+
+        // E o pedido tem voto (FIN-SEC-01G.1). A guarda acima so alcanca split
+        // ja `Revertido`; num pedido nao pago o split segue `Pendente`, e
+        // confirmar ali tornava devido o repasse de uma venda sem dinheiro —
+        // disparando `OrderSplitConfirmed`, que matricula o aluno.
+        //
+        // A pergunta e sobre **autoridade financeira**, e nao sobre o pedido
+        // estar encerrado: `AguardandoPagamento` nao esta encerrado e tambem
+        // nao pagou nada. Quem confirma repasse e `ConfirmOrderPayment`, na
+        // mesma transacao em que o pedido vira pago.
+        if (! $this->order?->status->temPagamentoConfirmado()) {
+            throw new SplitDePedidoNaoPago($this);
         }
 
         $this->update([
