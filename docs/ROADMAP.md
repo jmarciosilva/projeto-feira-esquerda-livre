@@ -2270,6 +2270,62 @@ Decisão, motivação histórica e matriz de campos:
 Arquitetura, auditoria e riscos: [`CATALOG_INTELLIGENCE.md`](CATALOG_INTELLIGENCE.md).
 Roadmap executável da trilha: [`ROADMAP_CATALOG_INTELLIGENCE.md`](ROADMAP_CATALOG_INTELLIGENCE.md).
 
+**CAT-DOM-02 — autoridade, curadoria e conteúdo do catálogo.** A CAT-DOM-01
+separou *o que um item é* de *quem o vende* e deixou a pergunta seguinte em
+aberto: **quem tem autoridade para alterar o `Product` global?** Enquanto cada
+produto tem uma oferta só, a pergunta não aparece. Com duas, um lojista reescreve
+a identidade que o outro exibe — dívida D-2, registrada em teste.
+
+| Subfase | Status | Entregável |
+|---|---|---|
+| CAT-DOM-02 — Auditoria do domínio produto × oferta | ✅ Concluída | Inventário de campos, readers/writers, 17 bloqueadores de multi-oferta |
+| CAT-DOM-02A — Correções de inconsistência pré-domínio | ✅ Concluída | Home lendo a oferta, FAQ preservada por omissão, painéis contando ofertas, nome do expositor no AVA |
+| CAT-DOM-02B — Autoridade, curadoria e conteúdo | ✅ Decisões concluídas | 13 decisões formais, matriz de autoridade e 11 gates de multi-oferta |
+| CAT-DOM-02C…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
+
+A **02A** corrigiu quatro inconsistências que já alcançavam produção no modelo
+1:1 — entre elas a home ainda lendo `modality` e `duration_min` das colunas
+legadas, e a API apagando todas as FAQs de um item quando o payload omitia a
+chave. Suíte: 857 → **867 passed · 2494 assertions · 0 failures**.
+
+A **02B** é exclusivamente decisória — nenhum código, nenhuma migration. As
+decisões aprovadas, de **D-CAT-09** a **D-CAT-21**:
+
+- **Autoridade sobre `Product` é da plataforma.** O expositor de origem pode
+  exercer edição canônica enquanto possuir **delegação válida** no estágio não
+  compartilhado — e essa delegação é um fato explícito de governança, **não
+  inferido da quantidade de ofertas** nem de `products.expositor_id`. Ela termina
+  com o compartilhamento e **não retorna** se o número de ofertas voltar a um.
+  Compartilhar um produto é ato exclusivo de curadoria (D-CAT-09).
+- **`products.is_active` é a validade canônica do item** e passa a ser exclusivo
+  da curadoria; `product_offers.is_active` é a disponibilidade comercial daquela
+  oferta e continua com o lojista. São estados distintos: nenhuma oferta ativa
+  **não** invalida o produto, e produto válido **não** significa algo à venda
+  (D-CAT-10).
+- **`products.expositor_id` é proveniência, nunca *ownership*** (D-CAT-11).
+- **Curadoria** = portadores de `produtos.moderar`, atuando **fora do caminho
+  crítico** de cadastro, precificação e venda (D-CAT-12).
+- **Imagem canônica e imagem da oferta** são conceitos distintos, com fallback
+  oferta → canônica: em artesanato, a foto é a peça (D-CAT-14, D-CAT-15).
+- **FAQ canônica e FAQ da oferta**, separadas; a FAQ atual migra para a oferta
+  (D-CAT-16).
+- **Perguntas carregam produto e oferta** — o contexto é o destinatário, não o
+  assunto (D-CAT-17, D-CAT-18).
+- **Semelhança nunca funde identidade**: não existe GTIN, SKU nem marca no
+  catálogo, então o único critério admissível é curadoria com evidência
+  (D-CAT-20).
+
+Dívidas remanescentes: M-04 (curso AVA com `product_id` UNIQUE), M-08, M-09
+(estratégia de `ofertaVigente`), M-10 (colisão de slug), M-12, M-13, M-14, M-16,
+M-17 e a D-1 da CAT-DOM-01 — todas com destino registrado, nenhuma resolvida.
+
+**Próxima etapa:** CAT-DOM-02C — fim do *write-through* de identidade e da
+escrita em espelho de `products.is_active`. Independente das demais, sem
+migration e sem decisão pendente. **Não autorizada.**
+
+Decisões, matrizes de autoridade e ciclo de vida, e os gates de multi-oferta:
+[`CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md`](CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md).
+
 ---
 
 ## 🧾 Trilha FIN-SEC — Integridade Comercial e Preservação Histórica (em andamento)
