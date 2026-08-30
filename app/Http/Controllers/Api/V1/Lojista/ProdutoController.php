@@ -78,7 +78,9 @@ class ProdutoController extends Controller
 
         $offer = app(SaveProductWithOffer::class)($data, $request->user()->expositor, $offer);
 
-        $this->syncFaqs($offer->product_id, $request->input('faqs', []));
+        // Sem default: num update, `faqs` ausente significa "nao mexi nisso",
+        // e nao "apague todas". Ver `syncFaqs()`.
+        $this->syncFaqs($offer->product_id, $request->input('faqs'));
         $this->syncAvaCourse($offer->product, (bool) ($data['is_digital'] ?? false));
 
         $offer->product->load(['category', 'faqs']);
@@ -177,8 +179,36 @@ class ProdutoController extends Controller
         }
     }
 
-    private function syncFaqs(int $productId, array $faqs): void
+    /**
+     * Substitui as FAQs do item pela lista recebida — quando houver lista.
+     *
+     * A sincronizacao comeca apagando tudo, e e isso que tornava a omissao
+     * destrutiva: um `PUT` que so mudasse o preco chegava aqui com um array
+     * vazio vindo do default e apagava as perguntas frequentes que o lojista
+     * havia escrito, sem nunca ter pedido isso. O painel Livewire nao sofria do
+     * mesmo problema porque `$this->faqs` e estado carregado no `mount()`, e
+     * sempre chega completo.
+     *
+     * A correcao esta em distinguir os dois casos que o default confundia:
+     *
+     * - `null` — a chave nao veio no payload. O cliente nao falou de FAQ, e
+     *   nada acontece com as FAQs. E o caso do app que atualiza um campo so.
+     * - `[]` — a chave veio vazia. E uma frase completa: "nao quero nenhuma".
+     *   Apaga todas, como sempre apagou.
+     *
+     * `faqs: null` explicito cai no primeiro caso. A validacao aceita o valor
+     * (`nullable`), e entre preservar e destruir sobre uma intencao ambigua, a
+     * unica escolha reversivel e preservar: o unico pedido inequivoco de apagar
+     * e a lista vazia.
+     *
+     * @param  array<int, array{question?: string, answer?: string}>|null  $faqs
+     */
+    private function syncFaqs(int $productId, ?array $faqs): void
     {
+        if ($faqs === null) {
+            return;
+        }
+
         ProductFaq::where('product_id', $productId)->delete();
 
         $valid = array_values(array_filter(

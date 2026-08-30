@@ -20,7 +20,14 @@ class Dashboard extends Component
 
         return view('livewire.lojista.dashboard', [
             'expositor'      => $expositor,
-            'totalProdutos'  => $expositor?->products()->count() ?? 0,
+            // "Produtos cadastrados" e o mesmo numero que "Meus Cadastros"
+            // lista, e aquela tela lista ofertas. Contar pela relacao legada
+            // `products` — que le `products.expositor_id`, hoje apenas
+            // proveniencia — divergia dela assim que o lojista removia um item:
+            // `DeleteProductOffer` apaga a oferta e deixa o produto no
+            // catalogo, entao o painel continuava contando o que a listagem ja
+            // nao mostrava.
+            'totalProdutos'  => $expositor?->offers()->count() ?? 0,
             'upcomingEvents' => $upcomingEvents,
         ])->layout('lojista.layouts.app', ['title' => 'Painel do Lojista']);
     }

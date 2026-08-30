@@ -23,7 +23,7 @@
         <h1>Parabéns, {{ $enrollment->user->name }}!</h1>
         <p>Você concluiu com sucesso o curso:</p>
         <div class="course-name">{{ $enrollment->course->product->name }}</div>
-        <p>por <strong>{{ $enrollment->course->product->expositor?->nome_fantasia }}</strong></p>
+        <p>por <strong>{{ $enrollment->course->product->expositor?->name }}</strong></p>
         <p style="font-size:13px; color:#999;">Concluído em: {{ $enrollment->completed_at->format('d/m/Y') }}</p>
     </div>
 

@@ -109,7 +109,7 @@
         <div class="course-name">{{ $enrollment->course->product->name }}</div>
 
         @if($enrollment->course->product->expositor)
-        <div class="expositor">por {{ $enrollment->course->product->expositor->nome_fantasia }}</div>
+        <div class="expositor">por {{ $enrollment->course->product->expositor->name }}</div>
         @endif
 
         <div class="details">

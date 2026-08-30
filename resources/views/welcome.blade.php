@@ -923,17 +923,17 @@
                         </div>
 
                         <div class="p-4 flex flex-col flex-1">
-                            {{-- Badges: modalidade --}}
-                            @if($item->modality)
+                            {{-- Badges: modalidade e duracao, sempre da oferta --}}
+                            @if($oferta?->modality)
                             <div class="flex items-center gap-1.5 mb-2 flex-wrap">
                                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
                                       style="background-color: #E8F4EA; color: #2D6A30;">
-                                    {{ $item->modality instanceof \App\Enums\Modality ? $item->modality->label() : $item->modality }}
+                                    {{ $oferta->modality->label() }}
                                 </span>
-                                @if($item->duration_min)
+                                @if($oferta->duration_min)
                                 <span class="text-xs font-medium px-2 py-0.5 rounded-full"
                                       style="background-color: #FDF8DC; color: #7A5C00;">
-                                    ⏱ {{ $item->duration_min >= 60 ? floor($item->duration_min/60).'h'.($item->duration_min%60 ? ($item->duration_min%60).'min' : '') : $item->duration_min.'min' }}
+                                    ⏱ {{ $oferta->duration_min >= 60 ? floor($oferta->duration_min/60).'h'.($oferta->duration_min%60 ? ($oferta->duration_min%60).'min' : '') : $oferta->duration_min.'min' }}
                                 </span>
                                 @endif
                             </div>
@@ -1053,16 +1053,17 @@
                         </div>
 
                         <div class="p-4 flex flex-col flex-1">
-                            @if($item->modality)
+                            {{-- Badges: modalidade e duracao, sempre da oferta --}}
+                            @if($oferta?->modality)
                             <div class="flex items-center gap-1.5 mb-2 flex-wrap">
                                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
                                       style="background-color: #EAF4E8; color: #2D6A2A;">
-                                    {{ $item->modality instanceof \App\Enums\Modality ? $item->modality->label() : $item->modality }}
+                                    {{ $oferta->modality->label() }}
                                 </span>
-                                @if($item->duration_min)
+                                @if($oferta->duration_min)
                                 <span class="text-xs font-medium px-2 py-0.5 rounded-full"
                                       style="background-color: #FDF8DC; color: #7A5C00;">
-                                    ⏱ {{ $item->duration_min >= 60 ? floor($item->duration_min/60).'h'.($item->duration_min%60 ? ($item->duration_min%60).'min' : '') : $item->duration_min.'min' }}
+                                    ⏱ {{ $oferta->duration_min >= 60 ? floor($oferta->duration_min/60).'h'.($oferta->duration_min%60 ? ($oferta->duration_min%60).'min' : '') : $oferta->duration_min.'min' }}
                                 </span>
                                 @endif
                             </div>

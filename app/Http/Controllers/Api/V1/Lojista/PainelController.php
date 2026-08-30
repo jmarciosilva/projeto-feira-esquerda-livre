@@ -18,7 +18,11 @@ class PainelController extends Controller
             : collect();
 
         return response()->json([
-            'total_produtos' => $expositor?->products()->count() ?? 0,
+            // Mesma contagem do painel web, e pela mesma razao: o numero
+            // corresponde ao que `GET /lojista/produtos` devolve, e aquele
+            // endpoint pagina ofertas. A relacao legada `products` divergia
+            // dele depois de qualquer remocao de oferta.
+            'total_produtos' => $expositor?->offers()->count() ?? 0,
             'upcoming_events' => $upcomingEvents->map(fn ($event) => [
                 'title' => $event->title,
                 'slug' => $event->slug,

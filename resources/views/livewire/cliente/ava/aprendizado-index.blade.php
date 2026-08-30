@@ -41,7 +41,7 @@
 
             <div class="p-5 flex flex-col gap-3 flex-1">
                 <div>
-                    <p class="text-xs text-gray-400 mb-0.5">{{ $product->expositor?->nome_fantasia }}</p>
+                    <p class="text-xs text-gray-400 mb-0.5">{{ $product->expositor?->name }}</p>
                     <h3 class="text-base font-bold text-gray-900 leading-snug">{{ $product->name }}</h3>
                 </div>
 
