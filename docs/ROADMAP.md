@@ -2281,7 +2281,8 @@ a identidade que o outro exibe — dívida D-2, registrada em teste.
 | CAT-DOM-02 — Auditoria do domínio produto × oferta | ✅ Concluída | Inventário de campos, readers/writers, 17 bloqueadores de multi-oferta |
 | CAT-DOM-02A — Correções de inconsistência pré-domínio | ✅ Concluída | Home lendo a oferta, FAQ preservada por omissão, painéis contando ofertas, nome do expositor no AVA |
 | CAT-DOM-02B — Autoridade, curadoria e conteúdo | ✅ Decisões concluídas | 13 decisões formais, matriz de autoridade e 11 gates de multi-oferta |
-| CAT-DOM-02C…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
+| CAT-DOM-02C — Autoridade de `Product` e fim do write-through | ✅ Concluída | Delegação canônica explícita, `is_active` sob curadoria, espelho comercial encerrado |
+| CAT-DOM-02D…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
 
 A **02A** corrigiu quatro inconsistências que já alcançavam produção no modelo
 1:1 — entre elas a home ainda lendo `modality` e `duration_min` das colunas
@@ -2319,9 +2320,33 @@ Dívidas remanescentes: M-04 (curso AVA com `product_id` UNIQUE), M-08, M-09
 (estratégia de `ofertaVigente`), M-10 (colisão de slug), M-12, M-13, M-14, M-16,
 M-17 e a D-1 da CAT-DOM-01 — todas com destino registrado, nenhuma resolvida.
 
-**Próxima etapa:** CAT-DOM-02C — fim do *write-through* de identidade e da
-escrita em espelho de `products.is_active`. Independente das demais, sem
-migration e sem decisão pendente. **Não autorizada.**
+A **02C** executou as três decisões que não dependiam de mais nada. A autoridade
+canônica ganhou representação própria — três colunas em `products`, com FK
+`SET NULL` para `expositores` — e passou a viver numa `ProductPolicy` que **não
+olha para a quantidade de ofertas nem para `products.expositor_id`**. A curadoria
+é identificada pela permissão `produtos.moderar`, que o projeto já declarava e
+que até agora não tinha superfície nenhuma; nenhuma permissão nova foi criada.
+
+`products.is_active` passou a ser exclusivo da curadoria e `toggleActive` faz uma
+escrita só, a da oferta. Os **doze** espelhos comerciais deixaram de ser
+gravados em `products` — as colunas continuam fisicamente lá, e a remoção é a
+02H. `products.is_active` **não** é um deles: é campo canônico legítimo, e não
+entra nessa remoção.
+
+Migration aditiva no MySQL real: 75 produtos, 75 ofertas, **75 delegações
+ativas**, zero órfãs, zero perdas. Suíte: 867 → **889 passed · 2559 assertions ·
+0 failures**. Quatro provas *mutation-like* confirmam que trocar a autoridade por
+contagem de ofertas, por `expositor_id`, ou reabrir o espelho, quebra os testes.
+
+Multi-oferta continua **desabilitada**: não há tela nem endpoint que crie uma
+segunda oferta sobre produto existente.
+
+**Próxima etapa:** CAT-DOM-02D — conteúdo por oferta (imagem da oferta, FAQ da
+oferta, contexto de oferta nas perguntas), com migrations aditivas e backfill
+1:1. **Não autorizada.**
+
+Mecanismo da delegação, backfill, matriz de autoridade e gates:
+[`CAT_DOM_02C_AUTORIDADE_PRODUCT_E_WRITE_THROUGH.md`](CAT_DOM_02C_AUTORIDADE_PRODUCT_E_WRITE_THROUGH.md).
 
 Decisões, matrizes de autoridade e ciclo de vida, e os gates de multi-oferta:
 [`CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md`](CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md).

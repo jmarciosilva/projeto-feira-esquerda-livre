@@ -59,7 +59,7 @@ class DemoProductSeeder extends Seeder
                         $name = "{$template['name']} - {$expositor->name}";
                         $slug = Str::slug("demo {$eixo} {$expositor->slug} {$template['name']}");
 
-                        $product = Product::updateOrCreate(
+                        $offer = $this->semearItemComOferta(
                             ['slug' => $slug],
                             [
                                 'expositor_id' => $expositor->id,
@@ -83,10 +83,11 @@ class DemoProductSeeder extends Seeder
                                 'is_active' => true,
                                 'is_digital' => $eixo !== 'produto',
                                 'sort_order' => 100 + $index,
-                            ]
+                            ],
+                            $expositor->id,
                         );
 
-                        $this->sincronizarOferta($product, $expositor->id);
+                        $product = $offer->product;
 
                         $created++;
                     }

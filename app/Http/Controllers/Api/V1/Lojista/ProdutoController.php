@@ -56,7 +56,12 @@ class ProdutoController extends Controller
         // da transacao, que agora vive dentro da SaveProductWithOffer.
         $data = $this->buildData($request, [], $imageService);
 
-        $offer = app(SaveProductWithOffer::class)($data, $request->user()->expositor);
+        $offer = app(SaveProductWithOffer::class)(
+            $data,
+            $request->user()->expositor,
+            null,
+            $request->user(),
+        );
 
         $this->syncFaqs($offer->product_id, $request->input('faqs', []));
         $this->syncAvaCourse($offer->product, (bool) ($data['is_digital'] ?? false));
@@ -76,7 +81,14 @@ class ProdutoController extends Controller
 
         $data = $this->buildData($request, $product->images ?? [], $imageService, $product);
 
-        $offer = app(SaveProductWithOffer::class)($data, $request->user()->expositor, $offer);
+        // O ator vai explicito: a autoridade canonica e da pessoa, e a action
+        // nao deve ter de adivinha-la a partir da sessao.
+        $offer = app(SaveProductWithOffer::class)(
+            $data,
+            $request->user()->expositor,
+            $offer,
+            $request->user(),
+        );
 
         // Sem default: num update, `faqs` ausente significa "nao mexi nisso",
         // e nao "apague todas". Ver `syncFaqs()`.

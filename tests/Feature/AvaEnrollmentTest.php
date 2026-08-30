@@ -36,12 +36,11 @@ class AvaEnrollmentTest extends TestCase
 
     private function makeDigitalProductWithPublishedCourse(Expositor $expositor): Product
     {
-        $product = Product::factory()->create([
+        $product = Product::factory()->comOferta(['price' => 99.90])->create([
             'expositor_id' => $expositor->id,
             'item_type'    => ItemType::Servico,
             'name'         => 'Curso de Culinária',
             'slug'         => 'curso-culinaria',
-            'price'        => 99.90,
             'is_digital'   => true,
             'is_active'    => true,
         ]);
@@ -79,9 +78,9 @@ class AvaEnrollmentTest extends TestCase
             'delivery_type'      => 'entrega',
             'customer_name'      => $buyer->name,
             'customer_whatsapp'  => '11999990000',
-            'items_total'        => $product->price,
+            'items_total'        => $product->ofertaVigente->price,
             'shipping_total'     => 0,
-            'total_amount'       => $product->price,
+            'total_amount'       => $product->ofertaVigente->price,
         ]);
 
         OrderItem::create([
@@ -89,15 +88,15 @@ class AvaEnrollmentTest extends TestCase
             'product_id'   => $product->id,
             'expositor_id' => $expositor->id,
             'product_name' => $product->name,
-            'unit_price'   => $product->price,
+            'unit_price'   => $product->ofertaVigente->price,
             'quantity'     => 1,
-            'total_price'  => $product->price,
+            'total_price'  => $product->ofertaVigente->price,
         ]);
 
         return OrderSplit::create([
             'order_id'           => $order->id,
             'expositor_id'       => $expositor->id,
-            'gross_amount'       => $product->price,
+            'gross_amount'       => $product->ofertaVigente->price,
             'commission_percent' => 10,
             'commission_amount'  => 9.99,
             'net_amount'         => 89.91,

@@ -65,14 +65,24 @@ class EventTrackingTest extends TestCase
 
     private function makeProduct(Expositor $expositor): Product
     {
-        return Product::factory()->create([
+        return Product::factory()->comOferta(['price' => 89.90])->create([
             'expositor_id' => $expositor->id,
             'item_type' => 'produto',
             'name' => 'Bolsa Artesanal',
             'slug' => 'bolsa-artesanal-'.uniqid(),
-            'price' => 89.90,
             'is_active' => true,
         ]);
+    }
+
+    /**
+     * O preco cobrado por este item.
+     *
+     * Vem da oferta, e nao do produto: desde a CAT-DOM-02C `products` nao
+     * guarda mais valor comercial nenhum.
+     */
+    private function preco(Product $product): string
+    {
+        return $product->ofertaVigente->price;
     }
 
     /**
@@ -155,7 +165,7 @@ class EventTrackingTest extends TestCase
             'product_id' => $product->id,
             'expositor_id' => $expositor->id,
             'quantity' => 3,
-            'price_snapshot' => $product->price,
+            'price_snapshot' => $this->preco($product),
         ]);
 
         $this->actingAs($buyer);
@@ -182,7 +192,7 @@ class EventTrackingTest extends TestCase
             'product_id' => $product->id,
             'expositor_id' => $expositor->id,
             'quantity' => 1,
-            'price_snapshot' => $product->price,
+            'price_snapshot' => $this->preco($product),
         ]);
 
         Livewire::actingAs($buyer)
@@ -222,9 +232,9 @@ class EventTrackingTest extends TestCase
             'delivery_type' => 'retirada',
             'customer_name' => $buyer->name,
             'customer_whatsapp' => '11999990000',
-            'items_total' => $product->price,
+            'items_total' => $this->preco($product),
             'shipping_total' => 0,
-            'total_amount' => $product->price,
+            'total_amount' => $this->preco($product),
         ]);
 
         OrderItem::create([
@@ -232,15 +242,15 @@ class EventTrackingTest extends TestCase
             'product_id' => $product->id,
             'expositor_id' => $expositor->id,
             'product_name' => $product->name,
-            'unit_price' => $product->price,
+            'unit_price' => $this->preco($product),
             'quantity' => 1,
-            'total_price' => $product->price,
+            'total_price' => $this->preco($product),
         ]);
 
         $split = OrderSplit::create([
             'order_id' => $order->id,
             'expositor_id' => $expositor->id,
-            'gross_amount' => $product->price,
+            'gross_amount' => $this->preco($product),
             'commission_percent' => 10,
             'commission_amount' => 8.99,
             'net_amount' => 80.91,
@@ -275,15 +285,15 @@ class EventTrackingTest extends TestCase
             'customer_name' => $buyer->name,
             'customer_email' => $buyer->email,
             'customer_whatsapp' => '11999990000',
-            'items_total' => $product->price,
+            'items_total' => $this->preco($product),
             'shipping_total' => 0,
-            'total_amount' => $product->price,
+            'total_amount' => $this->preco($product),
         ]);
 
         $split = OrderSplit::create([
             'order_id' => $order->id,
             'expositor_id' => $expositor->id,
-            'gross_amount' => $product->price,
+            'gross_amount' => $this->preco($product),
             'commission_percent' => 10,
             'commission_amount' => 8.99,
             'net_amount' => 80.91,
@@ -362,7 +372,7 @@ class EventTrackingTest extends TestCase
             'product_id' => $product->id,
             'expositor_id' => $expositor->id,
             'quantity' => 1,
-            'price_snapshot' => $product->price,
+            'price_snapshot' => $this->preco($product),
         ]);
 
         $this->actingAs($buyer);

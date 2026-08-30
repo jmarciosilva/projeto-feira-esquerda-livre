@@ -61,8 +61,28 @@ class Product extends Model
             'is_active' => 'boolean',
             'is_digital' => 'boolean',
             'images' => 'array',
+            'canonical_delegated_at' => 'datetime',
+            'canonical_delegation_revoked_at' => 'datetime',
         ];
     }
+
+    /**
+     * Os campos que respondem *o que este item é*, e que só mudam com
+     * autoridade canônica — curadoria ou delegação válida (D-CAT-09).
+     *
+     * `slug` fica fora porque é derivado do nome pela plataforma, não escolhido;
+     * `is_active` fica fora porque é validade canônica e pertence exclusivamente
+     * à curadoria (D-CAT-10); `images` fica fora porque seu desdobramento em
+     * imagem canônica e imagem da oferta é a CAT-DOM-02D (D-CAT-14).
+     */
+    public const CAMPOS_CANONICOS = [
+        'name',
+        'short_description',
+        'description',
+        'item_type',
+        'category_id',
+        'is_digital',
+    ];
 
     protected static function booted(): void
     {
@@ -81,6 +101,75 @@ class Product extends Model
     public function expositor(): BelongsTo
     {
         return $this->belongsTo(Expositor::class);
+    }
+
+    /**
+     * O expositor a quem a plataforma delegou a edição canônica deste item.
+     *
+     * Não confundir com `expositor()`: aquela é proveniência — quem trouxe o
+     * item ao catálogo —, esta é autoridade. Hoje as duas apontam para o mesmo
+     * expositor em toda a base, porque o backfill da CAT-DOM-02C inicializou
+     * uma a partir da outra; elas divergem no primeiro ato de curadoria, e
+     * **nenhuma autorização pode ler a primeira** (D-CAT-11).
+     */
+    public function canonicalDelegate(): BelongsTo
+    {
+        return $this->belongsTo(Expositor::class, 'canonical_delegate_expositor_id');
+    }
+
+    /**
+     * Existe delegação canônica em vigor sobre este item?
+     *
+     * Repare no que **não** aparece aqui: nenhuma contagem de ofertas, nenhuma
+     * leitura de `expositor_id`. A delegação é um fato declarado, e some por
+     * revogação ou pela saída do expositor (`nullOnDelete`) — nunca porque o
+     * número de ofertas mudou (D-CAT-09, §4.3.1).
+     */
+    public function temDelegacaoCanonicaAtiva(): bool
+    {
+        return $this->canonical_delegate_expositor_id !== null
+            && $this->canonical_delegation_revoked_at === null;
+    }
+
+    /** A delegação em vigor pertence a este expositor? */
+    public function delegaCanonicoPara(?int $expositorId): bool
+    {
+        return $expositorId !== null
+            && $this->temDelegacaoCanonicaAtiva()
+            && (int) $this->canonical_delegate_expositor_id === $expositorId;
+    }
+
+    /**
+     * Concede a delegação canônica a um expositor.
+     *
+     * `forceFill` porque as colunas de governança ficam **fora do `$fillable`**
+     * de propósito: elas não podem entrar por formulário nem por payload de
+     * API. Quem concede é o domínio, nunca um `update($request->all())`.
+     */
+    public function delegarCanonicoPara(int $expositorId): void
+    {
+        $this->forceFill([
+            'canonical_delegate_expositor_id' => $expositorId,
+            'canonical_delegated_at' => now(),
+            'canonical_delegation_revoked_at' => null,
+        ])->save();
+    }
+
+    /**
+     * Revoga a delegação, preservando quem a detinha e desde quando.
+     *
+     * A linha não é apagada: `canonical_delegate_expositor_id` e
+     * `canonical_delegated_at` continuam contando o que houve, e
+     * `canonical_delegation_revoked_at` diz que acabou. Sem isso, revogar
+     * apagaria a própria evidência de que alguém já teve a delegação.
+     */
+    public function revogarDelegacaoCanonica(): void
+    {
+        if (! $this->temDelegacaoCanonicaAtiva()) {
+            return;
+        }
+
+        $this->forceFill(['canonical_delegation_revoked_at' => now()])->save();
     }
 
     /** Todos os expositores que oferecem este item, em qualquer status. */

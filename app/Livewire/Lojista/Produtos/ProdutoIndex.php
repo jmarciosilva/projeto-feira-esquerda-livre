@@ -5,7 +5,6 @@ namespace App\Livewire\Lojista\Produtos;
 use App\Actions\Catalog\DeleteProductOffer;
 use App\Exceptions\OfertaComReservaAtiva;
 use App\Models\ProductOffer;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -32,14 +31,19 @@ class ProdutoIndex extends Component
     {
         $offer = $this->ofertasDoExpositor()->findOrFail($id);
 
-        // As duas escritas mudam juntas ou nenhuma muda: a oferta é a fonte de
-        // verdade, e `products.is_active` é o espelho da dívida D-1. Deixar a
-        // segunda falhar sozinha produziria a divergência que o espelho existe
-        // justamente para evitar.
-        DB::transaction(function () use ($offer) {
-            $offer->update(['is_active' => ! $offer->is_active]);
-            $offer->product->update(['is_active' => $offer->is_active]);
-        });
+        // Uma escrita só, e é a da oferta.
+        //
+        // Até a CAT-DOM-02B isto atualizava `products.is_active` junto, em
+        // espelho. A D-CAT-10 separou os dois estados: `products.is_active` é a
+        // validade canônica do item no catálogo e pertence à curadoria;
+        // `product_offers.is_active` é a disponibilidade comercial desta loja e
+        // continua sendo do lojista.
+        //
+        // Ele não perde nada com a separação — `ProductOffer::scopeVigente()`
+        // exige oferta ativa, então desligar aqui já tira o item de todas as
+        // vitrines. O que ele deixa de conseguir é retirar do catálogo um item
+        // de que outras lojas podem depender.
+        $offer->update(['is_active' => ! $offer->is_active]);
     }
 
     /**

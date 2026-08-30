@@ -13,7 +13,6 @@ use App\Models\Ava\AvaLessonProgress;
 use App\Models\Ava\AvaModule;
 use App\Models\ContentCategory;
 use App\Models\Expositor;
-use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\Concerns\SincronizaOfertaDoItem;
 use Illuminate\Database\Seeder;
@@ -60,7 +59,7 @@ class DemoAvaCourseSeeder extends Seeder
 
         $imagePath = $this->storeCourseImage();
 
-        $product = Product::updateOrCreate(
+        $offer = $this->semearItemComOferta(
             ['slug' => 'curso-online-de-informatica-popular'],
             [
                 'expositor_id' => $expositor->id,
@@ -84,9 +83,10 @@ class DemoAvaCourseSeeder extends Seeder
                 'is_digital' => true,
                 'sort_order' => 1,
             ],
+            $expositor->id,
         );
 
-        $this->sincronizarOferta($product, $expositor->id);
+        $product = $offer->product;
 
         $course = AvaCourse::updateOrCreate(
             ['product_id' => $product->id],

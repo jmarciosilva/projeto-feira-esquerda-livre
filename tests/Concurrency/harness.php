@@ -69,7 +69,9 @@ function catalogo(): array
 
     $product = Product::firstOrCreate(
         ['slug' => 'finsec01g-item'],
-        ['expositor_id' => $expositor->id, 'name' => 'Item 01G', 'price' => 100, 'item_type' => 'produto', 'is_active' => true],
+        // Sem `price`: desde a CAT-DOM-02C o valor comercial e da oferta, e
+        // `products` nao e mais area de passagem nem em fixture.
+        ['expositor_id' => $expositor->id, 'name' => 'Item 01G', 'item_type' => 'produto', 'is_active' => true],
     );
 
     $offer = ProductOffer::firstOrCreate(

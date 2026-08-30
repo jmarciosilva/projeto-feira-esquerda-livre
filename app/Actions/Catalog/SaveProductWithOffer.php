@@ -2,11 +2,14 @@
 
 namespace App\Actions\Catalog;
 
+use App\Exceptions\SemAutoridadeCanonica;
 use App\Models\Expositor;
 use App\Models\Product;
 use App\Models\ProductOffer;
+use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -20,6 +23,27 @@ use Illuminate\Validation\ValidationException;
  *
  * As duas superfícies continuam montando o mesmo array plano que já montavam.
  * A divisão acontece aqui, uma vez.
+ *
+ * ## O que a CAT-DOM-02C mudou
+ *
+ * Duas coisas, e as duas vinham da CAT-DOM-02B.
+ *
+ * **O espelho legado acabou.** Até aqui os **doze** campos comerciais eram
+ * gravados nos dois lados — `product_offers` como fonte de verdade e `products`
+ * como cópia — para que nenhuma coluna do banco guardasse preço diferente do
+ * que a oferta cobrava. As colunas continuam lá, fisicamente; o que parou foi a
+ * escrita. Com N ofertas por produto, um espelho de coluna única não teria o
+ * que refletir.
+ *
+ * `is_active` **não** é um deles. `CAMPOS_DA_OFERTA` o inclui porque
+ * `product_offers.is_active` de fato vem do formulário do lojista; o que deixou
+ * de acontecer é a cópia para `products.is_active`, que é validade canônica do
+ * item e pertence à curadoria (D-CAT-10). Ele permanece em `products` como
+ * coluna legítima, e não entra na remoção da CAT-DOM-02H.
+ *
+ * **Alterar a identidade do item passou a exigir autoridade.** Não basta ter
+ * uma oferta sobre ele: é preciso curadoria ou delegação declarada (D-CAT-09).
+ * A verificação vive na `ProductPolicy`, e aqui só se pergunta por ela.
  */
 final class SaveProductWithOffer
 {
@@ -63,12 +87,50 @@ final class SaveProductWithOffer
     ];
 
     /**
+     * Os doze espelhos comerciais legados de `products` — a dívida D-1.
+     *
+     * É `CAMPOS_DA_OFERTA` **menos `is_active`**, e a diferença é o ponto todo:
+     * `is_active` existe nas duas tabelas com significados distintos —
+     * disponibilidade comercial na oferta, validade canônica no produto
+     * (D-CAT-10) —, então não é espelho de nada e não entra na remoção da
+     * CAT-DOM-02H. Os outros doze não têm contrapartida canônica: são cópia
+     * pura, e `products` não deve recebê-los nem em runtime, nem em fixture,
+     * nem em seed.
+     *
+     * Nomeada aqui, e não repetida em cada lugar, porque quem precisa da lista
+     * — a `ProductFactory` e o trait de seed — precisa exatamente da mesma.
+     */
+    public const ESPELHOS_COMERCIAIS_LEGADOS = [
+        'price',
+        'price_type',
+        'modality',
+        'duration_min',
+        'weight',
+        'height',
+        'width',
+        'length',
+        'has_stock',
+        'stock_quantity',
+        'is_featured',
+        'sort_order',
+    ];
+
+    /**
      * @param  array<string, mixed>  $data  Campos já validados pela superfície.
      * @param  ProductOffer|null  $offer  Oferta a atualizar; nula cria item novo.
+     * @param  User|null  $ator  Quem está salvando; usado só para autoridade canônica.
+     *
+     * @throws SemAutoridadeCanonica quando o ator tenta mudar a identidade do item sem poder
      */
-    public function __invoke(array $data, Expositor $expositor, ?ProductOffer $offer = null): ProductOffer
-    {
-        return DB::transaction(function () use ($data, $expositor, $offer) {
+    public function __invoke(
+        array $data,
+        Expositor $expositor,
+        ?ProductOffer $offer = null,
+        ?User $ator = null,
+    ): ProductOffer {
+        $ator ??= auth()->user();
+
+        return DB::transaction(function () use ($data, $expositor, $offer, $ator) {
             $dadosDaOferta = Arr::only($data, self::CAMPOS_DA_OFERTA);
 
             if ($offer === null) {
@@ -77,6 +139,12 @@ final class SaveProductWithOffer
                     // item para o catálogo. Nenhuma autorização olha para cá.
                     'expositor_id' => $expositor->id,
                 ]);
+
+                // Quem traz um item novo ao catálogo recebe, no mesmo ato, a
+                // delegação para continuar editando o que ele é. É concessão
+                // declarada — não decorre de ser o único ofertante, e some se a
+                // curadoria a revogar (D-CAT-09).
+                $product->delegarCanonicoPara($expositor->id);
 
                 $offer = ProductOffer::create($dadosDaOferta + [
                     'product_id' => $product->id,
@@ -95,7 +163,7 @@ final class SaveProductWithOffer
             // `expositor_id` fica FORA dos dois updates, de propósito: o dono de
             // uma oferta existente nunca é recalculado a partir de quem está
             // salvando. É a mesma proteção da SEC-02, agora no lugar certo.
-            $offer->product->update($this->dadosDoProduto($data));
+            $offer->product->update($this->dadosDoProduto($data, $offer->product, $ator));
             $offer->update($dadosDaOferta);
 
             return $offer->refresh();
@@ -191,19 +259,120 @@ final class SaveProductWithOffer
     }
 
     /**
-     * Enquanto a dívida D-1 não for quitada, `products` recebe também os campos
-     * comerciais, em espelho. Não é fonte de verdade — nenhuma superfície os lê
-     * de lá desde a CAT-DOM-01E —, mas manter o espelho evita que uma coluna do
-     * banco guarde preço ou estoque diferente do que a oferta cobra.
+     * O que de fato vai para `products`.
      *
-     * Quando as colunas legadas forem removidas, esta soma cai e sobra
-     * `CAMPOS_DO_PRODUTO`.
+     * ## Fim do espelho (CAT-DOM-02C)
+     *
+     * Nada de `CAMPOS_DA_OFERTA` entra mais aqui. Doze desses campos são
+     * espelhos comerciais legados — preço, estoque, dimensões, destaque, ordem
+     * e condições de serviço —, gravados em cópia enquanto a cardinalidade real
+     * era 1:1. As colunas continuam existindo, e removê-las é a CAT-DOM-02H;
+     * o que parou foi a escrita.
+     *
+     * O décimo terceiro é `is_active`, e ele é caso à parte: em
+     * `product_offers` é disponibilidade comercial e continua vindo do lojista;
+     * em `products` é **validade canônica**, pertence à curadoria (D-CAT-10) e
+     * por isso também não é escrito por aqui — mas como campo legítimo do
+     * produto, não como espelho a remover.
+     *
+     * ## Autoridade sobre a identidade
+     *
+     * Na criação não há o que autorizar: o item está nascendo, e a delegação é
+     * concedida no mesmo ato. Na edição, mexer em nome, descrições, eixo,
+     * categoria ou natureza digital exige curadoria ou delegação válida.
+     *
+     * A verificação é sobre **mudança**, não sobre presença. Os dois
+     * formulários reenviam o item inteiro a cada salvamento, então exigir
+     * autoridade por o campo estar no payload impediria o lojista sem delegação
+     * de corrigir o próprio preço — recusa que puniria o que ele pode fazer por
+     * causa do que ele não mudou.
+     *
+     * `slug` sai do update de propósito: é derivado do nome pela plataforma e
+     * não está entre os campos que a delegação alcança (D-CAT-09 §4.1). Na
+     * criação ele continua sendo definido, e a API já se comportava assim —
+     * `ProdutoController::buildData()` sempre preservou o slug existente. O que
+     * muda é o painel Livewire passar a fazer o mesmo, encerrando uma
+     * divergência entre os dois canais.
+     *
+     * `images` e `image_path` seguem sendo gravados como antes, sem exigir
+     * autoridade: o desdobramento em imagem canônica e imagem da oferta é a
+     * CAT-DOM-02D, e antecipá-lo aqui trocaria uma dívida conhecida por uma
+     * meia-implementação.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
+     *
+     * @throws SemAutoridadeCanonica
      */
-    private function dadosDoProduto(array $data): array
+    private function dadosDoProduto(array $data, ?Product $product = null, ?User $ator = null): array
     {
-        return Arr::only($data, [...self::CAMPOS_DO_PRODUTO, ...self::CAMPOS_DA_OFERTA]);
+        $campos = Arr::only($data, self::CAMPOS_DO_PRODUTO);
+
+        if ($product === null) {
+            return $campos;
+        }
+
+        unset($campos['slug']);
+
+        $mudancas = $this->mudancasCanonicas($product, $campos);
+
+        if ($mudancas !== [] && ! $this->podeEditarCanonico($ator, $product)) {
+            throw new SemAutoridadeCanonica($mudancas);
+        }
+
+        return $campos;
+    }
+
+    /**
+     * Quais campos canônicos o payload realmente altera.
+     *
+     * A comparação é contra os atributos crus do banco, e não contra os do
+     * model: `item_type` chega como string e sai do model como enum,
+     * `is_digital` chega como bool e mora como `0`/`1`. Comparar as duas formas
+     * direto acusaria mudança em todo salvamento, e a recusa passaria a
+     * depender de casting em vez de intenção.
+     *
+     * @param  array<string, mixed>  $campos
+     * @return array<int, string>
+     */
+    private function mudancasCanonicas(Product $product, array $campos): array
+    {
+        $atuais = $product->getAttributes();
+
+        return array_values(array_filter(
+            array_keys(Arr::only($campos, Product::CAMPOS_CANONICOS)),
+            fn (string $campo) => ! $this->mesmoValor($atuais[$campo] ?? null, $campos[$campo]),
+        ));
+    }
+
+    private function mesmoValor(mixed $atual, mixed $novo): bool
+    {
+        if ($atual === null || $novo === null) {
+            return $atual === null && $novo === null;
+        }
+
+        return $this->normalizar($atual) === $this->normalizar($novo);
+    }
+
+    private function normalizar(mixed $valor): string
+    {
+        if (is_bool($valor)) {
+            return (string) (int) $valor;
+        }
+
+        return (string) ($valor instanceof \BackedEnum ? $valor->value : $valor);
+    }
+
+    /**
+     * A pergunta da D-CAT-09, feita em um lugar só.
+     *
+     * Delega à `ProductPolicy` — que não olha para a quantidade de ofertas nem
+     * para `products.expositor_id` — em vez de repetir a regra aqui. Sem ator
+     * não há autoridade: um caminho que salve sem usuário autenticado não herda
+     * a permissão de ninguém.
+     */
+    private function podeEditarCanonico(?User $ator, Product $product): bool
+    {
+        return $ator !== null && Gate::forUser($ator)->allows('updateCanonical', $product);
     }
 }

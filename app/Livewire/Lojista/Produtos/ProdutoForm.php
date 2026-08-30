@@ -6,6 +6,7 @@ use App\Actions\Catalog\SaveProductWithOffer;
 use App\Enums\ItemType;
 use App\Enums\Modality;
 use App\Enums\PriceType;
+use App\Exceptions\SemAutoridadeCanonica;
 use App\Livewire\Concerns\ValidatesFileUploads;
 use App\Models\Ava\AvaCourse;
 use App\Models\ContentCategory;
@@ -277,7 +278,20 @@ class ProdutoForm extends Component
 
         $editando = $this->product && $this->product->exists;
 
-        $offer = app(SaveProductWithOffer::class)($data, $expositor, $editando ? $this->offer : null);
+        try {
+            $offer = app(SaveProductWithOffer::class)(
+                $data,
+                $expositor,
+                $editando ? $this->offer : null,
+                auth()->user(),
+            );
+        } catch (SemAutoridadeCanonica $semAutoridade) {
+            // Nada foi gravado — a action roda em transação. O lojista fica na
+            // tela com o que digitou e entende por que a alteração não passou.
+            session()->flash('error', $semAutoridade->mensagemParaOLojista());
+
+            return;
+        }
 
         $this->syncFaqs($offer->product_id);
         $this->syncAvaCourse($offer->product);

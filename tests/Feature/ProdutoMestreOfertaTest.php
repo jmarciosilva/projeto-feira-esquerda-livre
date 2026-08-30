@@ -275,13 +275,14 @@ class ProdutoMestreOfertaTest extends TestCase
             'is_active' => true,
         ]);
 
+        $nomeOriginal = $ofertaA->product->name;
+
         Livewire::actingAs($userB);
 
         // B abre o MESMO produto mestre e, mesmo assim, só alcança a oferta
         // dele: o produto compartilhado não é atalho para o preço de A.
         Livewire::test(ProdutoForm::class, ['product' => $ofertaA->product])
             ->assertSet('price', '80.00')
-            ->set('name', 'Nome alterado por B')
             ->set('price', '85.00')
             ->call('save');
 
@@ -289,13 +290,15 @@ class ProdutoMestreOfertaTest extends TestCase
         $this->assertSame('85.00', $ofertaB->fresh()->price);
         $this->assertSame($lojaA->id, $ofertaA->fresh()->expositor_id);
 
-        // Limite conhecido e registrado como dívida D-2: os campos de
-        // identidade do produto mestre — nome, descrições, imagens — ainda são
-        // graváveis por qualquer expositor que tenha uma oferta sobre ele. Hoje
-        // isso não alcança ninguém, porque a aplicação não expõe uma segunda
-        // oferta sobre o mesmo produto; antes de expor, este ponto precisa de
-        // curadoria ou de autoria por oferta.
-        $this->assertSame('Nome alterado por B', $ofertaA->fresh()->product->name);
+        // A dívida D-2 fechou aqui, na CAT-DOM-02C: a delegação canônica é de
+        // A, que trouxe o item ao catálogo. B tem oferta sobre o produto e
+        // mesmo assim não reescreve o que o produto É — nem o nome de A, nem o
+        // que as outras lojas exibem.
+        Livewire::test(ProdutoForm::class, ['product' => $ofertaA->product])
+            ->set('name', 'Nome alterado por B')
+            ->call('save');
+
+        $this->assertSame($nomeOriginal, $ofertaA->fresh()->product->name);
     }
 
     public function test_api_nao_permite_escolher_o_dono_da_oferta(): void
@@ -337,10 +340,23 @@ class ProdutoMestreOfertaTest extends TestCase
 
     // ─── Espelho legado D-1 ─────────────────────────────────────────────────
 
-    public function test_salvar_pela_action_mantem_o_espelho_legado_consistente(): void
+    /**
+     * Invertido na CAT-DOM-02C.
+     *
+     * Este teste nasceu na CAT-DOM-01 exigindo que `products` continuasse
+     * espelhando preço e estoque da oferta, para que nenhuma coluna do banco
+     * guardasse valor diferente do que era cobrado. A D-CAT-09 encerrou o
+     * espelho: com N ofertas por produto uma coluna única não tem o que
+     * refletir, e a `ProductOffer` passa a ser a única autoridade de runtime.
+     *
+     * O que ele prova agora é o oposto — e é o que impede o espelho de voltar.
+     */
+    public function test_salvar_pela_action_nao_alimenta_mais_o_espelho_legado(): void
     {
         ['user' => $user, 'expositor' => $expositor] = $this->makeLojista();
         $offer = $this->makeItem($expositor, ['item_type' => 'produto'], ['price' => 10]);
+
+        $precoLegadoAntes = $offer->product->getAttributes()['price'];
 
         Livewire::actingAs($user)
             ->test(ProdutoForm::class, ['product' => $offer->product])
@@ -349,28 +365,36 @@ class ProdutoMestreOfertaTest extends TestCase
             ->call('save');
 
         $offer->refresh();
-        $product = $offer->product->fresh();
+        $legado = $offer->product->fresh()->getAttributes();
 
-        // A oferta é a fonte de verdade...
+        // A oferta é a fonte de verdade, e recebeu a alteração.
         $this->assertSame('77.50', $offer->price);
         $this->assertSame(3, $offer->stock_quantity);
 
-        // ...e o espelho da dívida D-1 não pode contradizê-la enquanto as
-        // colunas legadas existirem em `products`.
-        $this->assertSame($offer->price, $product->price);
-        $this->assertSame($offer->stock_quantity, $product->stock_quantity);
-        $this->assertSame($offer->is_active, $product->is_active);
+        // As colunas legadas continuam fisicamente em `products` — removê-las é
+        // a CAT-DOM-02H —, mas ninguém mais as escreve.
+        $this->assertSame($precoLegadoAntes, $legado['price']);
+        $this->assertNotSame('77.50', $legado['price']);
     }
 
-    public function test_alternar_status_mantem_oferta_e_espelho_juntos(): void
+    /**
+     * Invertido na CAT-DOM-02C, por D-CAT-10.
+     *
+     * `products.is_active` é validade canônica e pertence à curadoria;
+     * `product_offers.is_active` é disponibilidade comercial e continua sendo
+     * do lojista. Alternar a oferta não pode mais alcançar o catálogo.
+     */
+    public function test_alternar_status_da_oferta_nao_toca_a_validade_canonica(): void
     {
         ['user' => $user, 'expositor' => $expositor] = $this->makeLojista();
         $offer = $this->makeItem($expositor);
 
+        $this->assertTrue((bool) $offer->product->is_active);
+
         Livewire::actingAs($user)->test(ProdutoIndex::class)->call('toggleActive', $offer->id);
 
         $this->assertFalse($offer->fresh()->is_active);
-        $this->assertFalse((bool) $offer->product->fresh()->is_active);
+        $this->assertTrue((bool) $offer->product->fresh()->is_active);
 
         Livewire::actingAs($user)->test(ProdutoIndex::class)->call('toggleActive', $offer->id);
 

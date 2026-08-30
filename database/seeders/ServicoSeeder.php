@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Enums\UserRole;
 use App\Models\ContentCategory;
 use App\Models\Expositor;
-use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\Concerns\SincronizaOfertaDoItem;
 use Illuminate\Database\Seeder;
@@ -246,16 +245,15 @@ class ServicoSeeder extends Seeder
                 $categorySlug = $prod['category_slug'] ?? null;
                 unset($prod['category_slug']);
 
-                $product = Product::updateOrCreate(
+                $this->semearItemComOferta(
                     ['name' => $prod['name']],
                     array_merge($prod, [
                         'expositor_id' => $expositor->id,
                         'is_active'    => true,
                         'category_id'  => $categorySlug ? ($cats[$categorySlug] ?? null) : null,
-                    ])
+                    ]),
+                    $expositor->id,
                 );
-
-                $this->sincronizarOferta($product, $expositor->id);
             }
 
             $this->command->line("  ✓ {$dados['expositor']['name']} → {$dados['user']['email']}");
