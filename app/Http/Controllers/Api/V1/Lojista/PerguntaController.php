@@ -58,11 +58,17 @@ class PerguntaController extends Controller
         return new PerguntaResource($productQuestion->load(['product', 'user']));
     }
 
+    /**
+     * As perguntas dirigidas às ofertas deste expositor (CAT-DOM-02F).
+     *
+     * Antes o filtro era `whereHas('product.offers', ...)` — "produtos em que
+     * tenho alguma oferta" —, o que com dois vendedores no mesmo item deixaria
+     * um responder pelo outro. O escopo agora parte da oferta da pergunta, e
+     * pergunta sem `product_offer_id` fica de fora: não tem destinatário
+     * comercial e ninguém a assume (D-02F-4, D-02F-5).
+     */
     private function baseQuery(int $expositorId)
     {
-        return ProductQuestion::whereHas(
-            'product',
-            fn ($q) => $q->whereHas('offers', fn ($o) => $o->where('expositor_id', $expositorId))
-        );
+        return ProductQuestion::dirigidaAoExpositor($expositorId);
     }
 }

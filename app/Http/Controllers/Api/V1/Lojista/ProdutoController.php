@@ -132,10 +132,13 @@ class ProdutoController extends Controller
     private function authorizeProduct(Request $request, Product $product): ProductOffer
     {
         $offer = $product->offers()
-            ->where('expositor_id', $request->user()->expositor->id)
+            ->doExpositor($request->user()->expositor->id)
             ->first();
 
-        abort_if($offer === null, 403);
+        // Recusa dupla de propósito. A consulta escopada já não traria oferta
+        // alheia; o predicado é a mesma regra dita no lugar onde ela mora
+        // (D-02F-1), e sobrevive a alguem trocar o escopo por um `find()`.
+        abort_unless($offer?->pertenceAoExpositorDe($request->user()) === true, 403);
 
         return $offer;
     }

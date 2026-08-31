@@ -160,9 +160,13 @@ class ProdutoForm extends Component
         // oferta sobre ele. Item que ele não oferece não é editável por ele,
         // ainda que exista no catálogo — e um produto que ficou sem nenhuma
         // oferta não vira porta de entrada para ninguém.
+        //
+        // A CAT-DOM-02F não mudou a regra: mudou o lugar dela. A comparação
+        // agora vem de `ProductOffer::pertenceAoExpositorDe()`, a definição
+        // única de ownership comercial (D-02F-1), para que a resposta seja a
+        // mesma aqui, na API, no painel e nas perguntas.
         abort_unless(
-            $this->offer !== null
-                && $this->offer->expositor_id === auth()->user()?->expositor?->id,
+            $this->offer?->pertenceAoExpositorDe(auth()->user()) === true,
             403,
             'Este item pertence a outra loja.',
         );

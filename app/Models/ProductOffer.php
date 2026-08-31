@@ -231,4 +231,38 @@ class ProductOffer extends Model
     {
         return $query->where('expositor_id', $expositorId);
     }
+
+    /**
+     * **Esta oferta é sua?** — a única definição de ownership comercial
+     * (CAT-DOM-02F, D-02F-1).
+     *
+     * A resposta sai de `product_offers.expositor_id`, e de mais nada. Os três
+     * atalhos que parecem equivalentes e não são:
+     *
+     * - **`products.expositor_id`** é proveniência (D-CAT-11): registra quem
+     *   trouxe o item ao catálogo, um fato histórico que não acompanha quem
+     *   vende hoje. O item pode ter sido cadastrado por A e ser oferecido só
+     *   por B;
+     * - **`canonical_delegate_expositor_id`** é poder sobre *o que o item é*,
+     *   concedido e revogável (D-CAT-09). Editar a identidade do produto e ser
+     *   dono da oferta são eixos independentes;
+     * - **cardinalidade** — "o produto só tem uma oferta, logo é dele" — é
+     *   estado comercial passageiro. Código que autoriza assim fica correto
+     *   hoje e errado no dia em que o segundo expositor aparecer.
+     *
+     * ## Por que um predicado, e não uma Policy
+     *
+     * `Gate::before` concede tudo a admin antes de qualquer Policy rodar, e
+     * admin **não tem expositor**. Uma Policy responderia "pode" e o código
+     * seguinte quebraria no expositor nulo — foi essa a razão registrada na
+     * SEC-02, e ela não mudou. A autoridade **canônica** continua na
+     * `ProductPolicy`, onde o override de admin é desejado; o ownership
+     * **comercial** mora aqui, onde ele não é.
+     */
+    public function pertenceAoExpositorDe(?User $user): bool
+    {
+        $expositorId = $user?->expositor?->id;
+
+        return $expositorId !== null && (int) $this->expositor_id === (int) $expositorId;
+    }
 }

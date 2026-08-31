@@ -2283,8 +2283,9 @@ a identidade que o outro exibe — dívida D-2, registrada em teste.
 | CAT-DOM-02B — Autoridade, curadoria e conteúdo | ✅ Decisões concluídas | 13 decisões formais, matriz de autoridade e 11 gates de multi-oferta |
 | CAT-DOM-02C — Autoridade de `Product` e fim do write-through | ✅ Concluída | Delegação canônica explícita, `is_active` sob curadoria, espelho comercial encerrado |
 | CAT-DOM-02D — Estrutura de conteúdo por oferta | ✅ Concluída | 3 migrations aditivas, `product_offer_faqs`, backfill em dois modos e o invariante de arquivo físico provado no MySQL real |
-| CAT-DOM-02E — Writers, readers e cutover | 🔍 **Implementação concluída · aguardando revisão pré-commit** | Imagem e FAQ comerciais passam a ser da oferta, pergunta ganha destinatário, fallback centralizado e limpeza determinística da FAQ legada |
-| CAT-DOM-02F…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
+| CAT-DOM-02E — Writers, readers e cutover | ✅ Concluída | Imagem e FAQ comerciais passam a ser da oferta, pergunta ganha destinatário, fallback centralizado e limpeza determinística da FAQ legada |
+| CAT-DOM-02F — Isolamento, autorização e governança | 🔍 **Implementação concluída · aguardando revisão pré-commit** | Ownership comercial com definição única na oferta, autoridade de resposta corrigida, isolamento A × B provado |
+| CAT-DOM-02G…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
 
 A **02A** corrigiu quatro inconsistências que já alcançavam produção no modelo
 1:1 — entre elas a home ainda lendo `modality` e `duration_min` das colunas
@@ -2457,9 +2458,51 @@ compartilhados**, zero arquivos ausentes, zero FAQ não resolvida.
 Auditoria de writers e readers, cutover, métricas e pendências:
 [`CAT_DOM_02E_WRITERS_READERS_E_CUTOVER.md`](CAT_DOM_02E_WRITERS_READERS_E_CUTOVER.md).
 
-**Multi-oferta continua desabilitada e a CAT-DOM-02F não foi iniciada**: nenhum
-guard de autorização mudou, e a suíte de isolamento da SEC-02 passou sem uma
-única expectativa alterada.
+**Multi-oferta continua desabilitada**: naquela fase nenhum guard de autorização
+mudou, e a suíte de isolamento da SEC-02 passou sem uma única expectativa
+alterada.
+
+**CAT-DOM-02F — implementação concluída, aguardando revisão pré-commit.** A 02D
+disse onde o dado mora, a 02E disse quem escreve e de onde se lê; esta fase
+responde **de quem ele é**. Nenhuma migration — é autorização, escopo de
+consulta, testes e documentação.
+
+A auditoria encontrou o ownership comercial já correto em quase toda parte, e
+**uma lacuna real**, aberta desde a 02B: os dois pontos que respondem perguntas
+de cliente — o painel e a API — autorizavam por *"tenho alguma oferta neste
+produto?"* em vez de *"esta pergunta é da minha oferta?"*. Com `Product` e
+`ProductOffer` em 1:1 as duas consultas devolvem o mesmo conjunto, e por isso
+nenhum teste acusava; com dois vendedores no mesmo item, B responderia — assinando
+com a loja dele — o que o cliente perguntou a A. É o R-2 que a trilha carregava
+esperando `product_questions.product_offer_id`, que a 02E entregou.
+
+O ownership comercial passou a ter **uma definição só**:
+`ProductOffer::pertenceAoExpositorDe()`. Ela deriva exclusivamente de
+`product_offers.expositor_id` — nunca de `products.expositor_id`, que é
+proveniência; nunca de `canonical_delegate_expositor_id`, que é poder sobre a
+identidade do item e não sobre a venda; nunca de cardinalidade, que é estado
+passageiro. Deliberadamente **não é uma Policy**: `Gate::before` concede tudo a
+admin antes de qualquer Policy rodar, e admin não tem expositor — a razão que a
+SEC-02 já registrava, e que continua valendo.
+
+A separação entre os dois eixos ficou provada nos dois sentidos: quem cadastrou o
+item não alcança a oferta de quem o vende, e quem é dono da oferta não ganha
+autoridade sobre a identidade do item. `Product.is_active` continua exclusivo de
+curadoria — recusado inclusive a quem tem delegação canônica.
+
+Isolamento A × B provado sobre oferta, preço, status, exclusão, imagem, FAQ e
+perguntas, no formulário Livewire, no painel e na API — incluindo tampering de id
+hidratado e de payload. `expositor_id` e `product_id` ficam fora da allowlist da
+oferta, o que torna a transferência impossível por construção e não por
+vigilância.
+
+Auditoria, matriz de autorização, decisões D-02F-1 a D-02F-7, gates e dívidas:
+[`CAT_DOM_02F_ISOLAMENTO_AUTORIZACAO_E_GOVERNANCA.md`](CAT_DOM_02F_ISOLAMENTO_AUTORIZACAO_E_GOVERNANCA.md).
+
+**Multi-oferta continua desabilitada e a CAT-DOM-02G não foi iniciada.** Ficam
+registradas como dívidas ativas a ausência de superfície de curadoria (G-1), o
+workflow de proposta e a autorização de curso do AVA (G-10), que ainda é por
+produto.
 
 Decisões, matrizes de autoridade e ciclo de vida, e os gates de multi-oferta:
 [`CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md`](CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md).

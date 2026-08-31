@@ -212,10 +212,13 @@ class ProductQandATest extends TestCase
         $product   = $this->makeProduct($expositor);
         $cliente   = $this->makeCliente();
 
+        // CAT-DOM-02F: a pergunta carrega a oferta a que foi dirigida — é ela
+        // que diz quem pode responder.
         $q = ProductQuestion::create([
-            'product_id' => $product->id,
-            'user_id'    => $cliente->id,
-            'question'   => 'Tem parcelamento?',
+            'product_id'       => $product->id,
+            'product_offer_id' => $product->offers()->sole()->id,
+            'user_id'          => $cliente->id,
+            'question'         => 'Tem parcelamento?',
         ]);
 
         Livewire::actingAs($lojista)
@@ -237,10 +240,11 @@ class ProductQandATest extends TestCase
         $cliente   = $this->makeCliente();
 
         $q = ProductQuestion::create([
-            'product_id' => $product->id,
-            'user_id'    => $cliente->id,
-            'question'   => 'Pergunta inapropriada',
-            'is_visible' => true,
+            'product_id'       => $product->id,
+            'product_offer_id' => $product->offers()->sole()->id,
+            'user_id'          => $cliente->id,
+            'question'         => 'Pergunta inapropriada',
+            'is_visible'       => true,
         ]);
 
         Livewire::actingAs($lojista)
@@ -281,23 +285,27 @@ class ProductQandATest extends TestCase
         $product   = $this->makeProduct($expositor);
         $cliente   = $this->makeCliente();
 
-        ProductQuestion::create(['product_id' => $product->id, 'user_id' => $cliente->id, 'question' => 'P1?']);
-        ProductQuestion::create(['product_id' => $product->id, 'user_id' => $cliente->id, 'question' => 'P2?']);
+        $offerId = $product->offers()->sole()->id;
+
+        ProductQuestion::create(['product_id' => $product->id, 'product_offer_id' => $offerId, 'user_id' => $cliente->id, 'question' => 'P1?']);
+        ProductQuestion::create(['product_id' => $product->id, 'product_offer_id' => $offerId, 'user_id' => $cliente->id, 'question' => 'P2?']);
         ProductQuestion::create([
-            'product_id'  => $product->id,
-            'user_id'     => $cliente->id,
-            'question'    => 'P3?',
-            'answer'      => 'R3',
-            'answered_at' => now(),
-            'answered_by' => $lojista->id,
+            'product_id'       => $product->id,
+            'product_offer_id' => $offerId,
+            'user_id'          => $cliente->id,
+            'question'         => 'P3?',
+            'answer'           => 'R3',
+            'answered_at'      => now(),
+            'answered_by'      => $lojista->id,
         ]);
 
-        // pendingCount é variável de view — verificamos via DB diretamente
-        $count = \App\Models\ProductQuestion::whereHas(
-            'product',
-            fn ($q) => $q->where('expositor_id', $expositor->id)
-        )->whereNull('answered_at')->count();
+        // CAT-DOM-02F: a contagem sai do mesmo escopo que o painel usa — a
+        // oferta da pergunta —, e não de uma consulta paralela por
+        // `products.expositor_id`, que é proveniência e não ownership.
+        $pendentes = ProductQuestion::dirigidaAoExpositor($expositor->id)
+            ->whereNull('answered_at')
+            ->count();
 
-        $this->assertEquals(2, $count);
+        $this->assertEquals(2, $pendentes);
     }
 }

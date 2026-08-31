@@ -191,8 +191,12 @@ class LojistaApiTest extends TestCase
             'price' => 89.9,
             'is_active' => true,
         ]);
+        // CAT-DOM-02F: a pergunta carrega a oferta a que foi dirigida, e é ela
+        // que define quem pode responder (D-02F-4). Sem contexto comercial não
+        // há destinatário, e ninguém a assume (D-02F-5).
         $question = ProductQuestion::create([
             'product_id' => $product->id,
+            'product_offer_id' => $product->offers()->sole()->id,
             'user_id' => User::factory()->create()->id,
             'question' => 'Tem em outra cor?',
         ]);
