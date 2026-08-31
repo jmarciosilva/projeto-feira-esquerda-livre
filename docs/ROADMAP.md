@@ -2282,7 +2282,7 @@ a identidade que o outro exibe — dívida D-2, registrada em teste.
 | CAT-DOM-02A — Correções de inconsistência pré-domínio | ✅ Concluída | Home lendo a oferta, FAQ preservada por omissão, painéis contando ofertas, nome do expositor no AVA |
 | CAT-DOM-02B — Autoridade, curadoria e conteúdo | ✅ Decisões concluídas | 13 decisões formais, matriz de autoridade e 11 gates de multi-oferta |
 | CAT-DOM-02C — Autoridade de `Product` e fim do write-through | ✅ Concluída | Delegação canônica explícita, `is_active` sob curadoria, espelho comercial encerrado |
-| CAT-DOM-02D — Estrutura de conteúdo por oferta | 📋 **Especificação concluída · implementação não iniciada** | Auditoria, estruturas recomendadas, FKs, backfill em duas execuções e 19 gates de especificação |
+| CAT-DOM-02D — Estrutura de conteúdo por oferta | 🔍 **Implementação concluída · aguardando revisão pré-commit** | 3 migrations aditivas, `product_offer_faqs`, backfill em dois modos, 42 testes novos e o invariante de arquivo físico provado no MySQL real |
 | CAT-DOM-02E…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
 
 A **02A** corrigiu quatro inconsistências que já alcançavam produção no modelo
@@ -2345,18 +2345,18 @@ segunda oferta sobre produto existente.
 Mecanismo da delegação, backfill, matriz de autoridade e gates:
 [`CAT_DOM_02C_AUTORIDADE_PRODUCT_E_WRITE_THROUGH.md`](CAT_DOM_02C_AUTORIDADE_PRODUCT_E_WRITE_THROUGH.md).
 
-**CAT-DOM-02D — especificação concluída, implementação não iniciada.** A fase
-seguinte cria o lugar do conteúdo que pertence ao expositor: imagem da oferta,
-FAQ da oferta e contexto de oferta nas perguntas. A auditoria que a especifica
-está feita; **nenhuma migration, model, controller ou teste foi escrito**.
+**CAT-DOM-02D — implementação concluída, aguardando revisão pré-commit.** A fase
+criou o lugar do conteúdo que pertence ao expositor: imagem da oferta, FAQ da
+oferta e contexto de oferta nas perguntas.
 
-O que a auditoria mediu no banco real: **0 FAQs e 0 perguntas** — o backfill
-desses dois custa zero, e essa janela fecha na primeira FAQ escrita e na primeira
-pergunta de cliente. E **75 produtos com exatamente uma imagem cada**, onde
-`thumb`, `medium` e `image_path` apontam para o mesmo arquivo — o que confirma
-que o cenário de arquivo compartilhado não é hipotético.
+O que a auditoria mediu no banco real, e a implementação **remediu** antes de
+escrever: **0 FAQs e 0 perguntas** — o backfill desses dois custa zero, e essa
+janela fecha na primeira FAQ escrita e na primeira pergunta de cliente. E **75
+produtos com exatamente uma imagem cada**, onde `thumb`, `medium` e `image_path`
+apontam para o mesmo arquivo — o que confirma que o cenário de arquivo
+compartilhado não é hipotético.
 
-Estruturas recomendadas: coluna `images` (JSON) em `product_offers`, escolhida
+Estruturas entregues: coluna `images` (JSON) em `product_offers`, escolhida
 por proporcionalidade sobre uma tabela própria — são no máximo quatro imagens sem
 metadado, e há treze pontos de leitura cujo custo de migração a coluna reduz;
 tabela nova `product_offer_faqs`, mantendo `product_faqs` como FAQ canônica e as
@@ -2372,12 +2372,24 @@ nunca compartilham arquivo físico**. `ImageService::delete()` apaga por caminho
 sem contar referências, então path compartilhado faria o lojista apagar a imagem
 do catálogo ao remover a dele.
 
-A 02D entrega estrutura **sem consumidor** — a aplicação continua lendo o lugar
-antigo até a 02E. É o que a torna reversível, e o que obriga duas execuções
+A 02D entrega estrutura **sem consumidor** — a aplicação continua lendo e
+escrevendo no lugar antigo até a 02E, e há teste dedicado que falha se algum
+writer for antecipado. É o que a torna reversível, e o que obriga duas execuções
 distintas do backfill: a **inicial**, que popula sem sobrescrever, e a
 **reconciliação final pré-cutover**, que elimina o que mudou na janela. Uma
 simples reexecução não serve — com a regra "não sobrescrever destino
 preenchido", tudo o que o lojista alterou entre as duas fases ficaria para trás.
+
+O backfill mora no command `catalog:backfill-offer-content`, com os modos
+`--inicial` e `--reconciliar`. A reconciliação **substitui e apaga**, e por isso
+exige `--confirmar-sem-writers-02e`: a premissa que a autoriza não é detectável
+pelo código, então é declarada por quem executa, e a execução não interativa sem
+a flag falha sem escrever nada.
+
+No banco real: **75 ofertas projetadas, 75 arquivos copiados, 0 paths
+compartilhados** entre produto e oferta, 0 arquivos ausentes, `products.images`
+e `product_faqs` intactos. A segunda execução não cria arquivo nenhum. A suíte
+completa passou de 889 para **931 testes, 2657 assertions, zero falhas**.
 
 Duas obrigações ficam registradas para a 02E: a reconciliação destrutiva de
 arquivos é **proibida** depois que o primeiro writer novo entrar em operação; e o
@@ -2391,6 +2403,12 @@ atômico de banco e disco.
 
 Auditoria, alternativas rejeitadas, backfill, invariantes e gates:
 [`CAT_DOM_02D_ESTRUTURA_CONTEUDO_POR_OFERTA.md`](CAT_DOM_02D_ESTRUTURA_CONTEUDO_POR_OFERTA.md).
+Schema final, algoritmos, métricas reais, evidência por gate e pendências das
+próximas fases:
+[`CAT_DOM_02D_IMPLEMENTACAO_E_VALIDACAO.md`](CAT_DOM_02D_IMPLEMENTACAO_E_VALIDACAO.md).
+
+**Multi-oferta continua desabilitada** e a CAT-DOM-02E **não foi iniciada**:
+nenhum writer, reader ou guard de autorização mudou nesta fase.
 
 Decisões, matrizes de autoridade e ciclo de vida, e os gates de multi-oferta:
 [`CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md`](CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md).

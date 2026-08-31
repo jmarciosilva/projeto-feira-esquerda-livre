@@ -724,9 +724,39 @@ compartilhamento fica **dentro da mesma entrada** e as duas morrem juntas
 (§11.1). O que a implementação **não pode** fazer é reaproveitar o arquivo do
 produto.
 
-Nomes de destino devem seguir o padrão do `ImageService` — UUID novo, sufixo
-`_thumb.webp` / `_medium.webp`, mesmo diretório — para que a exclusão e a
+Nomes de destino devem seguir o padrão do `ImageService` — **UUID novo, sufixo
+`_thumb` / `_medium`, mesmo diretório da origem** — para que a exclusão e a
 listagem futuras não precisem distinguir origem.
+
+**A extensão é a do arquivo de origem, e não `.webp` fixa.** A primeira versão
+desta especificação prescrevia `_thumb.webp` / `_medium.webp` por analogia com
+`ImageService::store()`. A analogia não se sustenta, e a inspeção dos arquivos
+reais mostrou por quê: os 75 produtos deste banco referenciam conteúdo **PNG**,
+e o backfill **copia bytes** — não decodifica, não converte, não reencoda.
+
+> **Cópia byte-a-byte não é conversão de formato.** É proibido atribuir extensão
+> `.webp` a conteúdo que permanece codificado como PNG, JPEG ou qualquer outro
+> formato: o servidor anunciaria um `Content-Type` que o arquivo não tem, e o
+> decodificador do cliente receberia um formato diferente do prometido.
+
+`ImageService::store()` pode gravar `.webp` porque de fato **reencoda** o upload
+com o Intervention Image (§7.1). O backfill não faz isso, e por isso não herda a
+extensão — herda o padrão de nomeação.
+
+Se em alguma fase futura a normalização para WebP passar a ser obrigatória, ela
+terá de executar **decodificação e reencodificação reais** da imagem, e será uma
+decisão dessa fase — não um efeito colateral de renomear arquivo. Nada disso
+pertence à 02D.
+
+Regra da fase, então:
+
+```text
+copiar bytes
+→ preservar a extensão da origem
+→ UUID novo, sufixo _thumb / _medium, mesmo diretório
+
+sem jamais compartilhar path físico entre Product e ProductOffer (§17)
+```
 
 ### 16.4 Imagens — reconciliação final pré-cutover
 

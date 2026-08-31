@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A oferta de um expositor sobre um item de catálogo.
@@ -30,6 +31,7 @@ class ProductOffer extends Model
     protected $fillable = [
         'product_id',
         'expositor_id',
+        'images',
         'price',
         'price_type',
         'modality',
@@ -59,6 +61,7 @@ class ProductOffer extends Model
             'has_stock' => 'boolean',
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
+            'images' => 'array',
         ];
     }
 
@@ -70,6 +73,25 @@ class ProductOffer extends Model
     public function expositor(): BelongsTo
     {
         return $this->belongsTo(Expositor::class);
+    }
+
+    /**
+     * A FAQ comercial desta oferta (CAT-DOM-02D).
+     *
+     * Não confundir com `Product::faqs()`, que a partir desta fase significa
+     * FAQ canônica. Nada em runtime lê esta relação ainda — o formulário e a
+     * API continuam escrevendo em `product_faqs` até a 02E. Ela existe porque o
+     * backfill e a verificação de integridade precisam dela.
+     */
+    public function offerFaqs(): HasMany
+    {
+        return $this->hasMany(ProductOfferFaq::class)->orderBy('sort_order');
+    }
+
+    /** As perguntas feitas nesta oferta (CAT-DOM-02D). */
+    public function questions(): HasMany
+    {
+        return $this->hasMany(ProductQuestion::class);
     }
 
     protected static function booted(): void

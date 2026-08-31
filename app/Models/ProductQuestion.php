@@ -9,6 +9,7 @@ class ProductQuestion extends Model
 {
     protected $fillable = [
         'product_id',
+        'product_offer_id',
         'user_id',
         'question',
         'answer',
@@ -28,6 +29,19 @@ class ProductQuestion extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * A oferta em que a pergunta foi feita (CAT-DOM-02D).
+     *
+     * Nula em linha legada e em pergunta cuja oferta foi removida — a FK é
+     * `SET NULL`, porque a pergunta é conteúdo do cliente e sobrevive à saída
+     * do expositor. `product_id` continua sendo o agrupamento canônico, e uma
+     * coluna não substitui a outra (D-CAT-17).
+     */
+    public function productOffer(): BelongsTo
+    {
+        return $this->belongsTo(ProductOffer::class);
     }
 
     public function user(): BelongsTo
