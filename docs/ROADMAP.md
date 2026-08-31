@@ -2286,8 +2286,8 @@ a identidade que o outro exibe — dívida D-2, registrada em teste.
 | CAT-DOM-02E — Writers, readers e cutover | ✅ Concluída | Imagem e FAQ comerciais passam a ser da oferta, pergunta ganha destinatário, fallback centralizado e limpeza determinística da FAQ legada |
 | CAT-DOM-02F — Isolamento, autorização e governança | ✅ Concluída | Ownership comercial com definição única na oferta, autoridade de resposta corrigida, isolamento A × B provado |
 | CAT-DOM-02G — Preparação para multi-oferta, AVA e slug | ✅ Concluída | Seleção de oferta determinística, matrícula com oferta de origem, URL sem escolha implícita de vendedor |
-| CAT-DOM-02H — Remoção das colunas legadas de `products` | 🔍 **Implementação concluída · aguardando revisão pré-commit** | Doze espelhos comerciais removidos com prova; `products` de 29 para 17 colunas |
-| CAT-DOM-02I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
+| CAT-DOM-02H — Remoção das colunas legadas de `products` | ✅ Concluída | Doze espelhos comerciais removidos com prova; `products` de 29 para 17 colunas |
+| CAT-DOM-02I — Hardening final e encerramento | 🔍 **Implementação concluída · aguardando revisão pré-commit** | Matriz de invariantes, auditoria de schema em MySQL real e teste transversal antirregressão |
 
 A **02A** corrigiu quatro inconsistências que já alcançavam produção no modelo
 1:1 — entre elas a home ainda lendo `modality` e `duration_min` das colunas
@@ -2616,9 +2616,53 @@ Inventário, matriz de writers/readers, evidência do MySQL, rollback e Decision
 Log D-02H-1 a D-02H-9:
 [`CAT_DOM_02H_REMOCAO_COLUNAS_LEGADAS_PRODUCTS.md`](CAT_DOM_02H_REMOCAO_COLUNAS_LEGADAS_PRODUCTS.md).
 
-**Multi-oferta continua desabilitada e a CAT-DOM-02I não foi iniciada.** Remover
-legado não abre porta nenhuma: o cadastro segue criando uma oferta por produto, e
-o guard da 02F continua recusando terceiros.
+**Multi-oferta continua desabilitada.** Remover legado não abre porta nenhuma: o
+cadastro segue criando uma oferta por produto, e o guard da 02F continua
+recusando terceiros.
+
+**CAT-DOM-02I — implementação concluída, aguardando revisão pré-commit.** A fase
+final não constrói nada: ela **prova, endurece e congela** o que a trilha
+construiu. **Nenhuma migration e nenhuma mudança de código de produção** — e o
+fato de não ter sido preciso corrigir nada é, em si, o resultado que ela buscava.
+
+A auditoria confirmou no MySQL 8.4 real: `products` com **17 colunas**, todas de
+identidade, curadoria, proveniência ou imagem canônica; **zero achados** na busca
+pelos doze espelhos; 16 lotes de migration aplicados e nenhum pendente. Cada
+`ON DELETE` foi conferido contra a decisão que o justifica — `SET NULL` onde o
+histórico precisa sobreviver à saída da loja, `CASCADE` onde o dado é composição
+da oferta.
+
+O gate mais importante fechou de forma **estrutural, e não por vigilância**:
+existe **um único** `ProductOffer::create` em todo o `app/`, dentro do ramo que
+cria o `Product` na mesma transação. Nenhuma assinatura aceita um `product_id`
+existente, e dois vendedores cadastrando o mesmo nome geram dois itens distintos.
+No banco, `UNIQUE(product_id, expositor_id)` é a segunda barreira. Multi-oferta
+não está desabilitada por convenção — está desabilitada por construção.
+
+Todos os usos remanescentes de `products.expositor_id` foram classificados: uma
+escrita de proveniência na criação, duas relações marcadas `@deprecated`, e o
+resto são docblocks explicando por que **não** se usa. As cinco ocorrências de
+`ofertaVigente`/`first()` também: apresentação pública, a definição da relação, e
+duas coleções já escopadas ao próprio expositor. Nenhuma decide de quem se
+compra, de quem se comprou ou quem responde.
+
+O `CatalogoHardeningFinalTest` fixa em asserções curtas as fronteiras que
+atravessam a trilha inteira — as que uma fase futura poderia desfazer sem tocar
+em nenhuma suíte específica. Ele passou na primeira execução, o que é a evidência
+de que os invariantes estavam de fato mantidos.
+
+Matriz de invariantes, auditoria completa, gates I-1 a I-13 e Decision Log
+D-02I-1 a D-02I-10:
+[`CAT_DOM_02I_HARDENING_FINAL_CATALOGO.md`](CAT_DOM_02I_HARDENING_FINAL_CATALOGO.md).
+
+> **CAT-DOM-02 — fundação tecnicamente concluída.** `Product` é identidade,
+> `ProductOffer` é comércio. A declaração de **publicada** depende de commit,
+> push e validação remota.
+
+Ficam registradas como dívidas as governanças sem superfície — curadoria (G-1),
+workflow de proposta e vinculação de oferta a item existente —, a apresentação
+sob multi-oferta e o SEO canônico. Fora de escopo, sem exceção: buy box, ranking,
+seller linking, IA, scoring e similaridade.
 
 Decisões, matrizes de autoridade e ciclo de vida, e os gates de multi-oferta:
 [`CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md`](CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md).
