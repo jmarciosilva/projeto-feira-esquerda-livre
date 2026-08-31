@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\Modality;
 use App\Enums\PriceType;
 use App\Exceptions\OfertaComReservaAtiva;
+use App\Support\PublicUrl;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -92,6 +93,67 @@ class ProductOffer extends Model
     public function questions(): HasMany
     {
         return $this->hasMany(ProductQuestion::class);
+    }
+
+    /**
+     * As imagens a exibir no contexto comercial desta oferta (CAT-DOM-02E).
+     *
+     * A cadeia é **decisão de leitura**, nunca persistência:
+     *
+     * ```text
+     * ProductOffer.images   imagem que o lojista enviou
+     * → Product.images      imagem canônica do item
+     * → Product.image_path  espelho legado do primeiro medium (dívida D-1)
+     * → []                  quem chama decide o placeholder
+     * ```
+     *
+     * O fallback existe porque os 75 itens desta base nasceram antes da 02D e
+     * porque a curadoria pode vir a dar imagem canônica a um item que nenhum
+     * lojista ilustrou. O que ele **não** faz é copiar path para dentro de
+     * `ProductOffer.images`: fallback de leitura que grava vira compartilhamento
+     * de arquivo físico, e é exatamente o que o §17 da 02D proíbe — com
+     * `ImageService::delete()` apagando por caminho e sem contar referências, o
+     * lojista removendo a imagem dele levaria junto a do catálogo.
+     *
+     * @return list<array<string, string>>
+     */
+    public function imagensParaExibicao(): array
+    {
+        $daOferta = $this->images ?? [];
+
+        if ($daOferta !== []) {
+            return $daOferta;
+        }
+
+        $canonicas = $this->product?->images ?? [];
+
+        if ($canonicas !== []) {
+            return $canonicas;
+        }
+
+        $legado = $this->product?->image_path;
+
+        return $legado ? [['thumb' => $legado, 'medium' => $legado]] : [];
+    }
+
+    /**
+     * URL da imagem principal para exibição comercial.
+     *
+     * `$tamanho` aceita `medium` (detalhe) ou `thumb` (listagem); a outra chave
+     * serve de reserva quando a entrada só tem uma das duas.
+     */
+    public function urlDaImagemPrincipal(string $tamanho = 'medium'): ?string
+    {
+        $primeira = $this->imagensParaExibicao()[0] ?? null;
+
+        if ($primeira === null) {
+            return null;
+        }
+
+        $reserva = $tamanho === 'thumb' ? 'medium' : 'thumb';
+        $path = $primeira[$tamanho] ?? $primeira[$reserva] ?? null;
+
+        return $path ? PublicUrl::for($path) : null;
     }
 
     protected static function booted(): void

@@ -173,10 +173,11 @@
                     </p>
                     @foreach($storeItems as $item)
                     @php
-                        $imgs  = $item->product?->images ?? [];
-                        $thumb = !empty($imgs[0]['thumb'])
-                            ? \Storage::url($imgs[0]['thumb'])
-                            : ($item->product?->image_path ? \Storage::url($item->product->image_path) : null);
+                        // A imagem do item no carrinho e a da oferta comprada. O
+                        // ultimo ramo cobre a oferta removida depois da compra
+                        // (`product_offer_id` e SET NULL): ai so resta o canonico.
+                        $thumb = $item->offer?->urlDaImagemPrincipal('thumb')
+                            ?? ($item->product?->image_path ? \Storage::url($item->product->image_path) : null);
                     @endphp
                     <div class="flex gap-3 items-center py-2" wire:key="item-{{ $item->id }}">
                         @if($thumb)

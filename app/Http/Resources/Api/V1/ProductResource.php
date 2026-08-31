@@ -55,8 +55,11 @@ class ProductResource extends JsonResource
             'height' => $oferta?->height ? (float) $oferta->height : null,
             'width' => $oferta?->width ? (float) $oferta->width : null,
             'length' => $oferta?->length ? (float) $oferta->length : null,
-            'main_image_url' => $this->main_image_url,
-            'images' => collect($this->images ?? [])->map(fn (array $image) => [
+            // CAT-DOM-02E: o resource ja representa o item **exibido por uma
+            // oferta** — preco, estoque e dimensoes vem dela desde a 01. A
+            // imagem passou a vir do mesmo lugar, com fallback canonico.
+            'main_image_url' => $oferta?->urlDaImagemPrincipal('medium') ?? $this->main_image_url,
+            'images' => collect($oferta?->imagensParaExibicao() ?? [])->map(fn (array $image) => [
                 'thumbnail_url' => isset($image['thumb']) ? PublicUrl::for($image['thumb']) : null,
                 'medium_url' => isset($image['medium']) ? PublicUrl::for($image['medium']) : null,
             ])->values(),
@@ -69,10 +72,16 @@ class ProductResource extends JsonResource
                 'name' => $this->category->name,
                 'slug' => $this->category->slug,
             ] : null),
-            'faqs' => $this->whenLoaded('faqs', fn () => $this->faqs->map(fn ($faq) => [
-                'question' => $faq->question,
-                'answer' => $faq->answer,
-            ])),
+            // A FAQ exposta e a comercial, da oferta. `product_faqs` virou FAQ
+            // canonica na 02E e nao entra aqui — nem misturada, nem como
+            // fallback (D-CAT-16).
+            'faqs' => $this->when(
+                (bool) $oferta?->relationLoaded('offerFaqs'),
+                fn () => $oferta->offerFaqs->map(fn ($faq) => [
+                    'question' => $faq->question,
+                    'answer' => $faq->answer,
+                ]),
+            ),
             'created_at' => $this->created_at,
         ];
     }

@@ -807,8 +807,9 @@
 
                         {{-- Imagem quadrada --}}
                         <div class="aspect-square overflow-hidden">
-                            @if($product->image_path)
-                                <img src="{{ Storage::url($product->image_path) }}"
+                            @php $thumb = $oferta?->urlDaImagemPrincipal('medium'); @endphp
+                            @if($thumb)
+                                <img src="{{ $thumb }}"
                                      alt="{{ $product->name }}"
                                      class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                                      loading="lazy">

@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Expositor;
 use App\Models\Product;
 use App\Models\ProductFaq;
+use App\Models\ProductOfferFaq;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,6 +42,17 @@ class ProductFaqTest extends TestCase
         ]);
     }
 
+    /** A FAQ comercial mora na oferta desde a CAT-DOM-02E. */
+    private function offerFaq(Product $product, string $question, string $answer, int $sortOrder = 0): ProductOfferFaq
+    {
+        return ProductOfferFaq::create([
+            'product_offer_id' => $product->offers()->sole()->id,
+            'question' => $question,
+            'answer' => $answer,
+            'sort_order' => $sortOrder,
+        ]);
+    }
+
     private function makeProduct(Expositor $expositor): Product
     {
         return Product::factory()->create([
@@ -57,6 +69,7 @@ class ProductFaqTest extends TestCase
 
     // ── Model & relation ───────────────────────────────────────────────────────
 
+    /** `Product::faqs()` continua existindo e agora significa FAQ canônica. */
     public function test_product_has_faqs_relation(): void
     {
         $lojista  = $this->makeLojista();
@@ -100,11 +113,15 @@ class ProductFaqTest extends TestCase
             ->set('faqs.0.answer', 'Em até 7 dias úteis.')
             ->call('save');
 
-        $this->assertDatabaseHas('product_faqs', [
-            'product_id' => $product->id,
+        // CAT-DOM-02E: o destino é a oferta do lojista.
+        $this->assertDatabaseHas('product_offer_faqs', [
+            'product_offer_id' => $product->offers()->sole()->id,
             'question'   => 'Qual o prazo de entrega?',
             'answer'     => 'Em até 7 dias úteis.',
         ]);
+
+        // E `product_faqs`, que virou FAQ canônica, não recebe nada.
+        $this->assertDatabaseMissing('product_faqs', ['product_id' => $product->id]);
     }
 
     public function test_empty_faq_items_not_persisted(): void
@@ -147,12 +164,7 @@ class ProductFaqTest extends TestCase
         $expositor = $this->makeExpositor($lojista);
         $product   = $this->makeProduct($expositor);
 
-        ProductFaq::create([
-            'product_id' => $product->id,
-            'question'   => 'Tem garantia?',
-            'answer'     => 'Sim, 30 dias.',
-            'sort_order' => 0,
-        ]);
+        $this->offerFaq($product, 'Tem garantia?', 'Sim, 30 dias.');
 
         Livewire::actingAs($lojista)
             ->test(\App\Livewire\Lojista\Produtos\ProdutoForm::class, ['product' => $product])
@@ -184,12 +196,7 @@ class ProductFaqTest extends TestCase
         $expositor = $this->makeExpositor($lojista);
         $product   = $this->makeProduct($expositor);
 
-        ProductFaq::create([
-            'product_id' => $product->id,
-            'question'   => 'Aceita troca?',
-            'answer'     => 'Sim, em 7 dias.',
-            'sort_order' => 0,
-        ]);
+        $this->offerFaq($product, 'Aceita troca?', 'Sim, em 7 dias.');
 
         $this->get(route('loja.produto', [$expositor->slug, $product->slug]))
              ->assertOk()
@@ -215,12 +222,7 @@ class ProductFaqTest extends TestCase
         $expositor = $this->makeExpositor($lojista);
         $product   = $this->makeProduct($expositor);
 
-        ProductFaq::create([
-            'product_id' => $product->id,
-            'question'   => 'Antiga pergunta',
-            'answer'     => 'Antiga resposta',
-            'sort_order' => 0,
-        ]);
+        $this->offerFaq($product, 'Antiga pergunta', 'Antiga resposta');
 
         Livewire::actingAs($lojista)
             ->test(\App\Livewire\Lojista\Produtos\ProdutoForm::class, ['product' => $product])
@@ -228,7 +230,7 @@ class ProductFaqTest extends TestCase
             ->set('faqs.0.answer', 'Nova resposta')
             ->call('save');
 
-        $this->assertDatabaseMissing('product_faqs', ['question' => 'Antiga pergunta']);
-        $this->assertDatabaseHas('product_faqs', ['question' => 'Nova pergunta']);
+        $this->assertDatabaseMissing('product_offer_faqs', ['question' => 'Antiga pergunta']);
+        $this->assertDatabaseHas('product_offer_faqs', ['question' => 'Nova pergunta']);
     }
 }

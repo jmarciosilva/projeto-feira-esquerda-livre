@@ -132,8 +132,7 @@
                        class="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                         <div class="aspect-square overflow-hidden bg-gray-50">
                             @php
-                                $imgs  = $product->images ?? [];
-                                $thumb = !empty($imgs[0]['thumb']) ? Storage::url($imgs[0]['thumb']) : ($product->image_path ? Storage::url($product->image_path) : null);
+                                $thumb = $offer->urlDaImagemPrincipal('thumb');
                             @endphp
                             @if($thumb)
                             <img src="{{ $thumb }}" alt="{{ $product->name }}"

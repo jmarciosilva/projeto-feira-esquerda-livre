@@ -39,6 +39,7 @@ class BackfillOfferContent extends Command
     protected $signature = 'catalog:backfill-offer-content
         {--inicial : Popula o destino vazio sem sobrescrever nada (execução da CAT-DOM-02D)}
         {--reconciliar : Sincroniza o destino com a origem legada, substituindo e apagando (pré-cutover da 02E)}
+        {--limpar-faq-legada : Passo 6 do cutover — remove de product_faqs a FAQ comercial já migrada, e só ela}
         {--confirmar-sem-writers-02e : Declara que nenhum writer da CAT-DOM-02E foi habilitado; obrigatório em --reconciliar}
         {--simular : Apenas mede e relata, sem escrever no banco nem no disco}';
 
@@ -48,15 +49,26 @@ class BackfillOfferContent extends Command
     {
         $inicial = (bool) $this->option('inicial');
         $reconciliar = (bool) $this->option('reconciliar');
+        $limpar = (bool) $this->option('limpar-faq-legada');
+        $simular = (bool) $this->option('simular');
+
+        if ($limpar) {
+            if ($inicial || $reconciliar) {
+                $this->error('--limpar-faq-legada é um passo próprio do cutover e não se combina com os modos de backfill.');
+
+                return self::INVALID;
+            }
+
+            return $this->limparFaqLegada($backfill, $simular);
+        }
 
         if ($inicial === $reconciliar) {
-            $this->error('Escolha exatamente um modo: --inicial ou --reconciliar.');
+            $this->error('Escolha exatamente um modo: --inicial, --reconciliar ou --limpar-faq-legada.');
 
             return self::INVALID;
         }
 
         $modo = $reconciliar ? BackfillAction::MODO_RECONCILIAR : BackfillAction::MODO_INICIAL;
-        $simular = (bool) $this->option('simular');
 
         if ($reconciliar && ! $simular && ! $this->confirmarAusenciaDeWriters()) {
             return self::FAILURE;
@@ -83,6 +95,44 @@ class BackfillOfferContent extends Command
 
         $this->newLine();
         $this->info('Integridade verificada.');
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Passo 6 do cutover: `product_faqs` volta a significar só FAQ canônica.
+     *
+     * Roda **depois** de a reconciliação ter fechado a paridade — antes disso,
+     * apagar a origem destruiria conteúdo que ainda não chegou ao destino. Por
+     * isso o comando confere a paridade primeiro e se recusa a limpar se ela
+     * não fechar.
+     */
+    private function limparFaqLegada(BackfillAction $backfill, bool $simular): int
+    {
+        $divergencias = $backfill->divergenciasDeFaq();
+
+        if ($divergencias !== []) {
+            foreach ($divergencias as $divergencia) {
+                $this->error("FAQ sem paridade: {$divergencia}");
+            }
+
+            $this->error('A limpeza exige paridade fechada. Rode --reconciliar antes; nada foi apagado.');
+
+            return self::FAILURE;
+        }
+
+        $resultado = $backfill->limparFaqComercialLegada($simular);
+
+        $this->info(sprintf(
+            'FAQ comercial legada%s: %d removida(s), %d preservada(s).',
+            $simular ? ' (simulação)' : '',
+            $resultado['removidas'],
+            $resultado['preservadas'],
+        ));
+
+        foreach ($resultado['detalhes'] as $detalhe) {
+            $this->warn($detalhe);
+        }
 
         return self::SUCCESS;
     }

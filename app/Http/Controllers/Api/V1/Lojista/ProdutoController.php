@@ -9,12 +9,13 @@ use App\Http\Requests\Api\V1\Lojista\ProdutoRequest;
 use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Ava\AvaCourse;
 use App\Models\Product;
-use App\Models\ProductFaq;
 use App\Models\ProductOffer;
+use App\Models\ProductOfferFaq;
 use App\Services\ImageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ProdutoController extends Controller
@@ -44,7 +45,8 @@ class ProdutoController extends Controller
     public function show(Request $request, Product $product): ProductResource
     {
         $offer = $this->authorizeProduct($request, $product);
-        $product->load(['category', 'faqs']);
+        $product->load('category');
+        $offer->load('offerFaqs');
 
         return ProductResource::daOferta($offer);
     }
@@ -63,10 +65,11 @@ class ProdutoController extends Controller
             $request->user(),
         );
 
-        $this->syncFaqs($offer->product_id, $request->input('faqs', []));
+        $this->syncFaqs($offer, $request->input('faqs', []));
         $this->syncAvaCourse($offer->product, (bool) ($data['is_digital'] ?? false));
 
-        $offer->product->load(['category', 'faqs']);
+        $offer->product->load('category');
+        $offer->load('offerFaqs');
 
         return ProductResource::daOferta($offer);
     }
@@ -79,7 +82,7 @@ class ProdutoController extends Controller
     {
         $offer = $this->authorizeProduct($request, $product);
 
-        $data = $this->buildData($request, $product->images ?? [], $imageService, $product);
+        $data = $this->buildData($request, $offer->images ?? [], $imageService, $product);
 
         // O ator vai explicito: a autoridade canonica e da pessoa, e a action
         // nao deve ter de adivinha-la a partir da sessao.
@@ -92,10 +95,11 @@ class ProdutoController extends Controller
 
         // Sem default: num update, `faqs` ausente significa "nao mexi nisso",
         // e nao "apague todas". Ver `syncFaqs()`.
-        $this->syncFaqs($offer->product_id, $request->input('faqs'));
+        $this->syncFaqs($offer, $request->input('faqs'));
         $this->syncAvaCourse($offer->product, (bool) ($data['is_digital'] ?? false));
 
-        $offer->product->load(['category', 'faqs']);
+        $offer->product->load('category');
+        $offer->load('offerFaqs');
 
         return ProductResource::daOferta($offer);
     }
@@ -179,8 +183,10 @@ class ProdutoController extends Controller
             'is_featured' => $data['is_featured'] ?? false,
             'is_digital' => $data['is_digital'] ?? false,
             'sort_order' => $data['sort_order'] ?? 0,
+            // Campo da oferta desde a CAT-DOM-02E; `image_path` saiu do payload
+            // porque é espelho legado do medium canônico (D-1), e o que o
+            // lojista envia é a imagem da oferta dele.
             'images' => $images,
-            'image_path' => $images[0]['medium'] ?? $product?->image_path,
         ];
     }
 
@@ -213,28 +219,42 @@ class ProdutoController extends Controller
      * unica escolha reversivel e preservar: o unico pedido inequivoco de apagar
      * e a lista vazia.
      *
+     * ## O destino mudou na CAT-DOM-02E
+     *
+     * A FAQ que o lojista escreve e da **oferta** dele, e vai para
+     * `product_offer_faqs`. `product_faqs` passou a significar FAQ canonica e
+     * nao e mais escrita por aqui: povoa-la a partir do formulario do vendedor
+     * faria a plataforma afirmar como verdade do catalogo o que e resposta de
+     * um comerciante (D-CAT-16, D-CAT-18).
+     *
+     * A transacao e nova e necessaria: `product_offer_faqs` tem
+     * `UNIQUE(product_offer_id, sort_order)`, e um conjunto meio apagado
+     * deixaria a proxima insercao colidindo.
+     *
      * @param  array<int, array{question?: string, answer?: string}>|null  $faqs
      */
-    private function syncFaqs(int $productId, ?array $faqs): void
+    private function syncFaqs(ProductOffer $offer, ?array $faqs): void
     {
         if ($faqs === null) {
             return;
         }
-
-        ProductFaq::where('product_id', $productId)->delete();
 
         $valid = array_values(array_filter(
             $faqs,
             fn ($f) => ! empty(trim($f['question'] ?? '')) && ! empty(trim($f['answer'] ?? ''))
         ));
 
-        foreach ($valid as $i => $faq) {
-            ProductFaq::create([
-                'product_id' => $productId,
-                'question' => trim($faq['question']),
-                'answer' => trim($faq['answer']),
-                'sort_order' => $i,
-            ]);
-        }
+        DB::transaction(function () use ($offer, $valid) {
+            ProductOfferFaq::where('product_offer_id', $offer->id)->delete();
+
+            foreach ($valid as $i => $faq) {
+                ProductOfferFaq::create([
+                    'product_offer_id' => $offer->id,
+                    'question' => trim($faq['question']),
+                    'answer' => trim($faq['answer']),
+                    'sort_order' => $i,
+                ]);
+            }
+        });
     }
 }

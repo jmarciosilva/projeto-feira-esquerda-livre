@@ -59,8 +59,9 @@
                     <tr class="hover:bg-gray-50 transition-colors">
                         <td class="py-4 px-4">
                             <div class="flex items-center gap-3">
-                                @if($product->main_image_url)
-                                <img src="{{ $product->main_image_url }}" alt="{{ $product->name }}"
+                                @php $thumb = $offer->urlDaImagemPrincipal('thumb'); @endphp
+                                @if($thumb)
+                                <img src="{{ $thumb }}" alt="{{ $product->name }}"
                                      class="w-14 h-14 rounded-xl object-cover flex-shrink-0 border border-gray-100">
                                 @else
                                 @php

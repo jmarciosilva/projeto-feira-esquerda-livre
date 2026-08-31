@@ -44,6 +44,15 @@ use Illuminate\Validation\ValidationException;
  * **Alterar a identidade do item passou a exigir autoridade.** Não basta ter
  * uma oferta sobre ele: é preciso curadoria ou delegação declarada (D-CAT-09).
  * A verificação vive na `ProductPolicy`, e aqui só se pergunta por ela.
+ *
+ * ## O que a CAT-DOM-02E mudou
+ *
+ * **A imagem trocou de lado.** `images` saiu de `CAMPOS_DO_PRODUTO` e entrou em
+ * `CAMPOS_DA_OFERTA`; `image_path` saiu e não foi substituído. O que o lojista
+ * envia é a imagem da **oferta dele**, e é lá que ela passa a ser gravada. As
+ * duas colunas de `products` continuam existindo como imagem canônica do item
+ * — o que acabou foi a escrita comercial sobre elas, exatamente como a 02C fez
+ * com os doze espelhos de preço e estoque.
  */
 final class SaveProductWithOffer
 {
@@ -59,8 +68,6 @@ final class SaveProductWithOffer
         'description',
         'category_id',
         'is_digital',
-        'images',
-        'image_path',
     ];
 
     /**
@@ -71,6 +78,7 @@ final class SaveProductWithOffer
      * quem vende.
      */
     public const CAMPOS_DA_OFERTA = [
+        'images',
         'price',
         'price_type',
         'modality',
@@ -294,10 +302,17 @@ final class SaveProductWithOffer
      * muda é o painel Livewire passar a fazer o mesmo, encerrando uma
      * divergência entre os dois canais.
      *
-     * `images` e `image_path` seguem sendo gravados como antes, sem exigir
-     * autoridade: o desdobramento em imagem canônica e imagem da oferta é a
-     * CAT-DOM-02D, e antecipá-lo aqui trocaria uma dívida conhecida por uma
-     * meia-implementação.
+     * `images` **saiu** desta lista na CAT-DOM-02E, e `image_path` saiu junto.
+     * A imagem que o lojista envia é da oferta dele — passou a ser campo de
+     * `CAMPOS_DA_OFERTA`. `products.images` e `products.image_path` continuam
+     * existindo como **imagem canônica do item**, e deixaram de receber
+     * write-through comercial: quem os povoa é a curadoria, e a superfície
+     * dela ainda não existe (dívida G-1). Enquanto não existir, um item novo
+     * nasce sem imagem canônica e o contexto comercial lê a da oferta.
+     *
+     * Consequência boa e deliberada: trocar a imagem deixou de contar como
+     * mudança canônica, então o lojista sem delegação pode mexer na foto da
+     * própria oferta — que é dele — sem esbarrar na `SemAutoridadeCanonica`.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>

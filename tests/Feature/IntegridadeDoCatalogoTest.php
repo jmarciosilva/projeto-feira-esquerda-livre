@@ -12,8 +12,8 @@ use App\Models\Ava\AvaCourse;
 use App\Models\Ava\AvaEnrollment;
 use App\Models\Expositor;
 use App\Models\Product;
-use App\Models\ProductFaq;
 use App\Models\ProductOffer;
+use App\Models\ProductOfferFaq;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -196,8 +196,10 @@ class IntegridadeDoCatalogoTest extends TestCase
             'slug' => 'bolsa-de-palha-'.(++self::$contador),
         ]);
 
-        ProductFaq::create([
-            'product_id' => $product->id,
+        // CAT-DOM-02E: a FAQ que a API escreve e le e a da oferta.
+        // `product_faqs` virou FAQ canonica e nao participa mais deste fluxo.
+        ProductOfferFaq::create([
+            'product_offer_id' => $product->offers()->sole()->id,
             'question' => 'Qual a origem da palha?',
             'answer' => 'Colhida e trançada aqui mesmo.',
             'sort_order' => 0,
@@ -226,9 +228,9 @@ class IntegridadeDoCatalogoTest extends TestCase
         $this->putJson("/api/v1/lojista/produtos/{$product->id}", $this->payloadDeUpdate())
             ->assertOk();
 
-        $this->assertDatabaseCount('product_faqs', 1);
-        $this->assertDatabaseHas('product_faqs', [
-            'product_id' => $product->id,
+        $this->assertDatabaseCount('product_offer_faqs', 1);
+        $this->assertDatabaseHas('product_offer_faqs', [
+            'product_offer_id' => $product->offers()->sole()->id,
             'question' => 'Qual a origem da palha?',
         ]);
     }
@@ -243,7 +245,7 @@ class IntegridadeDoCatalogoTest extends TestCase
             'faqs' => [],
         ]))->assertOk();
 
-        $this->assertDatabaseCount('product_faqs', 0);
+        $this->assertDatabaseCount('product_offer_faqs', 0);
     }
 
     public function test_update_com_nova_lista_substitui_as_perguntas(): void
@@ -258,9 +260,12 @@ class IntegridadeDoCatalogoTest extends TestCase
             ],
         ]))->assertOk();
 
-        $this->assertDatabaseCount('product_faqs', 2);
-        $this->assertDatabaseHas('product_faqs', ['question' => 'Lava na máquina?']);
-        $this->assertDatabaseMissing('product_faqs', ['question' => 'Qual a origem da palha?']);
+        $this->assertDatabaseCount('product_offer_faqs', 2);
+        $this->assertDatabaseHas('product_offer_faqs', ['question' => 'Lava na máquina?']);
+        $this->assertDatabaseMissing('product_offer_faqs', ['question' => 'Qual a origem da palha?']);
+
+        // A FAQ canonica nao e criada por efeito colateral do writer comercial.
+        $this->assertDatabaseCount('product_faqs', 0);
     }
 
     public function test_criar_item_sem_faqs_continua_nascendo_sem_perguntas(): void
@@ -276,6 +281,7 @@ class IntegridadeDoCatalogoTest extends TestCase
             'price' => 70.0,
         ])->assertCreated();
 
+        $this->assertDatabaseCount('product_offer_faqs', 0);
         $this->assertDatabaseCount('product_faqs', 0);
     }
 

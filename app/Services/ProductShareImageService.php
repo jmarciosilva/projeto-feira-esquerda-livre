@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Product;
 use App\Models\ProductOffer;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Drivers\Gd\Driver;
@@ -37,7 +36,7 @@ class ProductShareImageService
             $rectangle->background('#F4E294');
         });
 
-        if ($imagePath = $this->productImagePath($product)) {
+        if ($imagePath = $this->productImagePath($offer)) {
             $image = $this->manager->read(Storage::disk('public')->path($imagePath))->cover(900, 560);
             $canvas->place($image, 'top-left', 90, 190);
         } else {
@@ -81,11 +80,13 @@ class ProductShareImageService
         return $canvas->toPng()->toString();
     }
 
-    private function productImagePath(Product $product): ?string
+    private function productImagePath(ProductOffer $offer): ?string
     {
-        $images = $product->images ?? [];
+        // CAT-DOM-02E: o card compartilhado e da oferta, e a resolucao com
+        // fallback canonico mora num lugar so.
+        $images = $offer->imagensParaExibicao();
 
-        return $images[0]['medium'] ?? $images[0]['thumb'] ?? $product->image_path;
+        return $images[0]['medium'] ?? $images[0]['thumb'] ?? null;
     }
 
     private function fontPath(string $name): string

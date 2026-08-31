@@ -22,14 +22,20 @@
             $course     = $enrollment->course;
             $accessible = $enrollment->isAccessible();
             $percent    = (int) $enrollment->completion_percent;
+            // CAT-DOM-02E: a matricula nao guarda qual oferta foi comprada — o
+            // vinculo nao existe e cria-lo seria redesenhar o AVA, fora desta
+            // fase. Para a capa, a oferta vigente basta: e ilustracao do item,
+            // nao afirmacao sobre quem vendeu.
+            $capa = $product->ofertaVigente?->urlDaImagemPrincipal('medium')
+                ?? ($product->image_path ? Storage::url($product->image_path) : null);
         @endphp
 
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
 
             {{-- Thumb --}}
             <div class="h-36 w-full flex items-center justify-center" style="background:#F4E294;">
-                @if($product->image_path)
-                    <img src="{{ Storage::url($product->image_path) }}" alt="{{ $product->name }}"
+                @if($capa)
+                    <img src="{{ $capa }}" alt="{{ $product->name }}"
                          class="h-full w-full object-cover">
                 @else
                     <svg class="w-12 h-12 opacity-40" fill="none" stroke="#3D3000" viewBox="0 0 24 24">

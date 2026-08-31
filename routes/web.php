@@ -465,7 +465,7 @@ Route::get('/loja/{slug}/{productSlug}', function (string $slug, string $product
     $offer = ProductOffer::whereHas('product', fn ($q) => $q->where('slug', $productSlug))
         ->where('expositor_id', $expositor->id)
         ->vigente()
-        ->with('product.faqs')
+        ->with(['product', 'offerFaqs'])
         ->firstOrFail();
 
     $product = $offer->product;

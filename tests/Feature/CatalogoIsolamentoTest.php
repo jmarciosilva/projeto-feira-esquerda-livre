@@ -73,14 +73,24 @@ class CatalogoIsolamentoTest extends TestCase
         ], $overrides));
     }
 
+    /**
+     * Item com duas imagens comerciais.
+     *
+     * Desde a CAT-DOM-02E elas moram na **oferta**: `products.images` é a
+     * imagem canônica do catálogo e não recebe mais o que o lojista envia.
+     */
     private function withImages(Expositor $expositor): Product
     {
-        return $this->makeProduct($expositor, [
+        $product = $this->makeProduct($expositor);
+
+        $product->offers()->sole()->update([
             'images' => [
                 ['thumb' => 'products/a-thumb.webp', 'medium' => 'products/a-medium.webp'],
                 ['thumb' => 'products/b-thumb.webp', 'medium' => 'products/b-medium.webp'],
             ],
         ]);
+
+        return $product->fresh();
     }
 
     /**
@@ -154,7 +164,7 @@ class CatalogoIsolamentoTest extends TestCase
             ->test(ProdutoForm::class, ['product' => $product])
             ->call('removeImage', 0);
 
-        $this->assertCount(1, $product->fresh()->images);
+        $this->assertCount(1, $product->offers()->sole()->fresh()->images);
     }
 
     public function test_owner_edits_own_faq(): void
@@ -167,8 +177,8 @@ class CatalogoIsolamentoTest extends TestCase
             ->set('faqs', [['question' => 'Qual o material?', 'answer' => 'Algodão informado pelo lojista.']])
             ->call('save');
 
-        $this->assertDatabaseHas('product_faqs', [
-            'product_id' => $product->id,
+        $this->assertDatabaseHas('product_offer_faqs', [
+            'product_offer_id' => $product->offers()->sole()->id,
             'question' => 'Qual o material?',
         ]);
     }
@@ -266,7 +276,7 @@ class CatalogoIsolamentoTest extends TestCase
             ->test(ProdutoForm::class, ['product' => $product])
             ->assertForbidden();
 
-        $this->assertCount(2, $product->fresh()->images);
+        $this->assertCount(2, $product->offers()->sole()->fresh()->images);
     }
 
     // ── FAQ alheia ────────────────────────────────────────────────────────────

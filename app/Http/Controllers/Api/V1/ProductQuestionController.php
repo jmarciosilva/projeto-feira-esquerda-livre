@@ -23,11 +23,18 @@ class ProductQuestionController extends Controller
         return ProductQuestionResource::collection($questions);
     }
 
-    /** POST /api/v1/produtos/{product}/perguntas */
+    /**
+     * POST /api/v1/produtos/{product}/perguntas
+     *
+     * A oferta vem do request (`product_offer_id`, opcional) ou da cardinalidade
+     * determinística. Quando nenhuma das duas resolve, o `FormRequest` já
+     * recusou com 422 — este método nunca escolhe uma oferta por conta própria.
+     */
     public function store(StoreProductQuestionRequest $request, Product $product): ProductQuestionResource
     {
         $question = ProductQuestion::create([
             'product_id' => $product->id,
+            'product_offer_id' => $request->resolverOferta()?->id,
             'user_id' => $request->user()->id,
             'question' => $request->validated('question'),
         ]);

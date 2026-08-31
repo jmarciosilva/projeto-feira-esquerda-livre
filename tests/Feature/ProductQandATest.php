@@ -73,8 +73,10 @@ class ProductQandATest extends TestCase
         $product  = $this->makeProduct($expositor);
         $cliente  = $this->makeCliente();
 
+        $offer = $product->offers()->sole();
+
         Livewire::actingAs($cliente)
-            ->test(ProductQandA::class, ['product' => $product])
+            ->test(ProductQandA::class, ['product' => $product, 'offer' => $offer])
             ->set('question', 'Qual o prazo de entrega para SP?')
             ->call('submit')
             ->assertSet('submitted', true)
@@ -82,10 +84,35 @@ class ProductQandATest extends TestCase
 
         $this->assertDatabaseHas('product_questions', [
             'product_id' => $product->id,
+            // CAT-DOM-02E: a pergunta guarda a oferta onde foi feita — quem
+            // responde é o lojista dela.
+            'product_offer_id' => $offer->id,
             'user_id'    => $cliente->id,
             'question'   => 'Qual o prazo de entrega para SP?',
             'answer'     => null,
         ]);
+    }
+
+    /**
+     * Sem contexto comercial não se registra pergunta.
+     *
+     * Recusar é o comportamento certo: escolher uma oferta por conveniência
+     * mandaria o cliente falar com um vendedor que ele não escolheu.
+     */
+    public function test_pergunta_sem_contexto_de_oferta_e_recusada(): void
+    {
+        $lojista = $this->makeLojista();
+        $expositor = $this->makeExpositor($lojista);
+        $product = $this->makeProduct($expositor);
+        $cliente = $this->makeCliente();
+
+        Livewire::actingAs($cliente)
+            ->test(ProductQandA::class, ['product' => $product])
+            ->set('question', 'Qual o prazo de entrega para SP?')
+            ->call('submit')
+            ->assertStatus(422);
+
+        $this->assertDatabaseCount('product_questions', 0);
     }
 
     public function test_question_requires_minimum_5_chars(): void

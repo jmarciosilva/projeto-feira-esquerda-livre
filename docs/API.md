@@ -80,10 +80,29 @@ Lojistas **não se cadastram** por aqui — a conta é criada quando a administr
 | POST | `/contato` | Mesmo fluxo do formulário de contato do site, sem sair do app. Body: `name, email, phone?, subject, message` |
 | POST | `/seja-um-expositor` | Mesmo fluxo do formulário "Seja um Expositor" do site. Body: `nome_loja, responsavel, cpf_cnpj, whatsapp, email, instagram_url, facebook_url?, pix_tipo, pix_chave, banco_nome?, banco_agencia?, banco_conta?, banco_tipo_conta?, descricao?, eixos?[]` |
 | GET | `/produtos/{id}/perguntas` | Perguntas já respondidas e visíveis |
-| POST | `/produtos/{id}/perguntas` | **Requer login.** Body: `question` (5–500 chars) |
+| POST | `/produtos/{id}/perguntas` | **Requer login.** Body: `question` (5–500 chars) · `product_offer_id` (opcional, ver abaixo) |
 | POST | `/frete/cotacao` | Cotação de frete (mesmo endpoint do checkout web). Body: `store_id, destination_zipcode, items[{product_id, quantity}]` |
 | GET | `/feed` | Publicações visíveis da comunidade (posts dos lojistas), paginado. `liked_by_me` só é calculado quando autenticado |
 | GET | `/feed/{post}/comentarios` | Comentários visíveis de uma publicação |
+
+> **`product_offer_id` — contexto comercial da pergunta (CAT-DOM-02E).**
+> A pergunta passou a registrar **em que oferta foi feita**, porque quem responde
+> é o lojista dela. O campo é **opcional**, e continuará opcional enquanto
+> multi-oferta estiver desabilitada — nenhum cliente existente quebra.
+>
+> ```text
+> informado          → validado contra o produto da rota; de outro produto, 422
+> ausente + 1 oferta → resolvido pela cardinalidade determinística
+> ausente + 0 ou >1  → 422 com erro em `product_offer_id`
+> ```
+>
+> A oferta **nunca** é inferida: nada de primeira oferta, expositor do produto ou
+> oferta mais barata. Quando a aplicação habilitar multi-oferta, uma fase futura
+> pode reavaliar tornar o campo obrigatório.
+>
+> O campo `faqs` do produto passou a trazer a **FAQ da oferta** exibida, e não a
+> FAQ canônica do catálogo; `images` e `main_image_url` seguem a mesma regra,
+> com fallback para a imagem canônica quando a oferta não tem uma.
 
 ---
 

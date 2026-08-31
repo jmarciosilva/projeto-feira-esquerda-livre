@@ -31,12 +31,16 @@
         @php
             $product = $item['product'];
             $course  = $item['course'];
+            // CAT-DOM-02E: a capa do curso e a imagem da oferta deste lojista,
+            // com fallback canonico. `image_path` sozinho deixaria de mostrar
+            // qualquer coisa em item novo, que ja nao recebe write-through.
+            $capa = $item['offer']?->urlDaImagemPrincipal('medium');
         @endphp
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
 
             <div class="h-32 flex items-center justify-center" style="background:#F4E294;">
-                @if($product->image_path)
-                    <img src="{{ Storage::url($product->image_path) }}" alt="{{ $product->name }}"
+                @if($capa)
+                    <img src="{{ $capa }}" alt="{{ $product->name }}"
                          class="h-full w-full object-cover">
                 @else
                     <svg class="w-10 h-10 opacity-40" fill="none" stroke="#3D3000" viewBox="0 0 24 24">

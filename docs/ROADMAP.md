@@ -2282,8 +2282,9 @@ a identidade que o outro exibe — dívida D-2, registrada em teste.
 | CAT-DOM-02A — Correções de inconsistência pré-domínio | ✅ Concluída | Home lendo a oferta, FAQ preservada por omissão, painéis contando ofertas, nome do expositor no AVA |
 | CAT-DOM-02B — Autoridade, curadoria e conteúdo | ✅ Decisões concluídas | 13 decisões formais, matriz de autoridade e 11 gates de multi-oferta |
 | CAT-DOM-02C — Autoridade de `Product` e fim do write-through | ✅ Concluída | Delegação canônica explícita, `is_active` sob curadoria, espelho comercial encerrado |
-| CAT-DOM-02D — Estrutura de conteúdo por oferta | 🔍 **Implementação concluída · aguardando revisão pré-commit** | 3 migrations aditivas, `product_offer_faqs`, backfill em dois modos, 42 testes novos e o invariante de arquivo físico provado no MySQL real |
-| CAT-DOM-02E…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
+| CAT-DOM-02D — Estrutura de conteúdo por oferta | ✅ Concluída | 3 migrations aditivas, `product_offer_faqs`, backfill em dois modos e o invariante de arquivo físico provado no MySQL real |
+| CAT-DOM-02E — Writers, readers e cutover | 🔍 **Implementação concluída · aguardando revisão pré-commit** | Imagem e FAQ comerciais passam a ser da oferta, pergunta ganha destinatário, fallback centralizado e limpeza determinística da FAQ legada |
+| CAT-DOM-02F…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
 
 A **02A** corrigiu quatro inconsistências que já alcançavam produção no modelo
 1:1 — entre elas a home ainda lendo `modality` e `duration_min` das colunas
@@ -2407,8 +2408,58 @@ Schema final, algoritmos, métricas reais, evidência por gate e pendências das
 próximas fases:
 [`CAT_DOM_02D_IMPLEMENTACAO_E_VALIDACAO.md`](CAT_DOM_02D_IMPLEMENTACAO_E_VALIDACAO.md).
 
-**Multi-oferta continua desabilitada** e a CAT-DOM-02E **não foi iniciada**:
-nenhum writer, reader ou guard de autorização mudou nesta fase.
+**Multi-oferta continua desabilitada**: nenhum writer, reader ou guard de
+autorização mudou naquela fase.
+
+**CAT-DOM-02E — implementação concluída, aguardando revisão pré-commit.** A 02D
+respondia *onde o dado mora*; esta fase responde **quem escreve e de onde a
+aplicação lê**. Imagem e FAQ comerciais deixaram de girar em torno de `Product` e
+passaram a girar em torno de `ProductOffer`, e a pergunta do cliente ganhou
+destinatário. **Nenhuma migration** — a estrutura já existia.
+
+A regra que organizou o trabalho não foi "trocar todo `Product.images`", e sim:
+**contexto comercial lê da oferta, contexto canônico continua lendo do produto**.
+Na prática todos os readers vivos são comerciais e todos já tinham a oferta em
+mãos — a rota da loja resolve a oferta pela URL desde a CAT-DOM-01, o carrinho
+tem `product_offer_id` desde a 01C e o `ProductResource` já resolvia preço pela
+oferta. Nenhum ponto precisou inventar uma oferta para poder ler.
+
+`images` saiu de `CAMPOS_DO_PRODUTO` e entrou em `CAMPOS_DA_OFERTA`;
+`image_path` saiu junto e não foi substituído. As duas colunas de `products`
+continuam existindo como imagem canônica — o que acabou foi a escrita comercial
+sobre elas, exatamente como a 02C fez com os doze espelhos de preço e estoque.
+Efeito colateral bem-vindo: trocar a foto deixou de contar como mudança canônica,
+então o lojista sem delegação pode mexer na imagem da própria oferta.
+
+O fallback de leitura — `oferta → canônica → espelho legado → placeholder` — vive
+num lugar só, em `ProductOffer::imagensParaExibicao()`. Ele é **decisão de
+exibição e nunca persistência**: copiar o caminho canônico para dentro de
+`ProductOffer.images` recriaria o compartilhamento de arquivo físico que a 02D
+proibiu, e há teste dedicado a isso. Pela mesma razão, remover a imagem comercial
+só apaga do disco o arquivo que a canônica não referencia.
+
+A FAQ do vendedor foi para `product_offer_faqs` e `product_faqs` passou a
+significar exclusivamente FAQ canônica. A limpeza da FAQ comercial legada é por
+**prova de correspondência**, linha a linha, e nunca um `DELETE` por tabela: a
+tabela não guarda autoria, e apagar em bloco destruiria FAQ canônica legítima.
+
+A pergunta registra a oferta em que foi feita. No storefront ela vem da página,
+que já a resolveu pela URL. Na API, `product_offer_id` entrou como campo
+**opcional** para não quebrar clientes: informado, é validado contra o produto da
+rota; ausente, resolve só quando há exatamente uma oferta; com zero ou mais de
+uma, a requisição é recusada com 422. Nunca `first()`, e nunca `ofertaVigente` —
+que ordena por preço e mandaria o cliente falar com um vendedor que ele não
+escolheu.
+
+No MySQL real: imagem canônica intacta nos 75 registros, **zero paths
+compartilhados**, zero arquivos ausentes, zero FAQ não resolvida.
+
+Auditoria de writers e readers, cutover, métricas e pendências:
+[`CAT_DOM_02E_WRITERS_READERS_E_CUTOVER.md`](CAT_DOM_02E_WRITERS_READERS_E_CUTOVER.md).
+
+**Multi-oferta continua desabilitada e a CAT-DOM-02F não foi iniciada**: nenhum
+guard de autorização mudou, e a suíte de isolamento da SEC-02 passou sem uma
+única expectativa alterada.
 
 Decisões, matrizes de autoridade e ciclo de vida, e os gates de multi-oferta:
 [`CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md`](CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md).

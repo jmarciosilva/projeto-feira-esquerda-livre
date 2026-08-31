@@ -503,6 +503,72 @@ final class BackfillOfferContent
     }
 
     /**
+     * Passo 6 do cutover (CAT-DOM-02E): tira de `product_faqs` a FAQ comercial
+     * que já chegou inteira ao destino.
+     *
+     * A tabela passou a significar **FAQ canônica**. Conteúdo comercial que
+     * sobrevivesse nela viraria afirmação do catálogo por omissão — o mesmo
+     * texto existindo simultaneamente como palavra do vendedor e da plataforma,
+     * que é exatamente o que a D-CAT-16 separou.
+     *
+     * ## Por que não é um `DELETE FROM product_faqs`
+     *
+     * `product_faqs` **não tem autoria**: nada na linha diz se ela foi escrita
+     * por um lojista ou pela curadoria. Apagar por tabela destruiria FAQ
+     * canônica legítima junto com a comercial.
+     *
+     * Então a remoção é por **prova de correspondência**: só sai a linha cujo
+     * par `(question, answer)` existe na FAQ da oferta determinística daquele
+     * produto. O que não tem correspondente **fica**, e é reportado — pode ser
+     * canônica, e na dúvida preserva-se.
+     *
+     * Produto com 0 ou mais de uma oferta não é tocado de forma alguma: sem
+     * destino determinístico não há o que provar.
+     *
+     * @return array{removidas: int, preservadas: int, detalhes: list<string>}
+     */
+    public function limparFaqComercialLegada(bool $simular = false): array
+    {
+        $removidas = 0;
+        $preservadas = 0;
+        $detalhes = [];
+
+        $deterministicos = $this->ofertasDeterministicas()->keyBy('product_id');
+
+        foreach (DB::table('product_faqs')->orderBy('id')->get() as $legada) {
+            $oferta = $deterministicos->get($legada->product_id);
+
+            if ($oferta === null) {
+                $preservadas++;
+                $detalhes[] = "FAQ #{$legada->id}: produto #{$legada->product_id} sem oferta determinística — preservada";
+
+                continue;
+            }
+
+            $temPar = DB::table('product_offer_faqs')
+                ->where('product_offer_id', $oferta->id)
+                ->where('question', $legada->question)
+                ->where('answer', $legada->answer)
+                ->exists();
+
+            if (! $temPar) {
+                $preservadas++;
+                $detalhes[] = "FAQ #{$legada->id}: sem correspondente na oferta #{$oferta->id} — preservada (pode ser canônica)";
+
+                continue;
+            }
+
+            if (! $simular) {
+                DB::table('product_faqs')->where('id', $legada->id)->delete();
+            }
+
+            $removidas++;
+        }
+
+        return ['removidas' => $removidas, 'preservadas' => $preservadas, 'detalhes' => $detalhes];
+    }
+
+    /**
      * Paridade origem × destino da FAQ, exigida antes do cutover da 02E.
      *
      * Comparada **por conteúdo, nunca por chave primária** — os

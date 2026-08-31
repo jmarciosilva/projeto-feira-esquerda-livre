@@ -11,9 +11,10 @@ use App\Livewire\Concerns\ValidatesFileUploads;
 use App\Models\Ava\AvaCourse;
 use App\Models\ContentCategory;
 use App\Models\Product;
-use App\Models\ProductFaq;
 use App\Models\ProductOffer;
+use App\Models\ProductOfferFaq;
 use App\Services\ImageService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -107,7 +108,6 @@ class ProdutoForm extends Component
             $this->description = $product->description ?? '';
             $this->category_id = $product->category_id;
             $this->is_digital = (bool) $product->is_digital;
-            $this->images = $product->images ?? [];
 
             // Daqui para baixo, tudo vem da oferta: é o que este lojista cobra
             // e oferece, não o que o item é.
@@ -126,7 +126,11 @@ class ProdutoForm extends Component
             $this->is_featured = $offer->is_featured;
             $this->sort_order = $offer->sort_order ?? 0;
 
-            $this->faqs = $product->faqs
+            // Imagem e FAQ passaram para a oferta na CAT-DOM-02E. O que este
+            // lojista vê e edita é o conteúdo dele, não o do catálogo.
+            $this->images = $offer->images ?? [];
+
+            $this->faqs = $offer->offerFaqs
                 ->map(fn ($f) => ['question' => $f->question, 'answer' => $f->answer])
                 ->toArray();
         }
@@ -191,14 +195,56 @@ class ProdutoForm extends Component
         // não havia permissão deixaria o estrago feito.
         $this->guardOwnership();
 
-        if (isset($this->images[$index])) {
-            Storage::disk('public')->delete($this->images[$index]['thumb'] ?? '');
-            Storage::disk('public')->delete($this->images[$index]['medium'] ?? '');
-            array_splice($this->images, $index, 1);
-            if ($this->product) {
-                $this->product->update(['images' => array_values($this->images)]);
+        if (! isset($this->images[$index])) {
+            return;
+        }
+
+        $removida = $this->images[$index];
+        array_splice($this->images, $index, 1);
+
+        if ($this->offer) {
+            $this->offer->update(['images' => array_values($this->images)]);
+        }
+
+        // Só os arquivos da oferta saem do disco, e só os que mais nada
+        // referencia. `ImageService::delete()` apaga por caminho e não conta
+        // referências (M-05): com a imagem canônica ainda apontando para o
+        // mesmo arquivo — o que acontece em item cuja oferta nunca teve imagem
+        // própria e vinha exibindo a do catálogo por fallback —, apagar aqui
+        // destruiria a imagem do item para todo mundo.
+        $canonicos = $this->pathsCanonicos();
+
+        foreach (['thumb', 'medium'] as $chave) {
+            $path = $removida[$chave] ?? null;
+
+            if ($path && ! in_array($path, $canonicos, true)) {
+                Storage::disk('public')->delete($path);
             }
         }
+    }
+
+    /**
+     * Todo caminho de arquivo que a imagem canônica do item referencia.
+     *
+     * @return list<string>
+     */
+    private function pathsCanonicos(): array
+    {
+        $paths = [];
+
+        foreach ($this->product?->images ?? [] as $entrada) {
+            foreach (['thumb', 'medium'] as $chave) {
+                if (! empty($entrada[$chave])) {
+                    $paths[] = $entrada[$chave];
+                }
+            }
+        }
+
+        if ($this->product?->image_path) {
+            $paths[] = $this->product->image_path;
+        }
+
+        return $paths;
     }
 
     public function save(ImageService $imageService): void
@@ -272,8 +318,10 @@ class ProdutoForm extends Component
             'is_featured' => $this->is_featured,
             'is_digital' => $this->is_digital,
             'sort_order' => $this->sort_order,
+            // Campo da oferta desde a CAT-DOM-02E. `image_path` saiu do payload
+            // junto: ele é espelho legado do primeiro medium canônico (D-1), e
+            // a imagem que o lojista envia não é canônica.
             'images' => array_values($images),
-            'image_path' => $images[0]['medium'] ?? ($this->product?->image_path),
         ];
 
         $editando = $this->product && $this->product->exists;
@@ -293,7 +341,7 @@ class ProdutoForm extends Component
             return;
         }
 
-        $this->syncFaqs($offer->product_id);
+        $this->syncFaqs($offer);
         $this->syncAvaCourse($offer->product);
 
         if (! $editando) {
@@ -306,7 +354,7 @@ class ProdutoForm extends Component
         $label = ItemType::from($this->item_type)->label();
         session()->flash('success', "{$label} atualizado com sucesso!");
 
-        $this->images = $this->product->fresh()->images ?? [];
+        $this->images = $offer->fresh()->images ?? [];
         $this->upload1 = $this->upload2 = $this->upload3 = $this->upload4 = null;
     }
 
@@ -317,23 +365,38 @@ class ProdutoForm extends Component
         }
     }
 
-    private function syncFaqs(int $productId): void
+    /**
+     * A FAQ que o lojista escreve é da oferta dele (CAT-DOM-02E).
+     *
+     * O destino mudou; a semântica da tela, não: continua sendo substituição
+     * integral do conjunto, com a posição vindo do índice do array. É o mesmo
+     * `delete` + `create` de sempre, agora dentro de uma transação porque
+     * `product_offer_faqs` tem `UNIQUE(product_offer_id, sort_order)` e um
+     * conjunto meio apagado deixaria a próxima inserção colidindo.
+     *
+     * `product_faqs` **não** é tocada: ela passou a significar FAQ canônica, e
+     * povoá-la a partir daqui faria a plataforma afirmar como verdade do
+     * catálogo o que é resposta de um vendedor (D-CAT-16, D-CAT-18).
+     */
+    private function syncFaqs(ProductOffer $offer): void
     {
-        ProductFaq::where('product_id', $productId)->delete();
-
         $valid = array_values(array_filter(
             $this->faqs,
             fn ($f) => ! empty(trim($f['question'] ?? '')) && ! empty(trim($f['answer'] ?? '')),
         ));
 
-        foreach ($valid as $i => $faq) {
-            ProductFaq::create([
-                'product_id' => $productId,
-                'question' => trim($faq['question']),
-                'answer' => trim($faq['answer']),
-                'sort_order' => $i,
-            ]);
-        }
+        DB::transaction(function () use ($offer, $valid) {
+            ProductOfferFaq::where('product_offer_id', $offer->id)->delete();
+
+            foreach ($valid as $i => $faq) {
+                ProductOfferFaq::create([
+                    'product_offer_id' => $offer->id,
+                    'question' => trim($faq['question']),
+                    'answer' => trim($faq['answer']),
+                    'sort_order' => $i,
+                ]);
+            }
+        });
     }
 
     public function render(): View

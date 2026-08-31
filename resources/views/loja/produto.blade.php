@@ -8,10 +8,10 @@
         // CAT-02: o resumo curto é escrito para ser lido fora da página; quando
         // existe, vale mais que a descrição longa cortada no caractere 160.
         $productDescription = Str::limit($product->short_description ?: ($product->description ?? $product->name), 160);
-        $productImages = $product->images ?? [];
-        $productOgImage = ! empty($productImages[0]['medium'])
-            ? Storage::url($productImages[0]['medium'])
-            : ($product->image_path ? Storage::url($product->image_path) : null);
+        // CAT-DOM-02E: esta pagina e a oferta desta loja sobre este item, entao
+        // a imagem vem da oferta, com fallback para a canonica do catalogo.
+        $productImages = $offer->imagensParaExibicao();
+        $productOgImage = $offer->urlDaImagemPrincipal('medium');
         $productOgImage = $productOgImage
             ? url($productOgImage)
             : route('loja.produto.share-preview', [$expositor->slug, $product->slug]);
@@ -81,7 +81,7 @@
             {{-- Galeria --}}
             <div class="p-4 sm:p-6">
                 @php
-                    $imgs = $product->images ?? [];
+                    $imgs = $offer->imagensParaExibicao();
                 @endphp
                 @if(count($imgs))
                 <div class="aspect-square rounded-xl overflow-hidden bg-gray-50 mb-3">
@@ -100,10 +100,6 @@
                     @endforeach
                 </div>
                 @endif
-                @elseif($product->image_path)
-                <div class="aspect-square rounded-xl overflow-hidden bg-gray-50">
-                    <img src="{{ Storage::url($product->image_path) }}" alt="{{ $product->name }}" class="w-full h-full object-cover">
-                </div>
                 @else
                 <div class="aspect-square rounded-xl flex items-center justify-center text-7xl"
                      style="background: linear-gradient(135deg, #F4E294, #E8A000);">🛍</div>
@@ -227,10 +223,14 @@
     </div>
 
     {{-- Q&A --}}
-    <livewire:product-qand-a :product="$product" />
+    <livewire:product-qand-a :product="$product" :offer="$offer" />
 
     {{-- FAQ --}}
-    @php $faqs = $product->faqs; @endphp
+    {{-- CAT-DOM-02E: a FAQ desta pagina e a do vendedor desta oferta.
+         `product_faqs` passou a ser FAQ canonica — afirmacao do catalogo, de
+         outro autor — e nao entra aqui nem como fallback: exibi-la no lugar da
+         resposta do lojista e exatamente a confusao que a D-CAT-16 separou. --}}
+    @php $faqs = $offer->offerFaqs; @endphp
     @if($faqs->isNotEmpty())
     <div class="mt-8">
         <h2 class="text-xl font-bold text-gray-900 mb-4">Perguntas Frequentes</h2>
@@ -275,8 +275,7 @@
                class="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                 <div class="aspect-square overflow-hidden bg-gray-50">
                     @php
-                        $otherImgs = $other->images ?? [];
-                        $otherThumb = !empty($otherImgs[0]['thumb']) ? Storage::url($otherImgs[0]['thumb']) : ($other->image_path ? Storage::url($other->image_path) : null);
+                        $otherThumb = $otherOffer->urlDaImagemPrincipal('thumb');
                     @endphp
                     @if($otherThumb)
                     <img src="{{ $otherThumb }}" alt="{{ $other->name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
