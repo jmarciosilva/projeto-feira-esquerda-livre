@@ -2282,7 +2282,8 @@ a identidade que o outro exibe — dívida D-2, registrada em teste.
 | CAT-DOM-02A — Correções de inconsistência pré-domínio | ✅ Concluída | Home lendo a oferta, FAQ preservada por omissão, painéis contando ofertas, nome do expositor no AVA |
 | CAT-DOM-02B — Autoridade, curadoria e conteúdo | ✅ Decisões concluídas | 13 decisões formais, matriz de autoridade e 11 gates de multi-oferta |
 | CAT-DOM-02C — Autoridade de `Product` e fim do write-through | ✅ Concluída | Delegação canônica explícita, `is_active` sob curadoria, espelho comercial encerrado |
-| CAT-DOM-02D…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
+| CAT-DOM-02D — Estrutura de conteúdo por oferta | 📋 **Especificação concluída · implementação não iniciada** | Auditoria, estruturas recomendadas, FKs, backfill em duas execuções e 19 gates de especificação |
+| CAT-DOM-02E…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
 
 A **02A** corrigiu quatro inconsistências que já alcançavam produção no modelo
 1:1 — entre elas a home ainda lendo `modality` e `duration_min` das colunas
@@ -2341,12 +2342,55 @@ contagem de ofertas, por `expositor_id`, ou reabrir o espelho, quebra os testes.
 Multi-oferta continua **desabilitada**: não há tela nem endpoint que crie uma
 segunda oferta sobre produto existente.
 
-**Próxima etapa:** CAT-DOM-02D — conteúdo por oferta (imagem da oferta, FAQ da
-oferta, contexto de oferta nas perguntas), com migrations aditivas e backfill
-1:1. **Não autorizada.**
-
 Mecanismo da delegação, backfill, matriz de autoridade e gates:
 [`CAT_DOM_02C_AUTORIDADE_PRODUCT_E_WRITE_THROUGH.md`](CAT_DOM_02C_AUTORIDADE_PRODUCT_E_WRITE_THROUGH.md).
+
+**CAT-DOM-02D — especificação concluída, implementação não iniciada.** A fase
+seguinte cria o lugar do conteúdo que pertence ao expositor: imagem da oferta,
+FAQ da oferta e contexto de oferta nas perguntas. A auditoria que a especifica
+está feita; **nenhuma migration, model, controller ou teste foi escrito**.
+
+O que a auditoria mediu no banco real: **0 FAQs e 0 perguntas** — o backfill
+desses dois custa zero, e essa janela fecha na primeira FAQ escrita e na primeira
+pergunta de cliente. E **75 produtos com exatamente uma imagem cada**, onde
+`thumb`, `medium` e `image_path` apontam para o mesmo arquivo — o que confirma
+que o cenário de arquivo compartilhado não é hipotético.
+
+Estruturas recomendadas: coluna `images` (JSON) em `product_offers`, escolhida
+por proporcionalidade sobre uma tabela própria — são no máximo quatro imagens sem
+metadado, e há treze pontos de leitura cujo custo de migração a coluna reduz;
+tabela nova `product_offer_faqs`, mantendo `product_faqs` como FAQ canônica e as
+duas FKs `NOT NULL`; e `product_offer_id` nullable em `product_questions`, ao
+lado do `product_id` que permanece.
+
+Regras de exclusão: **CASCADE** na FAQ da oferta, que é composição dela;
+**SET NULL** nas perguntas, porque são conteúdo do cliente e têm valor histórico
+— o mesmo tratamento que a FIN-SEC-01B deu a `order_items`.
+
+O invariante que a fase não pode perder: **imagem canônica e imagem da oferta
+nunca compartilham arquivo físico**. `ImageService::delete()` apaga por caminho,
+sem contar referências, então path compartilhado faria o lojista apagar a imagem
+do catálogo ao remover a dele.
+
+A 02D entrega estrutura **sem consumidor** — a aplicação continua lendo o lugar
+antigo até a 02E. É o que a torna reversível, e o que obriga duas execuções
+distintas do backfill: a **inicial**, que popula sem sobrescrever, e a
+**reconciliação final pré-cutover**, que elimina o que mudou na janela. Uma
+simples reexecução não serve — com a regra "não sobrescrever destino
+preenchido", tudo o que o lojista alterou entre as duas fases ficaria para trás.
+
+Duas obrigações ficam registradas para a 02E: a reconciliação destrutiva de
+arquivos é **proibida** depois que o primeiro writer novo entrar em operação; e o
+cutover precisa **remover de `product_faqs` a FAQ comercial migrada**, sob pena
+de o mesmo texto passar a existir como afirmação do vendedor e do catálogo ao
+mesmo tempo. FAQ sem oferta determinística bloqueia o cutover.
+
+Migrations fazem **apenas schema**; a cópia de arquivos fica num command
+controlado — o filesystem não participa da transação SQL, e não existe rollback
+atômico de banco e disco.
+
+Auditoria, alternativas rejeitadas, backfill, invariantes e gates:
+[`CAT_DOM_02D_ESTRUTURA_CONTEUDO_POR_OFERTA.md`](CAT_DOM_02D_ESTRUTURA_CONTEUDO_POR_OFERTA.md).
 
 Decisões, matrizes de autoridade e ciclo de vida, e os gates de multi-oferta:
 [`CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md`](CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md).
