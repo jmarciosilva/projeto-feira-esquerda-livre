@@ -110,12 +110,17 @@ class IntegridadeDoCatalogoTest extends TestCase
      *
      * @param  array<string, mixed>  $valores
      */
-    private function envelhecerEspelho(ProductOffer $offer, array $valores): void
-    {
-        DB::table('products')->where('id', $offer->product_id)->update($valores);
-    }
-
     // ─── 02A-1 — a home le a oferta, nunca o espelho ────────────────────────
+    //
+    // Ate a CAT-DOM-02G estes tres testes provavam a regra construindo a
+    // divergencia: gravavam um valor diferente no espelho de `products` e
+    // exigiam que a home mostrasse o da oferta. A CAT-DOM-02H removeu essas
+    // colunas, e com elas a possibilidade de divergir — o helper que
+    // envelhecia o espelho nao tem mais onde escrever.
+    //
+    // Os testes continuam valendo pelo que sempre provaram de fato: a home
+    // imprime o que a OFERTA diz, e omite quando a oferta nao diz nada. O que
+    // se perdeu foi a encenacao do erro, que agora e impossivel por schema.
 
     public function test_home_mostra_a_modalidade_da_oferta_e_nao_a_do_espelho_legado(): void
     {
@@ -124,10 +129,6 @@ class IntegridadeDoCatalogoTest extends TestCase
         foreach ([ItemType::Servico, ItemType::Cuidado] as $eixo) {
             $offer = $this->makeDestaque($expositor, $eixo);
             $offer->update(['modality' => Modality::Online]);
-
-            // O espelho fica dizendo outra coisa. Se a home o estivesse lendo,
-            // ela imprimiria "Presencial e Online".
-            $this->envelhecerEspelho($offer, ['modality' => Modality::Ambos->value]);
         }
 
         $response = $this->get('/');
@@ -147,11 +148,6 @@ class IntegridadeDoCatalogoTest extends TestCase
             // A badge de duracao so aparece junto da modalidade, e essa regra
             // de UI nao muda nesta fase: o teste preenche as duas.
             $offer->update(['modality' => Modality::Online, 'duration_min' => 90]);
-
-            $this->envelhecerEspelho($offer, [
-                'modality' => Modality::Online->value,
-                'duration_min' => 45,
-            ]);
         }
 
         $response = $this->get('/');
@@ -168,12 +164,7 @@ class IntegridadeDoCatalogoTest extends TestCase
         $offer = $this->makeDestaque($expositor, ItemType::Servico);
         $offer->update(['modality' => null, 'duration_min' => null]);
 
-        // Ausencia na oferta e ausencia na tela. Cair no espelho para "ter algo
-        // a mostrar" seria reintroduzir o leitor legado por outro caminho.
-        $this->envelhecerEspelho($offer, [
-            'modality' => Modality::Presencial->value,
-            'duration_min' => 90,
-        ]);
+        // Ausencia na oferta e ausencia na tela.
 
         $response = $this->get('/');
 

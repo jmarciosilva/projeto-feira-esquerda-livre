@@ -99,6 +99,14 @@ class ProductFactory extends Factory
                 // lá ele é validade canônica (D-CAT-10), e roteá-lo para a
                 // oferta faria `->create(['is_active' => false])` significar
                 // uma coisa na chamada e outra no banco.
+                //
+                // A CAT-DOM-02H removeu essas colunas de `products`, e este
+                // bloco continua sendo o que faz o açúcar de entrada funcionar:
+                // as factories gravam dentro de `Model::unguarded()`, então o
+                // `$fillable` limpo do modelo não filtra nada aqui — os valores
+                // chegam, são retirados antes da gravação e vão para a oferta.
+                // Sem este passo, `create(['price' => 120])` tentaria escrever
+                // numa coluna que não existe mais.
                 $comerciais = Arr::only(
                     $product->getAttributes(),
                     SaveProductWithOffer::ESPELHOS_COMERCIAIS_LEGADOS,

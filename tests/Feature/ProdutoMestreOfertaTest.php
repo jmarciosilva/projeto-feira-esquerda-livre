@@ -356,8 +356,6 @@ class ProdutoMestreOfertaTest extends TestCase
         ['user' => $user, 'expositor' => $expositor] = $this->makeLojista();
         $offer = $this->makeItem($expositor, ['item_type' => 'produto'], ['price' => 10]);
 
-        $precoLegadoAntes = $offer->product->getAttributes()['price'];
-
         Livewire::actingAs($user)
             ->test(ProdutoForm::class, ['product' => $offer->product])
             ->set('price', '77.50')
@@ -371,10 +369,11 @@ class ProdutoMestreOfertaTest extends TestCase
         $this->assertSame('77.50', $offer->price);
         $this->assertSame(3, $offer->stock_quantity);
 
-        // As colunas legadas continuam fisicamente em `products` — removê-las é
-        // a CAT-DOM-02H —, mas ninguém mais as escreve.
-        $this->assertSame($precoLegadoAntes, $legado['price']);
-        $this->assertNotSame('77.50', $legado['price']);
+        // As colunas legadas sairam de `products` na CAT-DOM-02H. Ate la o
+        // teste comparava o valor legado antes e depois do salvamento; agora a
+        // garantia e estrutural — nao ha coluna para um writer reencontrar.
+        $this->assertArrayNotHasKey('price', $legado);
+        $this->assertArrayNotHasKey('stock_quantity', $legado);
     }
 
     /**

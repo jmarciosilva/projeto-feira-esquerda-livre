@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Catalog\SaveProductWithOffer;
 use App\Enums\ItemType;
 use App\Enums\UserRole;
 use App\Livewire\Lojista\Produtos\ProdutoForm;
@@ -13,6 +14,7 @@ use App\Models\User;
 use Database\Seeders\Concerns\SincronizaOfertaDoItem;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -35,9 +37,12 @@ use Tests\TestCase;
  * pertence à curadoria; `product_offers.is_active` é disponibilidade comercial
  * e continua sendo do lojista.
  *
- * A terceira prova que o espelho legado morreu — as **doze** colunas comerciais
- * continuam em `products`, e ninguém mais as escreve. `products.is_active` não
- * é uma delas: é validade canônica, e permanece como coluna legítima.
+ * A terceira provava que o espelho legado morrera — as doze colunas comerciais
+ * continuavam em `products` e ninguém mais as escrevia. Na **CAT-DOM-02H** elas
+ * foram removidas do schema, e a prova mudou de natureza: não se verifica mais
+ * que a coluna ficou intacta, e sim que ela **não existe** e que o valor foi
+ * inteiro para a oferta. `products.is_active` nunca foi uma delas — é validade
+ * canônica, e permanece como coluna legítima.
  */
 class AutoridadeCanonicaTest extends TestCase
 {
@@ -333,21 +338,23 @@ class AutoridadeCanonicaTest extends TestCase
         ['user' => $user, 'expositor' => $expositor] = $this->makeLojista();
         $offer = $this->makeItem($expositor);
 
-        $legadoAntes = $offer->product->getAttributes()[$campo];
-
         Livewire::actingAs($user)
             ->test(ProdutoForm::class, ['product' => $offer->product])
             ->set($setter, $valor)
             ->call('save');
 
-        $depois = $offer->product->fresh()->getAttributes();
-
+        // A oferta recebeu o valor.
         $this->assertNotNull($offer->fresh()->{$campo});
-        $this->assertSame(
-            $legadoAntes,
-            $depois[$campo],
-            "A coluna legada products.{$campo} voltou a ser escrita.",
+
+        // E `products` nao tem onde recebe-lo: a coluna saiu na CAT-DOM-02H.
+        // Antes desta fase o teste comparava o valor legado antes e depois do
+        // salvamento; agora a garantia e estrutural, e mais forte — nao ha mais
+        // coluna para um writer futuro reencontrar.
+        $this->assertFalse(
+            Schema::hasColumn('products', $campo),
+            "A coluna legada products.{$campo} voltou a existir.",
         );
+        $this->assertArrayNotHasKey($campo, $offer->product->fresh()->getAttributes());
     }
 
     /** @return array<string, array{0: string, 1: mixed, 2: string}> */
@@ -362,17 +369,16 @@ class AutoridadeCanonicaTest extends TestCase
     }
 
     /**
-     * Os espelhos comerciais anuláveis, um a um, na criação real.
+     * Os doze espelhos comerciais, um a um, na criação real.
      *
-     * São nove dos doze. Os outros três — `has_stock`, `is_featured` e
-     * `sort_order` — são `NOT NULL` com default no schema e não podem ser
-     * verificados por `assertNull`; eles são cobertos por
-     * `test_campo_comercial_e_gravado_so_na_oferta`, que compara o valor legado
-     * antes e depois do salvamento.
+     * Até a CAT-DOM-02G este teste percorria só os nove anuláveis, porque os
+     * outros três — `has_stock`, `is_featured` e `sort_order` — eram `NOT NULL`
+     * com default e não podiam ser verificados por `assertNull`. Com as colunas
+     * removidas na 02H a distinção deixou de existir: nenhuma delas tem default
+     * a confundir, porque nenhuma delas existe.
      *
-     * `is_active` **não** está em nenhuma das duas listas: ele é validade
-     * canônica do item (D-CAT-10), não espelho comercial, e continua sendo uma
-     * coluna legítima de `products` que a CAT-DOM-02H não remove.
+     * `is_active` continua fora da lista: é validade canônica do item
+     * (D-CAT-10), não espelho comercial, e permanece em `products`.
      */
     public function test_criacao_real_nao_copia_os_espelhos_anulaveis(): void
     {
@@ -391,22 +397,26 @@ class AutoridadeCanonicaTest extends TestCase
             ->set('sort_order', 3)
             ->call('save');
 
-        $legado = Product::where('slug', 'oficina-sem-espelho')->firstOrFail()->getAttributes();
+        $produto = Product::where('slug', 'oficina-sem-espelho')->firstOrFail();
+        $legado = $produto->getAttributes();
 
-        foreach (self::ESPELHOS_COMERCIAIS as $campo) {
-            $this->assertNull(
-                $legado[$campo],
-                "products.{$campo} recebeu valor comercial na criação.",
+        foreach (SaveProductWithOffer::ESPELHOS_COMERCIAIS_LEGADOS as $campo) {
+            $this->assertFalse(
+                Schema::hasColumn('products', $campo),
+                "A coluna legada products.{$campo} voltou a existir.",
+            );
+            $this->assertArrayNotHasKey(
+                $campo,
+                $legado,
+                "products.{$campo} reapareceu nos atributos do item criado.",
             );
         }
-    }
 
-    /** Nove dos doze espelhos — os anuláveis. `is_active` fora, de propósito. */
-    private const ESPELHOS_COMERCIAIS = [
-        'price', 'price_type', 'modality', 'duration_min',
-        'weight', 'height', 'width', 'length',
-        'stock_quantity',
-    ];
+        // E o que o formulario enviou esta inteiro na oferta.
+        $oferta = $produto->offers()->sole();
+        $this->assertSame('150.00', $oferta->price);
+        $this->assertSame(90, $oferta->duration_min);
+    }
 
     public function test_desativar_a_oferta_nao_desativa_o_produto(): void
     {
@@ -440,8 +450,9 @@ class AutoridadeCanonicaTest extends TestCase
         $this->assertSame('321.00', $offer->price);
         $this->assertSame(9, $offer->stock_quantity);
 
-        $this->assertNull($legado['price']);
-        $this->assertNull($legado['stock_quantity']);
+        // E `products` nao tem mais onde guardar: as colunas sairam na 02H.
+        $this->assertArrayNotHasKey('price', $legado);
+        $this->assertArrayNotHasKey('stock_quantity', $legado);
     }
 
     public function test_states_de_servico_e_cuidado_mandam_o_comercial_para_a_oferta(): void
@@ -464,8 +475,8 @@ class AutoridadeCanonicaTest extends TestCase
         // ...e a forma de cobrança é da oferta.
         $this->assertSame('fixo', $servico->offers()->first()->price_type?->value);
         $this->assertSame('por_sessao', $cuidado->offers()->first()->price_type?->value);
-        $this->assertNull($servico->fresh()->getAttributes()['price_type']);
-        $this->assertNull($cuidado->fresh()->getAttributes()['price_type']);
+        $this->assertArrayNotHasKey('price_type', $servico->fresh()->getAttributes());
+        $this->assertArrayNotHasKey('price_type', $cuidado->fresh()->getAttributes());
     }
 
     public function test_seeder_nao_usa_products_como_area_de_passagem_comercial(): void
@@ -497,8 +508,8 @@ class AutoridadeCanonicaTest extends TestCase
         $this->assertTrue($offer->product->temDelegacaoCanonicaAtiva());
 
         $legado = $offer->product->fresh()->getAttributes();
-        $this->assertNull($legado['price']);
-        $this->assertNull($legado['stock_quantity']);
+        $this->assertArrayNotHasKey('price', $legado);
+        $this->assertArrayNotHasKey('stock_quantity', $legado);
         // `is_active` é canônico e continua verdadeiro pelo default do schema.
         $this->assertTrue((bool) $legado['is_active']);
     }
@@ -525,9 +536,8 @@ class AutoridadeCanonicaTest extends TestCase
         $this->assertSame('99.90', $offer->price);
         $this->assertSame(5, $offer->stock_quantity);
 
-        // As colunas legadas ficam no default do schema, sem nenhum valor vindo
-        // do formulário.
-        $this->assertNull($legado['price']);
-        $this->assertNull($legado['stock_quantity']);
+        // E o produto nao tem onde receber: as colunas sairam na CAT-DOM-02H.
+        $this->assertArrayNotHasKey('price', $legado);
+        $this->assertArrayNotHasKey('stock_quantity', $legado);
     }
 }

@@ -3,8 +3,6 @@
 namespace App\Models;
 
 use App\Enums\ItemType;
-use App\Enums\Modality;
-use App\Enums\PriceType;
 use App\Models\Ava\AvaCourse;
 use App\Support\PublicUrl;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +17,14 @@ class Product extends Model
 {
     use HasFactory;
 
+    /**
+     * Só o que o item **é**.
+     *
+     * Os doze espelhos comerciais saíram na CAT-DOM-02H, junto com as colunas.
+     * `is_active` fica: no produto é validade canônica do item no catálogo
+     * (D-CAT-10), e nunca foi espelho de nada. `expositor_id` fica: é
+     * proveniência (D-CAT-11), não propriedade.
+     */
     protected $fillable = [
         'expositor_id',
         'category_id',
@@ -29,35 +35,14 @@ class Product extends Model
         'description',
         'image_path',
         'images',
-        'price',
-        'weight',
-        'height',
-        'width',
-        'length',
-        'price_type',
-        'modality',
-        'duration_min',
-        'has_stock',
-        'stock_quantity',
-        'is_featured',
         'is_active',
         'is_digital',
-        'sort_order',
     ];
 
     protected function casts(): array
     {
         return [
             'item_type' => ItemType::class,
-            'price_type' => PriceType::class,
-            'modality' => Modality::class,
-            'price' => 'decimal:2',
-            'weight' => 'decimal:3',
-            'height' => 'decimal:2',
-            'width' => 'decimal:2',
-            'length' => 'decimal:2',
-            'has_stock' => 'boolean',
-            'is_featured' => 'boolean',
             'is_active' => 'boolean',
             'is_digital' => 'boolean',
             'images' => 'array',

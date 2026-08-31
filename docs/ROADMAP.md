@@ -2285,8 +2285,9 @@ a identidade que o outro exibe — dívida D-2, registrada em teste.
 | CAT-DOM-02D — Estrutura de conteúdo por oferta | ✅ Concluída | 3 migrations aditivas, `product_offer_faqs`, backfill em dois modos e o invariante de arquivo físico provado no MySQL real |
 | CAT-DOM-02E — Writers, readers e cutover | ✅ Concluída | Imagem e FAQ comerciais passam a ser da oferta, pergunta ganha destinatário, fallback centralizado e limpeza determinística da FAQ legada |
 | CAT-DOM-02F — Isolamento, autorização e governança | ✅ Concluída | Ownership comercial com definição única na oferta, autoridade de resposta corrigida, isolamento A × B provado |
-| CAT-DOM-02G — Preparação para multi-oferta, AVA e slug | 🔍 **Implementação concluída · aguardando revisão pré-commit** | Seleção de oferta determinística, matrícula com oferta de origem, URL sem escolha implícita de vendedor |
-| CAT-DOM-02H…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
+| CAT-DOM-02G — Preparação para multi-oferta, AVA e slug | ✅ Concluída | Seleção de oferta determinística, matrícula com oferta de origem, URL sem escolha implícita de vendedor |
+| CAT-DOM-02H — Remoção das colunas legadas de `products` | 🔍 **Implementação concluída · aguardando revisão pré-commit** | Doze espelhos comerciais removidos com prova; `products` de 29 para 17 colunas |
+| CAT-DOM-02I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
 
 A **02A** corrigiu quatro inconsistências que já alcançavam produção no modelo
 1:1 — entre elas a home ainda lendo `modality` e `duration_min` das colunas
@@ -2567,12 +2568,57 @@ cadastra um item recebe a delegação no mesmo ato, então o autor do produto
 digital continua administrando o curso; o que ele perde é o acesso ao curso de um
 item que outra pessoa trouxe ao catálogo.
 
-**Multi-oferta continua desabilitada e a CAT-DOM-02H não foi iniciada.** Nenhum
+**Multi-oferta continua desabilitada.** Nenhum
 buy box, ranking ou seleção automática foi criado — o seletor **recusa** o caso
 ambíguo em vez de resolvê-lo, e é essa recusa que mantém a decisão de produto em
 aberto para quem tem autoridade de tomá-la. Ficam registradas como dívidas
 ativas a ausência de superfície de curadoria (G-1), o workflow de proposta e a
 apresentação sob multi-oferta.
+
+**CAT-DOM-02H — implementação concluída, aguardando revisão pré-commit.** A 02C
+parou de escrever nas doze colunas que `products` mantinha como cópia da oferta;
+elas ficaram no schema, congeladas no valor do cutover. Esta fase as remove —
+depois de provar, uma a uma, que ninguém as usa. `products` foi de **29 para 17
+colunas**.
+
+O princípio não foi "já existe na oferta, então sai": foi **auditoria → prova →
+remoção**. Cada candidata precisou de zero writer, zero reader, zero
+autorização, zero FIN-SEC, zero AVA e zero contrato público. Os próprios scopes
+do `Product` já liam tudo da oferta e diziam isso em comentário, e o
+`ProductResource` já emitia os doze campos a partir dela — o contrato da API não
+muda com o drop.
+
+A auditoria achou **um writer residual**: o `ProductLogisticDataSeeder` tinha um
+bloco rotulado *"Espelho legado (dívida D-1)"* que ainda gravava peso e
+dimensões em `products`. Removido.
+
+**Ficaram de fora, e é o ponto mais importante da fase:** `is_active`, que é
+validade canônica da curadoria e nunca foi espelho; `expositor_id`, que é
+proveniência e não vira descartável só porque existe `product_offers.expositor_id`;
+e `images`/`image_path`, que são a imagem canônica do catálogo preservada pela
+02E. Confundir legado comercial com verdade canônica teria apagado governança e
+história.
+
+Nos dados reais: 75 itens, todos com valor nas doze colunas, e **divergência zero**
+contra `product_offers` — a prova de que estavam congelados desde a 02C e
+idênticos ao destino. O ciclo `migrate → rollback → reapply` foi validado em
+MySQL 8.4 real, com tipos, defaults e o índice de `is_featured` recriados
+exatamente. Fica registrado que **rollback de schema não restaura dados**: o
+`down()` devolve colunas vazias.
+
+Seis testes provavam a regra *construindo a divergência* — gravavam um valor
+diferente no espelho e exigiam que a aplicação lesse a oferta. Sem as colunas,
+essa encenação é impossível, e a prova mudou de natureza: de "o espelho ficou
+intacto" para "não há espelho". Um deles ganhou alcance: passou a cobrir os doze
+campos, e não só os nove anuláveis.
+
+Inventário, matriz de writers/readers, evidência do MySQL, rollback e Decision
+Log D-02H-1 a D-02H-9:
+[`CAT_DOM_02H_REMOCAO_COLUNAS_LEGADAS_PRODUCTS.md`](CAT_DOM_02H_REMOCAO_COLUNAS_LEGADAS_PRODUCTS.md).
+
+**Multi-oferta continua desabilitada e a CAT-DOM-02I não foi iniciada.** Remover
+legado não abre porta nenhuma: o cadastro segue criando uma oferta por produto, e
+o guard da 02F continua recusando terceiros.
 
 Decisões, matrizes de autoridade e ciclo de vida, e os gates de multi-oferta:
 [`CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md`](CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md).

@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Enums\ItemType;
-use App\Models\Product;
 use App\Models\ProductOffer;
 use Illuminate\Database\Seeder;
 
@@ -30,14 +29,11 @@ class ProductLogisticDataSeeder extends Seeder
         };
 
         // Quem despacha e a oferta: e la que o frete busca peso e dimensoes.
+        //
+        // O espelho em `products` sumiu na CAT-DOM-02H, e com ele a escrita
+        // dupla que existia aqui: nao ha mais o que contradizer.
         $total = ProductOffer::query()
             ->whereHas('product', fn ($q) => $q->where('item_type', ItemType::Produto->value))
-            ->where($semLogistica)
-            ->update($padrao);
-
-        // Espelho legado (divida D-1): `products` nao pode contradizer a oferta.
-        Product::query()
-            ->where('item_type', ItemType::Produto->value)
             ->where($semLogistica)
             ->update($padrao);
 
