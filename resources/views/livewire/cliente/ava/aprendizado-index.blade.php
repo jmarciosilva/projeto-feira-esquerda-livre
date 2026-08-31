@@ -22,11 +22,14 @@
             $course     = $enrollment->course;
             $accessible = $enrollment->isAccessible();
             $percent    = (int) $enrollment->completion_percent;
-            // CAT-DOM-02E: a matricula nao guarda qual oferta foi comprada — o
-            // vinculo nao existe e cria-lo seria redesenhar o AVA, fora desta
-            // fase. Para a capa, a oferta vigente basta: e ilustracao do item,
-            // nao afirmacao sobre quem vendeu.
-            $capa = $product->ofertaVigente?->urlDaImagemPrincipal('medium')
+            // CAT-DOM-02G fechou o gap que a 02E havia registrado: a matricula
+            // SIM sabe de qual oferta veio, por `order_split` -> `order_items`.
+            // A capa passa a vir de la, e nao mais de `ofertaVigente` — o aluno
+            // que comprou de B nao ve a vitrine de A porque B recolheu a oferta.
+            //
+            // Matricula de cortesia nao tem compra por tras: ai so resta a
+            // imagem canonica do item, que e do catalogo e nao de loja alguma.
+            $capa = $enrollment->ofertaDeOrigem()?->urlDaImagemPrincipal('medium')
                 ?? ($product->image_path ? Storage::url($product->image_path) : null);
         @endphp
 

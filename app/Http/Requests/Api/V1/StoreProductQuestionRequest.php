@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Actions\Catalog\Contexto;
+use App\Actions\Catalog\ResolveProductOffer;
+use App\Models\Product;
 use App\Models\ProductOffer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -66,18 +69,19 @@ class StoreProductQuestionRequest extends FormRequest
     public function resolverOferta(): ?ProductOffer
     {
         $produto = $this->route('product');
-        $informada = $this->input('product_offer_id');
 
-        if ($informada !== null) {
-            $oferta = ProductOffer::find($informada);
-
-            // A oferta precisa ser deste produto. Divergiu, recusa: corrigir
-            // silenciosamente para outra oferta seria decidir pelo cliente.
-            return $oferta?->product_id === $produto?->id ? $oferta : null;
+        if (! $produto instanceof Product) {
+            return null;
         }
 
-        $ofertas = ProductOffer::where('product_id', $produto?->id)->get();
-
-        return $ofertas->count() === 1 ? $ofertas->first() : null;
+        // Mesma regra do carrinho e do material de divulgação, dita uma vez só
+        // (CAT-DOM-02G). `Historico` porque uma pergunta pode ser dirigida a uma
+        // oferta que o lojista recolheu depois — quem pode respondê-la é assunto
+        // da autorização (D-02F-4), não da resolução.
+        return app(ResolveProductOffer::class)(
+            $produto,
+            $this->input('product_offer_id'),
+            Contexto::Historico,
+        );
     }
 }

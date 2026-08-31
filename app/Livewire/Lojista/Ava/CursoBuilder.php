@@ -57,17 +57,44 @@ class CursoBuilder extends Component
     // ── Aba ativa ─────────────────────────────────────────────────────────────
     public string $activeTab = 'configuracoes';
 
+    /**
+     * Quem pode editar o curso (CAT-DOM-02G, D-02G-6).
+     *
+     * O curso é conteúdo **canônico**: `ava_courses.product_id` é `UNIQUE`, e as
+     * aulas do item são as mesmas independentemente de quem o vende. Editar o
+     * que o item ensina é editar o que o item **é**, e isso tem uma autoridade
+     * já definida desde a CAT-DOM-02C — `ProductPolicy::updateCanonical`:
+     * curadoria (`produtos.moderar`) ou delegação canônica declarada e viva.
+     *
+     * ## O que estava errado
+     *
+     * O guard perguntava *"tenho alguma oferta neste produto?"*. Com `Product` e
+     * `ProductOffer` em 1:1 isso acertava por coincidência, e errava dos dois
+     * lados no dia em que deixasse de ser:
+     *
+     * - o vendedor que apenas **acrescentou uma oferta** editaria e publicaria o
+     *   curso do outro, porque tinha uma oferta;
+     * - a **curadoria** não conseguia abrir a tela, porque não tem expositor —
+     *   e o guard morria no `->id` de um nulo antes mesmo de decidir.
+     *
+     * ## Por que não há regressão hoje
+     *
+     * Quem cadastra um item recebe a delegação canônica no mesmo ato
+     * (`SaveProductWithOffer`), então o autor do produto digital continua
+     * entrando aqui. O que ele perde é o acesso que nunca deveria ter tido: o
+     * curso de um item que outra pessoa trouxe ao catálogo.
+     *
+     * Isto é autoridade **canônica**, e por isso passa pela `Gate` — onde o
+     * override de admin é desejado. Ownership comercial da oferta é outro eixo,
+     * mora em `ProductOffer::pertenceAoExpositorDe()` e não concede nada aqui.
+     */
     public function mount(AvaCourse $course): void
     {
-        // Garante que o lojista só acessa seu próprio curso
-        $expositor = auth()->user()->expositor;
-        $temOferta = $course->product->offers()
-            ->where('expositor_id', $expositor->id)
-            ->exists();
-
-        if (! $temOferta) {
-            abort(403);
-        }
+        abort_unless(
+            auth()->user()?->can('updateCanonical', $course->product) === true,
+            403,
+            'O conteúdo deste curso pertence ao catálogo, e não à sua oferta.',
+        );
 
         $this->course = $course;
         $this->loadCourseSettings();

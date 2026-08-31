@@ -39,10 +39,15 @@ class CursoController extends Controller
     /** PATCH /api/v1/lojista/cursos/{course}/publicar */
     public function publicar(Request $request, int $course): JsonResponse
     {
-        $curso = AvaCourse::whereHas(
-            'product.offers',
-            fn ($q) => $q->where('expositor_id', $request->user()->expositor->id)
-        )->findOrFail($course);
+        // Publicar é ato sobre conteúdo canônico, e não sobre a oferta: a
+        // autoridade é a mesma da `ProductPolicy` (D-02G-6). Ter uma oferta
+        // sobre o item não basta — e nunca deveria ter bastado.
+        $curso = AvaCourse::with('product')->findOrFail($course);
+
+        abort_unless(
+            $request->user()->can('updateCanonical', $curso->product),
+            404,
+        );
 
         $curso->update(['published_at' => $curso->isPublished() ? null : now()]);
 

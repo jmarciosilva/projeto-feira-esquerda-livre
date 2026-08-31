@@ -11,7 +11,10 @@ class AprendizadoIndex extends Component
     public function render(): View
     {
         $enrollments = AvaEnrollment::where('user_id', auth()->id())
-            ->with(['course.product.expositor'])
+            // `orderSplit` entra no eager load porque a capa passa por ele:
+            // a CAT-DOM-02G resolve a oferta de origem pela compra, e não pelo
+            // estado atual do catálogo (D-02G-5).
+            ->with(['course.product.expositor', 'orderSplit'])
             ->orderByDesc('enrolled_at')
             ->get();
 

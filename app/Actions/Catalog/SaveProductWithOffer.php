@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -142,7 +143,10 @@ final class SaveProductWithOffer
             $dadosDaOferta = Arr::only($data, self::CAMPOS_DA_OFERTA);
 
             if ($offer === null) {
-                $product = Product::create($this->dadosDoProduto($data) + [
+                $campos = $this->dadosDoProduto($data);
+                $campos['slug'] = $this->slugUnico($campos['slug'] ?? $campos['name'] ?? '');
+
+                $product = Product::create($campos + [
                     // Proveniência, não propriedade: registra quem trouxe o
                     // item para o catálogo. Nenhuma autorização olha para cá.
                     'expositor_id' => $expositor->id,
@@ -336,6 +340,41 @@ final class SaveProductWithOffer
         }
 
         return $campos;
+    }
+
+    /**
+     * Um slug que não colide (CAT-DOM-02G, G-11).
+     *
+     * `products.slug` é `UNIQUE` global, e este era o **único** dos slugs do
+     * projeto sem desambiguação — `Expositor`, `Post`, `Page` e `Event` todos
+     * têm a sua há tempos. Dois itens de nomes iguais colidiam na constraint e
+     * o cadastro morria com erro de banco, sem nada dizer ao lojista.
+     *
+     * O defeito é anterior a esta trilha e não tem relação com multi-oferta —
+     * mas a auditoria do G-11 o encontrou olhando exatamente para colisões de
+     * slug, e mais vendedores cadastrando significa mais chance de dois
+     * quererem "camiseta vermelha".
+     *
+     * **Não confundir com a pergunta do G-11.** Duas ofertas sobre o *mesmo*
+     * item compartilham um `Product` e, portanto, um slug só — isso é correto e
+     * é a identidade canônica funcionando. O que se desambigua aqui são
+     * **produtos diferentes** com o mesmo nome.
+     *
+     * Só roda na criação: o `slug` sai do payload de update (§`dadosDoProduto`),
+     * então um item existente nunca tem o seu reescrito por baixo, e nenhum
+     * permalink publicado muda.
+     */
+    private function slugUnico(string $base): string
+    {
+        $slug = Str::slug($base);
+        $candidato = $slug !== '' ? $slug : 'item';
+        $n = 0;
+
+        while (Product::where('slug', $candidato)->exists()) {
+            $candidato = $slug.'-'.++$n;
+        }
+
+        return $candidato;
     }
 
     /**

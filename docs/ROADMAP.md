@@ -2284,8 +2284,9 @@ a identidade que o outro exibe — dívida D-2, registrada em teste.
 | CAT-DOM-02C — Autoridade de `Product` e fim do write-through | ✅ Concluída | Delegação canônica explícita, `is_active` sob curadoria, espelho comercial encerrado |
 | CAT-DOM-02D — Estrutura de conteúdo por oferta | ✅ Concluída | 3 migrations aditivas, `product_offer_faqs`, backfill em dois modos e o invariante de arquivo físico provado no MySQL real |
 | CAT-DOM-02E — Writers, readers e cutover | ✅ Concluída | Imagem e FAQ comerciais passam a ser da oferta, pergunta ganha destinatário, fallback centralizado e limpeza determinística da FAQ legada |
-| CAT-DOM-02F — Isolamento, autorização e governança | 🔍 **Implementação concluída · aguardando revisão pré-commit** | Ownership comercial com definição única na oferta, autoridade de resposta corrigida, isolamento A × B provado |
-| CAT-DOM-02G…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
+| CAT-DOM-02F — Isolamento, autorização e governança | ✅ Concluída | Ownership comercial com definição única na oferta, autoridade de resposta corrigida, isolamento A × B provado |
+| CAT-DOM-02G — Preparação para multi-oferta, AVA e slug | 🔍 **Implementação concluída · aguardando revisão pré-commit** | Seleção de oferta determinística, matrícula com oferta de origem, URL sem escolha implícita de vendedor |
+| CAT-DOM-02H…I — Implementação | ⬜ Não autorizada | Sequência proposta no documento da 02B |
 
 A **02A** corrigiu quatro inconsistências que já alcançavam produção no modelo
 1:1 — entre elas a home ainda lendo `modality` e `duration_min` das colunas
@@ -2499,10 +2500,79 @@ vigilância.
 Auditoria, matriz de autorização, decisões D-02F-1 a D-02F-7, gates e dívidas:
 [`CAT_DOM_02F_ISOLAMENTO_AUTORIZACAO_E_GOVERNANCA.md`](CAT_DOM_02F_ISOLAMENTO_AUTORIZACAO_E_GOVERNANCA.md).
 
-**Multi-oferta continua desabilitada e a CAT-DOM-02G não foi iniciada.** Ficam
-registradas como dívidas ativas a ausência de superfície de curadoria (G-1), o
-workflow de proposta e a autorização de curso do AVA (G-10), que ainda é por
-produto.
+**Multi-oferta continua desabilitada.**
+
+**CAT-DOM-02G — implementação concluída, aguardando revisão pré-commit.** As
+fases anteriores responderam onde o dado mora, quem escreve, de onde se lê e de
+quem ele é. Esta responde a que sobrava: **qual oferta?** — sem inventar um
+critério que ninguém aprovou. **Nenhuma migration**; os três gates históricos
+fecharam sem tocar no schema.
+
+O risco que ela remove é o mesmo em toda parte: enquanto cada item tem uma oferta
+só, `first()`, `orderBy('id')` e `ofertaVigente` dão **todos** a resposta certa —
+e o critério só aparece quando o segundo vendedor chega, já em produção. Pior,
+esse critério não é neutro: "a mais barata ganha" é a regra de um **buy box**,
+uma decisão sobre de quem o cliente compra e quem fica sem a venda. Ela não deve
+nascer de um `->first()` escrito quando o mundo era 1:1.
+
+**G-9.** A auditoria encontrou dois pontos decidindo de verdade. O mais grave era
+o carrinho da API, que resolvia por `ofertaVigente` — a mais barata — e com isso
+escolhia preço, loja e estoque pelo cliente. O outro era o material de divulgação
+do editor, por `orderBy('id')->first()`. Ambos passaram por um seletor único, com
+contrato explícito: id informado é validado contra o produto; ausente só resolve
+com **exatamente uma** oferta; com zero ou mais de uma, recusa. O contrato da API
+ganhou `product_offer_id` **opcional**, no mesmo padrão que a 02E usou nas
+perguntas — nenhum cliente quebra. A regra da 02E foi absorvida pelo mesmo
+seletor, para não haver duas implementações da mesma coisa.
+
+O seletor distingue **comprar** de **olhar para trás**: compra exige oferta
+vigente; histórico aceita oferta inativa, porque pedido e matrícula apontam para
+o que foi vendido e não para o que ainda está à venda.
+
+**G-10.** O curso pertence ao `Product` — `ava_courses.product_id` é UNIQUE, e o
+conteúdo educacional é canônico. O que é comercial é a **compra**, e a matrícula
+já a referenciava por `order_split_id` desde a FIN-SEC-01B: o caminho até
+`order_items.product_offer_id` existia inteiro no schema e ninguém o percorria.
+Agora percorre. O erro que isso evita é concreto — o aluno compra de B, B recolhe
+a oferta, e `ofertaVigente` passaria a devolver A, reescrevendo de quem ele
+comprou porque o catálogo mudou depois.
+
+**G-11.** A URL nunca escolheu vendedor, e isso é estrutural: a única URL
+comercial é `/loja/{expositor}/{produto}`, que resolve loja e item — exatamente
+uma oferta. Não existe rota `/produto/{slug}` que precisasse desempatar, e há
+teste que falha se alguém criar uma. Duas lojas sobre o mesmo item terão URLs
+distintas por construção, e a oferta não ganha slug próprio.
+
+De lado, a auditoria achou um defeito **anterior a esta trilha**: `products.slug`
+é UNIQUE global e era o único slug do projeto sem desambiguação — `Expositor`,
+`Post`, `Page` e `Event` todos tinham a sua. Dois itens de mesmo nome colidiam na
+constraint e o cadastro morria com erro de banco. Confirmado no MySQL real e
+corrigido só na criação, para não reescrever permalink publicado.
+
+Auditoria, decisões D-02G-1 a D-02G-8, gates e dívidas datadas:
+[`CAT_DOM_02G_PREPARACAO_MULTI_OFERTA_AVA_SLUG.md`](CAT_DOM_02G_PREPARACAO_MULTI_OFERTA_AVA_SLUG.md).
+
+A revisão externa pegou uma contradição na primeira versão desta fase: ela
+declarava o curso canônico **e deixava a autorização perguntando "tenho alguma
+oferta neste produto?"**. As duas coisas não podiam ser verdade ao mesmo tempo. O
+bug foi provado por teste antes de ser corrigido, e errava dos dois lados — o
+vendedor que apenas acrescentara uma oferta abria o editor completo do curso e
+podia publicá-lo, enquanto a **curadoria não conseguia sequer abrir a tela**,
+porque não tem expositor e o guard morria no `->id` de um nulo.
+
+A autoridade correta já existia e só não estava sendo usada ali:
+`ProductPolicy::updateCanonical` — curadoria ou delegação canônica viva, escrita
+na 02C. Nenhuma role, Policy ou superfície nova. E sem regressão hoje: quem
+cadastra um item recebe a delegação no mesmo ato, então o autor do produto
+digital continua administrando o curso; o que ele perde é o acesso ao curso de um
+item que outra pessoa trouxe ao catálogo.
+
+**Multi-oferta continua desabilitada e a CAT-DOM-02H não foi iniciada.** Nenhum
+buy box, ranking ou seleção automática foi criado — o seletor **recusa** o caso
+ambíguo em vez de resolvê-lo, e é essa recusa que mantém a decisão de produto em
+aberto para quem tem autoridade de tomá-la. Ficam registradas como dívidas
+ativas a ausência de superfície de curadoria (G-1), o workflow de proposta e a
+apresentação sob multi-oferta.
 
 Decisões, matrizes de autoridade e ciclo de vida, e os gates de multi-oferta:
 [`CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md`](CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md).
