@@ -12,7 +12,7 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-05D — `ListingAssistant` interno** (a CAT-05 foi subdividida em A→H) |
+| Fase atual | **CAT-05D — `ListingAssistant` interno** 🔍 (a CAT-05 foi subdividida em A→H) |
 | Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização |
 | Próxima | CAT-05E — antialucinação e `missing_information` |
 | Suíte | 1079 passed · 3258 assertions · 0 failures |
@@ -77,7 +77,7 @@ subfase não há onde parar entre uma coisa e outra.
 | **CAT-05A** | ✅ Concluída | Auditoria de reconciliação — 13 itens, blockers B-1 a B-6, divergências doc × código |
 | **CAT-05B** | ✅ Concluída | Decisões de produto (B-1, B-2) e contratos das subfases seguintes |
 | **CAT-05C** | ✅ Concluída | `ListingContext` + `ContextSanitizer` |
-| **CAT-05D** | ⬜ | `ListingAssistant` interno, sem provider externo |
+| **CAT-05D** | 🔍 Em andamento | `ListingAssistant` interno, sem provider externo — implementação concluída, aguardando revisão do diff |
 | **CAT-05E** | ⬜ | Antialucinação e `missing_information` |
 | **CAT-05F** | ⬜ | Resiliência e fronteiras |
 | **CAT-05G** | ⬜ | Testes, custo de consulta e segurança |
@@ -357,6 +357,19 @@ Duas dívidas ficam registradas e rastreadas: **C-1**, `knownAttributes` é
 protegido por lista de proibição e quem o preencher na CAT-09 deve mapear campo
 a campo, nunca repassar payload em bloco; **C-2**, texto livre não é redigido, e
 o destino — CAT-05F ou CAT-10 — segue em aberto.
+
+**CAT-05D — o assistente, com um caminho só**
+([`CAT_05D_LISTING_ASSISTANT.md`](CAT_05D_LISTING_ASSISTANT.md)).
+`GenerateListingSuggestion` recebe um `ListingContext`, completa-o com o motor
+da CAT-04 e devolve um `ListingSuggestion` estruturado. **Não escreve nada** — e
+não chama nem `AssociateProductKnowledge`, apesar de ter os candidatos em mãos:
+sugerir texto e afirmar conhecimento são atos diferentes. Sem provider externo,
+`source` é sempre `internal`. Três decisões de honestidade: `suggested_name` é
+sempre nulo (não há base para preferir um nome a outro), `confidence` fica nula
+(o score da CAT-04 ordena, não mede) e campo já preenchido não recebe proposta.
+**P-1 — o backfill — foi formalmente adiado para a CAT-05H**; o `--dry-run`
+desta subfase confirmou que o número **45/75 continua valendo** depois da
+CAT-DOM-02 e da correção de vigência.
 
 ---
 
