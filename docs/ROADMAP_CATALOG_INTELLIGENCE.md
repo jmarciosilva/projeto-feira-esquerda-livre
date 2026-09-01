@@ -12,9 +12,9 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-05B — decisões de produto e contratos** 🔍 (a CAT-05 foi subdividida em A→H) |
-| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria de reconciliação |
-| Próxima | CAT-05C — `ListingContext` + `ContextSanitizer` |
+| Fase atual | **CAT-05C — `ListingContext` + `ContextSanitizer`** 🔍 (a CAT-05 foi subdividida em A→H) |
+| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos |
+| Próxima | CAT-05D — `ListingAssistant` interno |
 | Suíte | 1053 passed · 3127 assertions · 0 failures |
 | Código do módulo | `App\CatalogIntelligence`: 6 enums, 3 models, 5 Actions, 4 DTOs, 3 Support, 1 Query, 1 Command, 1 Provider |
 | Branch | `main` |
@@ -75,8 +75,8 @@ subfase não há onde parar entre uma coisa e outra.
 | Subfase | Status | Entregável |
 |---|---|---|
 | **CAT-05A** | ✅ Concluída | Auditoria de reconciliação — 13 itens, blockers B-1 a B-6, divergências doc × código |
-| **CAT-05B** | 🔍 Em andamento | Decisões de produto (B-1, B-2) e contratos das subfases seguintes |
-| **CAT-05C** | ⬜ | `ListingContext` + `ContextSanitizer` |
+| **CAT-05B** | ✅ Concluída | Decisões de produto (B-1, B-2) e contratos das subfases seguintes |
+| **CAT-05C** | 🔍 Em andamento | `ListingContext` + `ContextSanitizer` — implementação concluída, aguardando revisão do diff |
 | **CAT-05D** | ⬜ | `ListingAssistant` interno, sem provider externo |
 | **CAT-05E** | ⬜ | Antialucinação e `missing_information` |
 | **CAT-05F** | ⬜ | Resiliência e fronteiras |
@@ -346,6 +346,17 @@ log em [`CAT_05B_DECISOES_DE_PRODUTO_E_CONTRATOS.md`](CAT_05B_DECISOES_DE_PRODUT
   canônica e não visibilidade. Passou a exigir a mesma vigência de
   `ProductOffer::scopeVigente()`. Fecha a dívida **M-17**, que já estava
   endereçada nominalmente a esta fase.
+
+**CAT-05C — o insumo e a fronteira**
+([`CAT_05C_LISTING_CONTEXT_E_SANITIZER.md`](CAT_05C_LISTING_CONTEXT_E_SANITIZER.md)).
+`ListingContext` carrega só identidade de catálogo e não tem parâmetro que
+aceite `ProductOffer` ou `Expositor` — a fronteira é estrutural, não
+disciplinar. `ContextSanitizer` faz a minimização na construção, importando de
+`SaveProductWithOffer` a lista do que é condição de venda em vez de copiá-la.
+Duas dívidas ficam registradas e rastreadas: **C-1**, `knownAttributes` é
+protegido por lista de proibição e quem o preencher na CAT-09 deve mapear campo
+a campo, nunca repassar payload em bloco; **C-2**, texto livre não é redigido, e
+o destino — CAT-05F ou CAT-10 — segue em aberto.
 
 ---
 
