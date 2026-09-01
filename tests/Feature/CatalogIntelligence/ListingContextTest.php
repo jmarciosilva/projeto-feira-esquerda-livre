@@ -329,6 +329,11 @@ class ListingContextTest extends TestCase
 
     // ── Conhecimento ──────────────────────────────────────────────────────────
 
+    /**
+     * A forma ganhou `terms` na **CAT-05E** (P-4): as palavras-chave passaram a
+     * incluir termo comercial e sinônimo, e o conceito precisa carregá-los.
+     * Continua não havendo model aqui — só texto.
+     */
     public function test_conhecimento_entra_como_texto_e_nao_como_model(): void
     {
         $this->conceito('Crochê');
@@ -337,8 +342,9 @@ class ListingContextTest extends TestCase
             ->comConhecimento($this->candidatosPara('Tapete de crochê'));
 
         $this->assertNotEmpty($contexto->knowledge);
-        $this->assertSame(['name', 'type', 'description'], array_keys($contexto->knowledge[0]));
+        $this->assertSame(['name', 'type', 'description', 'terms'], array_keys($contexto->knowledge[0]));
         $this->assertSame('Crochê', $contexto->knowledge[0]['name']);
+        $this->assertIsArray($contexto->knowledge[0]['terms']);
     }
 
     public function test_conceito_nao_aprovado_nao_entra_no_contexto(): void

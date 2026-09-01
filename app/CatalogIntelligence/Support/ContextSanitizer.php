@@ -6,6 +6,8 @@ use App\Actions\Catalog\SaveProductWithOffer;
 use App\CatalogIntelligence\DTOs\KnowledgeCandidate;
 use App\CatalogIntelligence\DTOs\SimilarProduct;
 use App\CatalogIntelligence\Enums\KnowledgeStatus;
+use App\CatalogIntelligence\Enums\KnowledgeTermType;
+use App\CatalogIntelligence\Models\KnowledgeTerm;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -221,12 +223,20 @@ class ContextSanitizer
      * influenciando o texto sugerido a um lojista é exatamente o que a CAT-03
      * criou `status` para impedir.
      *
-     * O `KnowledgeEntry` fica de fora: sai nome, tipo e descrição curada, que é
-     * o que serve de insumo. Devolver o model deixaria relações, timestamps e
-     * proveniência ao alcance de quem consumisse o contexto.
+     * O `KnowledgeEntry` fica de fora: sai nome, tipo, descrição curada e os
+     * termos úteis, que é o que serve de insumo. Devolver o model deixaria
+     * relações, timestamps e proveniência ao alcance de quem consumisse o
+     * contexto.
+     *
+     * ## `terms` entrou na CAT-05E (P-4)
+     *
+     * Até a CAT-05D esta redução descartava os termos, e por isso `keywords`
+     * saía só com nomes canônicos. A consequência era concreta: o conceito
+     * "Costura" não alcançava quem procura por *"ajuste de roupa"*, que é o
+     * termo comercial cadastrado para ele.
      *
      * @param  Collection<int, KnowledgeCandidate>|array<int, KnowledgeCandidate>  $candidatos
-     * @return array<int, array{name: string, type: string, description: string|null}>
+     * @return array<int, array{name: string, type: string, description: string|null, terms: array<int, string>}>
      */
     public function conhecimento(Collection|array $candidatos): array
     {
@@ -236,7 +246,52 @@ class ContextSanitizer
                 'name' => (string) $c->entry->name,
                 'type' => $c->entry->type->value,
                 'description' => $c->entry->description,
+                'terms' => $this->termosUteis($c),
             ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Os termos de um conceito que servem como palavra-chave (CAT-05E, P-4).
+     *
+     * Dos quatro tipos que a CAT-03 criou, **dois entram e dois não**, e o
+     * critério é o que o docblock de `KnowledgeTermType` já antecipava: *"um
+     * termo comercial é como o público procura, e um alias costuma ser só
+     * grafia alternativa"*.
+     *
+     * - **`CommercialTerm` entra**, e é o de maior valor: "ajuste de roupa",
+     *   "cerâmica artesanal", "sementes amazônicas" são a frase que alguém
+     *   digita na busca, e nenhuma delas é o nome canônico do conceito;
+     * - **`Synonym` entra**: "argila" para Barro, "trabalho manual" para
+     *   Artesanato, "combo" para Kit são vocabulário alternativo legítimo. Uma
+     *   parte são formas verbais — "crochetar", "tricotar" —, fracas como
+     *   palavra-chave mas inofensivas;
+     * - **`Alias` fica fora.** Na base real, **sete dos oito** são a grafia sem
+     *   acento do próprio nome canônico: `croche`, `ceramica`, `algodao`, `la`,
+     *   `trico`, `decoracao`, `feito a mao`. Como palavra-chave produziriam
+     *   "Crochê" e "croche" lado a lado — e não acrescentam nem ao casamento,
+     *   porque o `KnowledgeNormalizer` já remove acentos;
+     * - **`Keyword` fica fora** por ora: o tipo existe no enum e **nenhum
+     *   registro o usa**. Incluí-lo agora seria decidir o comportamento de um
+     *   caso que ninguém exercita.
+     *
+     * A relação `terms` chega carregada: `MatchProductKnowledge` é o único
+     * produtor de `KnowledgeCandidate` e faz `->with('terms')`. Um candidato
+     * vindo de outro caminho sem eager-load resolveria por lazy-load, o que
+     * custaria uma consulta por conceito — está registrado como observação de
+     * custo no documento da subfase.
+     *
+     * @return array<int, string>
+     */
+    private function termosUteis(KnowledgeCandidate $candidato): array
+    {
+        return $candidato->entry->terms
+            ->filter(fn (KnowledgeTerm $t) => in_array($t->type, [
+                KnowledgeTermType::CommercialTerm,
+                KnowledgeTermType::Synonym,
+            ], true))
+            ->map(fn (KnowledgeTerm $t) => (string) $t->term)
             ->values()
             ->all();
     }

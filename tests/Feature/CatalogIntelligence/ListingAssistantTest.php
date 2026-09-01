@@ -3,6 +3,7 @@
 namespace Tests\Feature\CatalogIntelligence;
 
 use App\CatalogIntelligence\Actions\AssociateProductKnowledge;
+use App\CatalogIntelligence\Actions\AttachKnowledgeTerm;
 use App\CatalogIntelligence\Actions\CreateOrUpdateKnowledge;
 use App\CatalogIntelligence\Actions\GenerateListingSuggestion;
 use App\CatalogIntelligence\Actions\MatchProductKnowledge;
@@ -12,6 +13,8 @@ use App\CatalogIntelligence\DTOs\ProductKnowledgeInput;
 use App\CatalogIntelligence\Enums\KnowledgeEntryType;
 use App\CatalogIntelligence\Enums\KnowledgeSource;
 use App\CatalogIntelligence\Enums\KnowledgeStatus;
+use App\CatalogIntelligence\Enums\KnowledgeTermType;
+use App\CatalogIntelligence\Enums\ListingGap;
 use App\CatalogIntelligence\Enums\SuggestionSource;
 use App\CatalogIntelligence\Models\KnowledgeEntry;
 use App\Enums\ItemType;
@@ -23,6 +26,7 @@ use Tests\TestCase;
 
 /**
  * CAT-05D — o assistente de conteúdo interno.
+ * CAT-05E — antialucinação, palavras-chave por termo e pedidos legíveis.
  *
  * Duas garantias interessam mais que o texto produzido: **gerar não escreve** e
  * **nada entra no texto que não estivesse no contexto**. O resto é composição,
@@ -47,6 +51,11 @@ class ListingAssistantTest extends TestCase
             KnowledgeSource::HumanCurated,
             description: $descricaoCurada,
         );
+    }
+
+    private function termo(KnowledgeEntry $entry, string $termo, KnowledgeTermType $tipo): void
+    {
+        app(AttachKnowledgeTerm::class)($entry, $termo, $tipo);
     }
 
     private function assistente(): GenerateListingSuggestion
@@ -251,17 +260,168 @@ class ListingAssistantTest extends TestCase
         $this->assertStringContainsString('Artesanato', $sugestao->description);
     }
 
-    public function test_palavras_chave_sao_os_conceitos_aprovados(): void
+    public function test_palavras_chave_incluem_os_conceitos_aprovados(): void
     {
         $this->conceito('Crochê');
         $this->conceito('Feito à mão', KnowledgeEntryType::Attribute);
 
         $sugestao = $this->assistente()($this->contexto('Tapete de crochê feito à mão'));
 
-        $keywords = $sugestao->keywords;
-        sort($keywords);
+        $this->assertContains('Crochê', $sugestao->keywords);
+        $this->assertContains('Feito à mão', $sugestao->keywords);
+    }
 
-        $this->assertSame(['Crochê', 'Feito à mão'], $keywords);
+    // ── P-4: quais termos viram palavra-chave (CAT-05E) ───────────────────────
+
+    /**
+     * O caso que motivou a decisão: "Costura" não alcança quem procura por
+     * "ajuste de roupa", que é o termo comercial cadastrado para ela.
+     */
+    public function test_termo_comercial_entra_nas_palavras_chave(): void
+    {
+        $costura = $this->conceito('Costura');
+        $this->termo($costura, 'ajuste de roupa', KnowledgeTermType::CommercialTerm);
+
+        $sugestao = $this->assistente()($this->contexto('Serviço de costura sob medida'));
+
+        $this->assertContains('Costura', $sugestao->keywords);
+        $this->assertContains('ajuste de roupa', $sugestao->keywords);
+    }
+
+    public function test_sinonimo_entra_nas_palavras_chave(): void
+    {
+        $barro = $this->conceito('Barro', KnowledgeEntryType::Material);
+        $this->termo($barro, 'argila', KnowledgeTermType::Synonym);
+
+        $sugestao = $this->assistente()($this->contexto('Tigela de barro nordestina'));
+
+        $this->assertContains('Barro', $sugestao->keywords);
+        $this->assertContains('argila', $sugestao->keywords);
+    }
+
+    /**
+     * Sete dos oito `alias` da base real são a grafia sem acento do próprio
+     * nome canônico. Como palavra-chave produziriam "Crochê" e "croche" lado a
+     * lado — e não acrescentam nem ao casamento, que já normaliza acentos.
+     */
+    public function test_grafia_alternativa_nao_entra_nas_palavras_chave(): void
+    {
+        $croche = $this->conceito('Crochê');
+        $this->termo($croche, 'croche', KnowledgeTermType::Alias);
+
+        $sugestao = $this->assistente()($this->contexto('Tapete de crochê'));
+
+        $this->assertContains('Crochê', $sugestao->keywords);
+        $this->assertNotContains('croche', $sugestao->keywords);
+    }
+
+    /** O tipo existe no enum e nenhum registro o usa — não se decide por ele agora. */
+    public function test_termo_do_tipo_keyword_nao_entra_por_ora(): void
+    {
+        $croche = $this->conceito('Crochê');
+        $this->termo($croche, 'tapetaria', KnowledgeTermType::Keyword);
+
+        $sugestao = $this->assistente()($this->contexto('Tapete de crochê'));
+
+        $this->assertNotContains('tapetaria', $sugestao->keywords);
+    }
+
+    public function test_o_nome_canonico_vem_antes_dos_termos(): void
+    {
+        $costura = $this->conceito('Costura');
+        $this->termo($costura, 'ajuste de roupa', KnowledgeTermType::CommercialTerm);
+
+        $keywords = $this->assistente()($this->contexto('Serviço de costura'))->keywords;
+
+        $this->assertLessThan(
+            array_search('ajuste de roupa', $keywords, true),
+            array_search('Costura', $keywords, true),
+        );
+    }
+
+    public function test_palavras_chave_nao_repetem(): void
+    {
+        $croche = $this->conceito('Crochê');
+        $this->termo($croche, 'crochetar', KnowledgeTermType::Synonym);
+        $trico = $this->conceito('Tricô');
+        $this->termo($trico, 'crochetar', KnowledgeTermType::Synonym);
+
+        $keywords = $this->assistente()($this->contexto('Peça de crochê e tricô'))->keywords;
+
+        $this->assertSame(array_values(array_unique($keywords)), $keywords);
+    }
+
+    // ── missing_information em linguagem de lojista (CAT-05E) ─────────────────
+
+    /** A citação da §3.4: "em vez de inventar material, devolve 'informe o material'". */
+    public function test_o_que_falta_e_pedido_em_portugues_e_nao_nome_de_campo(): void
+    {
+        $this->conceito('Crochê', descricaoCurada: 'Técnica de tecer.');
+
+        $pedidos = $this->assistente()($this->contexto('Tapete de crochê'))->missingInformation;
+
+        foreach (['short_description', 'description', 'category', 'attributes', 'knowledge'] as $tecnico) {
+            $this->assertNotContains($tecnico, $pedidos, "nome de campo cru vazou: {$tecnico}");
+        }
+
+        $this->assertContains(ListingGap::Attributes->pedido(), $pedidos);
+        $this->assertStringContainsString('material', ListingGap::Attributes->pedido());
+    }
+
+    public function test_toda_lacuna_tem_pedido_e_nenhum_e_vazio(): void
+    {
+        foreach (ListingGap::cases() as $lacuna) {
+            $this->assertNotSame('', trim($lacuna->pedido()), "{$lacuna->value} sem pedido");
+        }
+    }
+
+    /**
+     * Pedir "escreva um resumo" ao lado de um resumo pronto é ruído, e ruído
+     * faz o lojista desconfiar dos pedidos que ele precisa mesmo atender.
+     */
+    public function test_lacuna_que_a_sugestao_preenche_nao_vira_pedido(): void
+    {
+        $this->conceito('Crochê', descricaoCurada: 'Técnica de tecer.');
+
+        $sugestao = $this->assistente()($this->contexto('Tapete de crochê'));
+
+        $this->assertNotNull($sugestao->shortDescription, 'o cenário exige resumo proposto');
+        $this->assertNotNull($sugestao->description, 'o cenário exige descrição proposta');
+
+        $this->assertNotContains(ListingGap::ShortDescription->pedido(), $sugestao->missingInformation);
+        $this->assertNotContains(ListingGap::Description->pedido(), $sugestao->missingInformation);
+    }
+
+    /** O que o assistente não pode preencher continua sendo pedido, sempre. */
+    public function test_lacuna_que_depende_de_pessoa_continua_sendo_pedida(): void
+    {
+        $this->conceito('Crochê', descricaoCurada: 'Técnica de tecer.');
+
+        $pedidos = $this->assistente()($this->contexto('Tapete de crochê'))->missingInformation;
+
+        $this->assertContains(ListingGap::Attributes->pedido(), $pedidos);
+        $this->assertContains(ListingGap::Category->pedido(), $pedidos);
+    }
+
+    public function test_campo_sem_proposta_volta_a_ser_pedido(): void
+    {
+        // Conceito sem descrição curada: não há descrição a propor, então a
+        // lacuna permanece e o pedido reaparece.
+        $this->conceito('Crochê');
+
+        $sugestao = $this->assistente()($this->contexto('Tapete de crochê'));
+
+        $this->assertNull($sugestao->description);
+        $this->assertContains(ListingGap::Description->pedido(), $sugestao->missingInformation);
+    }
+
+    public function test_sugestao_vazia_pede_tudo_em_linguagem_de_lojista(): void
+    {
+        $sugestao = $this->assistente()($this->contexto('Item que a base não alcança'));
+
+        $this->assertFalse($sugestao->temAlgoAPropor());
+        $this->assertContains(ListingGap::Knowledge->pedido(), $sugestao->missingInformation);
+        $this->assertContains(ListingGap::ShortDescription->pedido(), $sugestao->missingInformation);
     }
 
     // ── Não sobrescrever o que o humano escreveu ──────────────────────────────
@@ -309,9 +469,11 @@ class ListingAssistantTest extends TestCase
 
         $sugestao = $this->assistente()($this->contexto('Tapete de crochê'));
 
-        $this->assertContains('short_description', $sugestao->missingInformation);
-        $this->assertContains('description', $sugestao->missingInformation);
-        $this->assertContains('attributes', $sugestao->missingInformation);
+        // Revisto na CAT-05E: o que sai já é pedido, não nome de campo, e o
+        // resumo e a descrição saíram da lista porque a sugestão os preenche.
+        $this->assertNotEmpty($sugestao->missingInformation);
+        $this->assertContains(ListingGap::Attributes->pedido(), $sugestao->missingInformation);
+        $this->assertContains(ListingGap::Category->pedido(), $sugestao->missingInformation);
     }
 
     // ── Item ainda não salvo × item do catálogo ───────────────────────────────

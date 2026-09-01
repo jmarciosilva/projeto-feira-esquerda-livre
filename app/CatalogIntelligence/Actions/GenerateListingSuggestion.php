@@ -4,6 +4,7 @@ namespace App\CatalogIntelligence\Actions;
 
 use App\CatalogIntelligence\DTOs\ListingContext;
 use App\CatalogIntelligence\DTOs\ListingSuggestion;
+use App\CatalogIntelligence\Enums\ListingGap;
 use App\CatalogIntelligence\Enums\SuggestionSource;
 use App\CatalogIntelligence\Queries\FindSimilarProducts;
 use App\Models\Product;
@@ -125,15 +126,24 @@ class GenerateListingSuggestion
             // Sem conceito não há do que compor texto — mas o que falta
             // continua sendo dito. É o estado normal de um catálogo cuja base
             // ainda não alcança o item, e não um erro.
-            return ListingSuggestion::vazia($this->oQueFalta($contexto));
+            return ListingSuggestion::vazia($this->oQueFalta($contexto, []));
         }
+
+        // O texto é composto **antes** de se apurar o que falta, e a ordem é o
+        // ponto: uma lacuna que a própria sugestão preenche deixa de ser
+        // pedido. Ver `oQueFalta()`.
+        $resumo = $this->resumoSugerido($contexto, $conceitos);
+        $descricao = $this->descricaoSugerida($contexto, $conceitos);
 
         return new ListingSuggestion(
             suggestedName: $this->nomeSugerido(),
-            shortDescription: $this->resumoSugerido($contexto, $conceitos),
-            description: $this->descricaoSugerida($contexto, $conceitos),
+            shortDescription: $resumo,
+            description: $descricao,
             keywords: $this->palavrasChave($conceitos),
-            missingInformation: $this->oQueFalta($contexto),
+            missingInformation: $this->oQueFalta($contexto, array_keys(array_filter([
+                ListingGap::ShortDescription->value => $resumo,
+                ListingGap::Description->value => $descricao,
+            ], fn ($v) => $v !== null))),
             source: SuggestionSource::Internal,
         );
     }
@@ -165,7 +175,7 @@ class GenerateListingSuggestion
      * conceito inteiro, nunca no meio de uma palavra, porque resumo truncado é
      * o defeito que aquela fase existiu para eliminar.
      *
-     * @param  array<int, array{name: string, type: string, description: string|null}>  $conceitos
+     * @param  array<int, array{name: string, type: string, description: string|null, terms: array<int, string>}>  $conceitos
      */
     private function resumoSugerido(ListingContext $contexto, array $conceitos): ?string
     {
@@ -196,7 +206,7 @@ class GenerateListingSuggestion
      * Conceito sem descrição curada entra apenas pelo nome, na frase final —
      * não se inventa explicação para ele.
      *
-     * @param  array<int, array{name: string, type: string, description: string|null}>  $conceitos
+     * @param  array<int, array{name: string, type: string, description: string|null, terms: array<int, string>}>  $conceitos
      */
     private function descricaoSugerida(ListingContext $contexto, array $conceitos): ?string
     {
@@ -232,35 +242,71 @@ class GenerateListingSuggestion
     }
 
     /**
-     * Palavras-chave: os nomes dos conceitos aprovados, e nada além.
+     * Palavras-chave: nome canônico do conceito **e os termos úteis** (P-4).
      *
-     * **Termos e sinônimos ficam de fora nesta subfase.** Se `keywords` sai de
-     * conceito, de termo ou dos dois é a pendência **P-4** da CAT-05B, com
-     * destino CAT-05E. Incluir os termos agora responderia por conta própria
-     * uma pergunta que já tem dono — e o caminho barato é acrescentá-los
-     * depois, não removê-los de um contrato já publicado.
+     * A CAT-05D entregava só nomes canônicos, e a lacuna era verificável na
+     * base real: o conceito "Costura" não alcançava quem procura por *"ajuste
+     * de roupa"*, que é o termo comercial cadastrado para ele. Palavra-chave
+     * existe para ser encontrada, e quem procura raramente usa o nome que a
+     * curadoria escolheu.
      *
-     * @param  array<int, array{name: string, type: string, description: string|null}>  $conceitos
+     * Quais termos entram é decisão do `ContextSanitizer::termosUteis()`, que
+     * é onde a regra mora: **termo comercial e sinônimo sim, grafia
+     * alternativa não**. Aqui só se ordena e desduplica.
+     *
+     * O nome canônico vem primeiro, e é isso que a ordem garante: a lista
+     * começa pelo que a curadoria nomeou e só depois oferece as variantes.
+     *
+     * @param  array<int, array{name: string, type: string, description: string|null, terms: array<int, string>}>  $conceitos
      * @return array<int, string>
      */
     private function palavrasChave(array $conceitos): array
     {
-        return array_values(array_unique(array_column($conceitos, 'name')));
+        $nomes = array_column($conceitos, 'name');
+        $termos = array_merge(...array_values(array_column($conceitos, 'terms') ?: [[]]));
+
+        return array_values(array_unique(array_merge($nomes, $termos)));
     }
 
     /**
-     * O que falta, em nome de campo.
+     * O que falta, **em pedido** — não em nome de coluna.
      *
-     * Ainda **não** é a `missing_information` que o lojista vai ler: traduzir
-     * "attributes" em "informe o material da peça" é a CAT-05E, que é a fase
-     * da antialucinação. Aqui é a leitura crua de `ListingContext::lacunas()`,
-     * repassada sem enfeite — e o valor de já existir é que a sugestão nunca
-     * sai sem dizer o que não sabe, nem mesmo a sugestão vazia.
+     * É a tradução que a §3.4 exige: *"em vez de inventar material, a
+     * inteligência devolve 'informe o material'"*. `ListingContext::lacunas()`
+     * continua sendo o insumo correto e não mudou — ele é da CAT-05C e diz o
+     * que o item não tem. O que esta subfase acrescenta são duas camadas em
+     * cima dele.
      *
+     * **Primeira: lacuna que a sugestão preenche não vira pedido.** Se o
+     * assistente está oferecendo um resumo, pedir "escreva um resumo" na mesma
+     * resposta é ruído — e ruído faz o lojista desconfiar dos outros pedidos,
+     * inclusive os que ele precisa mesmo atender. Sobram os que dependem de
+     * alguém: categoria é escolha dele, atributo é fato que só ele sabe,
+     * conhecimento é trabalho da curadoria.
+     *
+     * **Segunda: cada lacuna vira texto legível**, por `ListingGap::pedido()`.
+     *
+     * Lacuna desconhecida é descartada em vez de virar pedido vazio — mas o
+     * `match` do enum é o que impede que isso aconteça em silêncio quando
+     * alguém acrescentar uma lacuna nova sem tradução.
+     *
+     * @param  array<int, string>  $preenchidasPelaSugestao
      * @return array<int, string>
      */
-    private function oQueFalta(ListingContext $contexto): array
+    private function oQueFalta(ListingContext $contexto, array $preenchidasPelaSugestao): array
     {
-        return $contexto->lacunas();
+        $pedidos = [];
+
+        foreach ($contexto->lacunas() as $campo) {
+            $lacuna = ListingGap::tryFrom($campo);
+
+            if ($lacuna === null || in_array($campo, $preenchidasPelaSugestao, true)) {
+                continue;
+            }
+
+            $pedidos[] = $lacuna->pedido();
+        }
+
+        return $pedidos;
     }
 }

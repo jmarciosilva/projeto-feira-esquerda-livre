@@ -62,7 +62,7 @@ final class ListingContext
     /**
      * @param  array<int, string>  $categoryPath  Do ancestral mais alto até a própria categoria.
      * @param  array<string, scalar>  $knownAttributes  Só o que foi informado; nunca inferido.
-     * @param  array<int, array{name: string, type: string, description: string|null}>  $knowledge
+     * @param  array<int, array{name: string, type: string, description: string|null, terms: array<int, string>}>  $knowledge
      * @param  array<int, array{name: string, shared_concepts: array<int, string>, reasons: array<int, string>}>  $similarItems
      */
     private function __construct(
