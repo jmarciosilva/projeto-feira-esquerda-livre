@@ -12,7 +12,7 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-05E — antialucinação e `missing_information`** (a CAT-05 foi subdividida em A→H) |
+| Fase atual | **CAT-05E — antialucinação e `missing_information`** 🔍 (a CAT-05 foi subdividida em A→H) |
 | Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno |
 | Próxima | CAT-05F — resiliência e fronteiras |
 | Suíte | 1104 passed · 3318 assertions · 0 failures |
@@ -78,7 +78,7 @@ subfase não há onde parar entre uma coisa e outra.
 | **CAT-05B** | ✅ Concluída | Decisões de produto (B-1, B-2) e contratos das subfases seguintes |
 | **CAT-05C** | ✅ Concluída | `ListingContext` + `ContextSanitizer` |
 | **CAT-05D** | ✅ Concluída | `ListingAssistant` interno, sem provider externo |
-| **CAT-05E** | ⬜ | Antialucinação e `missing_information` |
+| **CAT-05E** | 🔍 Em andamento | Antialucinação e `missing_information` — implementação concluída, aguardando revisão do diff |
 | **CAT-05F** | ⬜ | Resiliência e fronteiras |
 | **CAT-05G** | ⬜ | Testes, custo de consulta e segurança |
 | **CAT-05H** | ⬜ | Validação real sobre os 75 itens e documentação final |
@@ -370,6 +370,18 @@ sempre nulo (não há base para preferir um nome a outro), `confidence` fica nul
 **P-1 — o backfill — foi formalmente adiado para a CAT-05H**; o `--dry-run`
 desta subfase confirmou que o número **45/75 continua valendo** depois da
 CAT-DOM-02 e da correção de vigência.
+
+**CAT-05E — antialucinação e pedidos legíveis**
+([`CAT_05E_ANTIALUCINACAO_E_MISSING_INFORMATION.md`](CAT_05E_ANTIALUCINACAO_E_MISSING_INFORMATION.md)).
+Fecha a **P-4**: `keywords` passa a incluir **termo comercial e sinônimo**, e
+não só o nome canônico — "Costura" não alcançava quem procura por *"ajuste de
+roupa"*. **`alias` fica fora**, porque sete dos oito da base real são a grafia
+sem acento do próprio nome canônico, e a normalização já cobre isso. E
+`missing_information` deixa de devolver nome de coluna: `ListingGap` traduz cada
+lacuna no pedido que a §3.4 exige — *"em vez de inventar material, devolve
+'informe o material'"*. Lacuna que a própria sugestão preenche **não** vira
+pedido. A subfase alterou o `ContextSanitizer` da CAT-05C, já commitado, e o
+registro disso está no §3 do documento.
 
 ---
 
