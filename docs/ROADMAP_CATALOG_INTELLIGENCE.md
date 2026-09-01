@@ -12,10 +12,10 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-05D — `ListingAssistant` interno** 🔍 (a CAT-05 foi subdividida em A→H) |
-| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização |
-| Próxima | CAT-05E — antialucinação e `missing_information` |
-| Suíte | 1079 passed · 3258 assertions · 0 failures |
+| Fase atual | **CAT-05E — antialucinação e `missing_information`** (a CAT-05 foi subdividida em A→H) |
+| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno |
+| Próxima | CAT-05F — resiliência e fronteiras |
+| Suíte | 1104 passed · 3318 assertions · 0 failures |
 | Código do módulo | `App\CatalogIntelligence`: 6 enums, 3 models, 5 Actions, 5 DTOs, 4 Support, 1 Query, 1 Command, 1 Provider |
 | Branch | `main` |
 
@@ -77,7 +77,7 @@ subfase não há onde parar entre uma coisa e outra.
 | **CAT-05A** | ✅ Concluída | Auditoria de reconciliação — 13 itens, blockers B-1 a B-6, divergências doc × código |
 | **CAT-05B** | ✅ Concluída | Decisões de produto (B-1, B-2) e contratos das subfases seguintes |
 | **CAT-05C** | ✅ Concluída | `ListingContext` + `ContextSanitizer` |
-| **CAT-05D** | 🔍 Em andamento | `ListingAssistant` interno, sem provider externo — implementação concluída, aguardando revisão do diff |
+| **CAT-05D** | ✅ Concluída | `ListingAssistant` interno, sem provider externo |
 | **CAT-05E** | ⬜ | Antialucinação e `missing_information` |
 | **CAT-05F** | ⬜ | Resiliência e fronteiras |
 | **CAT-05G** | ⬜ | Testes, custo de consulta e segurança |
