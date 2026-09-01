@@ -111,14 +111,42 @@ Nenhum outro tipo existe. A inteligência nasce cobrindo os três.
 
 ### 2.2 Colunas reais de `products`
 
-Verificadas no MySQL de desenvolvimento, não apenas nas migrations:
+> **Atualizado pela CAT-DOM-02H (2026-08-31).** Esta lista descrevia as **29**
+> colunas que `products` tinha quando a trilha CAT começou, incluindo os doze
+> espelhos comerciais. Eles foram **removidos do schema**; a tabela tem hoje
+> **17 colunas**, todas canônicas. A lista abaixo é a atual — a anterior fica
+> registrada logo em seguida, porque explica de onde a inteligência partiu.
+
+Verificadas no MySQL 8.4 de desenvolvimento, não apenas nas migrations:
 
 ```text
-id  item_type  expositor_id  category_id  name  slug  description
-image_path  images(json)  price  weight  height  width  length
-price_type  modality  duration_min  is_featured  is_active  is_digital
-has_stock  stock_quantity  sort_order  created_at  updated_at
+id  item_type  expositor_id  canonical_delegate_expositor_id
+canonical_delegated_at  canonical_delegation_revoked_at  category_id
+name  slug  short_description  description  image_path  images(json)
+is_active  is_digital  created_at  updated_at
 ```
+
+**As doze colunas que saíram**, e para onde foram — todas para
+`product_offers`, que é a autoridade comercial desde a CAT-DOM-02C:
+
+```text
+price  price_type  modality  duration_min  weight  height  width  length
+has_stock  stock_quantity  is_featured  sort_order
+```
+
+A lista canônica delas vive em código, não aqui:
+`SaveProductWithOffer::ESPELHOS_COMERCIAIS_LEGADOS`.
+
+**O que ficou, e por quê.** `is_active` é validade canônica do item e pertence à
+curadoria (D-CAT-10) — nunca foi espelho, e existe nas duas tabelas com
+significados diferentes. `expositor_id` é **proveniência** (D-CAT-11): registra
+quem trouxe o item ao catálogo, e não autoriza nada. As três colunas
+`canonical_*` são a delegação de edição canônica (D-CAT-09).
+
+**Para a inteligência, a mudança é a favor.** O matcher e a similaridade sempre
+leram só identidade — nome, descrição, resumo, eixo, categoria. Agora `products`
+não tem mais nada além disso, e nenhuma leitura futura pode se apoiar em preço
+ou estoque por acidente.
 
 Migrations que formam essa tabela:
 
@@ -126,11 +154,16 @@ Migrations que formam essa tabela:
 - `2026_06_13_000003_alter_products_add_fase3_fields.php`
 - `2026_07_01_000002_add_shipping_dimensions_to_products_table.php`
 - `2026_07_01_800001_add_is_digital_to_products_table.php`
+- `2026_08_26_150001_add_short_description_to_products_table.php` — CAT-02
+- `2026_08_30_100001_add_canonical_delegation_to_products.php` — CAT-DOM-02C
+- `2026_08_31_200001_remove_legacy_offer_columns_from_products_table.php` —
+  CAT-DOM-02H, a que removeu os doze espelhos
 
-**Achado central para a CAT-02:** existia `description` (`text`, nullable) e
-**não existia `short_description`** — um card, uma busca e um compartilhamento
-tinham que truncar a descrição longa. **A CAT-02 acrescentou
-`short_description`** (`varchar(500)`, nullable, antes de `description`).
+**Achado central para a CAT-02:** na auditoria existia `description` (`text`,
+nullable) e **não existia `short_description`** — um card, uma busca e um
+compartilhamento tinham que truncar a descrição longa. **A CAT-02 acrescentou
+`short_description`** (`varchar(500)`, nullable, antes de `description`), e por
+isso ela já aparece na lista acima.
 Palavras-chave, tags e atributos estruturados continuam **fora** de `products`,
 de propósito: são multivalorados e pertencem às estruturas `catalog_*`.
 

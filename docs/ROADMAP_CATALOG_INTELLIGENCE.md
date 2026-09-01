@@ -12,9 +12,9 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-DOM-01 concluída** — produto mestre × oferta do expositor |
+| Fase atual | **CAT-DOM-02 concluída** (02A→02I) — fundação do domínio de catálogo |
 | Próxima | CAT-05 — assistente de conteúdo |
-| Suíte | 594 passed · 1626 assertions · 0 failures |
+| Suíte | 1048 passed · 3117 assertions · 0 failures |
 | Código do módulo | `App\CatalogIntelligence`: 6 enums, 3 models, 5 Actions, 4 DTOs, 3 Support, 1 Query, 1 Command, 1 Provider |
 | Branch | `main` |
 
@@ -55,6 +55,7 @@ Qualquer regressão em relação a esses números precisa ser justificada.
 | **CAT-03** | ✅ Concluída | Base de conhecimento, proveniência e governança |
 | **CAT-04** | ✅ Concluída | Motor de similaridade determinístico e explicável |
 | **CAT-DOM-01** | ✅ Concluída | Separação entre produto mestre e oferta do expositor |
+| **CAT-DOM-02** | ✅ Concluída | Fundação do domínio (02A→02I): autoridade, conteúdo por oferta, cutover, isolamento, preparação multi-oferta, remoção do espelho legado e hardening — detalhada no `ROADMAP.md` principal |
 | **CAT-05** | ⬜ Próxima | Assistente de conteúdo |
 | **CAT-06** | ⬜ | Integração opcional com IA externa |
 | **CAT-07** | ⬜ | Feedback humano e memória |
@@ -254,8 +255,13 @@ aditivas, 75 ofertas backfilladas 1:1 com **zero divergências** no MySQL real.
 **Decisões humanas da fase.** (H-1) Item de expositor inativo **sai das
 vitrines** — o produto e o conhecimento continuam no catálogo e voltam a
 aparecer quando outro expositor criar uma oferta. (H-2) As colunas comerciais
-**permanecem** em `products`, sem migration destrutiva; ficam em espelho,
-mantido pela `SaveProductWithOffer`, como dívida D-1.
+**permaneceram** em `products` naquela fase, sem migration destrutiva; ficaram
+em espelho, mantido pela `SaveProductWithOffer`, como dívida D-1.
+
+> **A dívida D-1 foi quitada.** A CAT-DOM-02C encerrou a escrita no espelho e a
+> **CAT-DOM-02H removeu as doze colunas** do schema — `products` foi de 29 para
+> 17 colunas. A decisão (H-2) descreve o estado daquela fase, e não o atual.
+> Ver [`CAT_DOM_02H_REMOCAO_COLUNAS_LEGADAS_PRODUCTS.md`](CAT_DOM_02H_REMOCAO_COLUNAS_LEGADAS_PRODUCTS.md).
 
 **Auditoria (01A).** 75 produtos, todos ativos, todos com expositor e com preço;
 **zero** nomes repetidos entre lojas, **zero** pedidos e itens de carrinho.
