@@ -26,17 +26,41 @@ use Illuminate\Support\Facades\DB;
  * da trilha é **reaproveitar conhecimento entre lojas**, e limitar ao próprio
  * expositor esvaziaria isso — um lojista novo não teria referência alguma.
  *
- * O que é lido já é público: apenas itens `is_active`, e apenas nome, categoria
- * e conceitos, exatamente o que qualquer visitante vê em `/produtos` e
- * `/loja/{slug}`. Nada de estoque, custo, dono, pedido ou dado de gestão sai
- * daqui. A SEC-02 continua valendo integralmente — ela protege **edição** de
- * item alheio, e nada nesta consulta escreve.
+ * O que é lido já é público: apenas nome, categoria e conceitos, exatamente o
+ * que qualquer visitante vê em `/produtos` e `/loja/{slug}`. Nada de estoque,
+ * custo, dono, pedido ou dado de gestão sai daqui. A SEC-02 continua valendo
+ * integralmente — ela protege **edição** de item alheio, e nada nesta consulta
+ * escreve.
+ *
+ * ## Vigência: o que é sugerido é o que alguém está vendendo (CAT-05B, M-17)
+ *
+ * Até aqui o filtro era `products.is_active` solto, e a frase acima era falsa.
+ * A CAT-DOM-01 tirou de `products` a resposta sobre visibilidade, e a D-CAT-10
+ * deu a essa coluna outro significado: **validade canônica do item**, decidida
+ * pela curadoria. Quem responde "o público vê isto?" passou a ser
+ * `ProductOffer::scopeVigente()` — oferta ativa, produto ativo e expositor
+ * ativo. Um item com produto ativo e oferta desligada continuava saindo daqui
+ * como sugestão, e a sua página pública responde 404.
+ *
+ * A regra **não é reescrita aqui**: a consulta pede
+ * `Product::scopeComOfertaVigente()`, que delega ao escopo da oferta. É a
+ * mesma concentração que impede o catálogo por eixo e a página da loja de
+ * divergirem, agora valendo também para a similaridade.
+ *
+ * **Isto não contradiz a D-CAT-21.** Um `Product` sem oferta continua ativo no
+ * catálogo interno e na Catalog Intelligence: o conhecimento associado a ele
+ * permanece, ele continua sendo comparado *a partir* de si mesmo e volta a
+ * aparecer no instante em que alguém criar uma oferta vigente. O que ele deixa
+ * de fazer é ser **oferecido a outro lojista como referência** — sugerir o que
+ * ninguém vende é sugerir um 404.
  *
  * ## Custo
  *
- * Duas consultas, independentemente do tamanho do catálogo: os conceitos do
- * item de origem e, numa só varredura do pivot, todos os itens que
- * compartilham algum deles. Não há laço com consulta dentro.
+ * Três consultas, independentemente do tamanho do catálogo: os conceitos do
+ * item de origem, uma só varredura do pivot com todos os itens que compartilham
+ * algum deles, e a hidratação dos produtos encontrados. A vigência entra como
+ * subconsulta na segunda, e não como consulta a mais. Não há laço com consulta
+ * dentro.
  */
 class FindSimilarProducts
 {
@@ -64,7 +88,11 @@ class FindSimilarProducts
             ->whereIn('pk.knowledge_entry_id', $meus->keys()->all())
             // Um item nunca é semelhante a si mesmo.
             ->where('pk.product_id', '!=', $product->id)
-            ->where('p.is_active', true)
+            // Só o que alguém está de fato oferecendo. A regra inteira vem do
+            // escopo do domínio — produto ativo, oferta ativa e expositor
+            // ativo —, e não é repetida aqui: repetir seria criar a segunda
+            // definição de vigência que a CAT-DOM-01 existiu para eliminar.
+            ->whereIn('pk.product_id', Product::query()->comOfertaVigente()->select('products.id'))
             ->select('pk.product_id', 'pk.knowledge_entry_id', 'pk.source', 'p.category_id')
             ->get()
             ->groupBy('product_id');

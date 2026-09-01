@@ -224,7 +224,21 @@ class ProdutoMestreOfertaTest extends TestCase
             'product_id' => $vizinho->product_id,
             'knowledge_entry_id' => $conceitoId,
         ]);
-        $this->assertCount(1, app(FindSimilarProducts::class)($origem->product));
+
+        // **Revisto na CAT-05B (D-CAT-05B-2).** Até aqui este teste afirmava
+        // que o vizinho continuava saindo como semelhante, e essa afirmação
+        // era a dívida M-17 congelada em asserção: `FindSimilarProducts`
+        // filtrava `products.is_active`, que depois da D-CAT-10 significa
+        // validade canônica e não visibilidade. Sugerir a outro lojista um
+        // item que ninguém vende é sugerir uma página que responde 404.
+        //
+        // O que a 01G existe para provar continua provado, e agora pelos dois
+        // lados: o conhecimento **não é apagado** (asserção acima) e o item
+        // que perdeu o vendedor **continua enxergando** o catálogo (asserção
+        // abaixo). O que ele deixa de ser é oferecido como referência.
+        $this->assertCount(0, app(FindSimilarProducts::class)($origem->product));
+
+        $this->assertCount(1, app(FindSimilarProducts::class)($vizinho->product));
     }
 
     // ─── SEC-02 no novo alvo (01F) ──────────────────────────────────────────

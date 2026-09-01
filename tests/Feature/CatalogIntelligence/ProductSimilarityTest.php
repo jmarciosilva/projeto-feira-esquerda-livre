@@ -430,12 +430,98 @@ class ProductSimilarityTest extends TestCase
         $this->assertCount(0, app(FindSimilarProducts::class)($sozinho));
     }
 
-    public function test_inactive_products_are_not_returned_as_similar(): void
+    // ── Vigência: só se sugere o que alguém está vendendo (CAT-05B, M-17) ─────
+
+    /**
+     * Os três eixos da vigência, um por vez.
+     *
+     * Antes da CAT-05B só o primeiro era coberto, e só ele funcionava: o filtro
+     * era `products.is_active` solto. Os outros dois passavam despercebidos
+     * porque `ProductFactory` cria tudo ativo — e no banco de desenvolvimento
+     * não havia um único expositor inativo para denunciar o furo.
+     *
+     * @return array<string, array{0: \Closure}>
+     */
+    public static function eixosDeVigencia(): array
+    {
+        return [
+            'produto sem validade canônica' => [
+                fn (Product $b) => $b->update(['is_active' => false]),
+            ],
+            'oferta desligada pelo lojista' => [
+                fn (Product $b) => $b->offers()->update(['is_active' => false]),
+            ],
+            'expositor fora da Feira' => [
+                fn (Product $b) => $b->offers->first()->expositor->update(['is_active' => false]),
+            ],
+        ];
+    }
+
+    /** @dataProvider eixosDeVigencia */
+    public function test_item_sem_oferta_vigente_nao_e_sugerido_como_semelhante(\Closure $tirarDeVigencia): void
     {
         [$a, $b] = $this->doisItensComConhecimentoEmComum();
-        $b->update(['is_active' => false]);
+
+        // Antes: os dois se enxergam.
+        $this->assertCount(1, app(FindSimilarProducts::class)($a));
+
+        $tirarDeVigencia($b->load('offers.expositor'));
 
         $this->assertCount(0, app(FindSimilarProducts::class)($a));
+    }
+
+    /** Sem nenhuma oferta não há quem venda — e sugerir isso é sugerir um 404. */
+    public function test_item_sem_oferta_alguma_nao_e_sugerido_como_semelhante(): void
+    {
+        [$a] = $this->doisItensComConhecimentoEmComum();
+
+        $orfao = Product::factory()->semOferta()->create([
+            'name' => 'Manta de crochê artesanal para decoração',
+        ]);
+        app(AssociateProductKnowledge::class)($orfao, $this->match($orfao->name));
+
+        $encontrados = app(FindSimilarProducts::class)($a)->pluck('product.id')->all();
+
+        $this->assertNotContains($orfao->id, $encontrados);
+    }
+
+    /**
+     * A contrapartida da D-CAT-21: o item sem oferta **continua no catálogo
+     * interno e na Catalog Intelligence**.
+     *
+     * A vigência filtra quem é *oferecido como referência*, nunca quem pode
+     * *pedir* referência. Se filtrasse os dois lados, o produto que ficou sem
+     * vendedor perderia o conhecimento acumulado na prática — exatamente o que
+     * a CAT-DOM-01 existiu para impedir.
+     */
+    public function test_item_sem_oferta_continua_encontrando_semelhantes(): void
+    {
+        [, $b] = $this->doisItensComConhecimentoEmComum();
+
+        $orfao = Product::factory()->semOferta()->create([
+            'name' => 'Manta de crochê artesanal para decoração',
+        ]);
+        app(AssociateProductKnowledge::class)($orfao, $this->match($orfao->name));
+
+        $encontrados = app(FindSimilarProducts::class)($orfao)->pluck('product.id')->all();
+
+        $this->assertContains($b->id, $encontrados);
+    }
+
+    /** O conhecimento não é apagado por perder vigência — ele só deixa de ser sugerido. */
+    public function test_perder_vigencia_nao_apaga_o_conhecimento_do_item(): void
+    {
+        [, $b] = $this->doisItensComConhecimentoEmComum();
+
+        $conceitosAntes = DB::table('catalog_product_knowledge')->where('product_id', $b->id)->count();
+        $this->assertGreaterThan(0, $conceitosAntes);
+
+        $b->offers()->update(['is_active' => false]);
+
+        $this->assertSame(
+            $conceitosAntes,
+            DB::table('catalog_product_knowledge')->where('product_id', $b->id)->count(),
+        );
     }
 
     /** O conhecimento é global: a referência atravessa lojistas de propósito. */
