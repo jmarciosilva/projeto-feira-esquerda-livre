@@ -12,9 +12,10 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-DOM-02 concluída** (02A→02I) — fundação do domínio de catálogo |
-| Próxima | CAT-05 — assistente de conteúdo |
-| Suíte | 1048 passed · 3117 assertions · 0 failures |
+| Fase atual | **CAT-05B — decisões de produto e contratos** 🔍 (a CAT-05 foi subdividida em A→H) |
+| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria de reconciliação |
+| Próxima | CAT-05C — `ListingContext` + `ContextSanitizer` |
+| Suíte | 1053 passed · 3127 assertions · 0 failures |
 | Código do módulo | `App\CatalogIntelligence`: 6 enums, 3 models, 5 Actions, 4 DTOs, 3 Support, 1 Query, 1 Command, 1 Provider |
 | Branch | `main` |
 
@@ -56,13 +57,31 @@ Qualquer regressão em relação a esses números precisa ser justificada.
 | **CAT-04** | ✅ Concluída | Motor de similaridade determinístico e explicável |
 | **CAT-DOM-01** | ✅ Concluída | Separação entre produto mestre e oferta do expositor |
 | **CAT-DOM-02** | ✅ Concluída | Fundação do domínio (02A→02I): autoridade, conteúdo por oferta, cutover, isolamento, preparação multi-oferta, remoção do espelho legado e hardening — detalhada no `ROADMAP.md` principal |
-| **CAT-05** | ⬜ Próxima | Assistente de conteúdo |
+| **CAT-05** | 🔍 Em andamento | Assistente de conteúdo — subdividida em A→H logo abaixo |
 | **CAT-06** | ⬜ | Integração opcional com IA externa |
 | **CAT-07** | ⬜ | Feedback humano e memória |
 | **CAT-08** | ⬜ | Interface administrativa da inteligência |
 | **CAT-09** | ⬜ | Integração no cadastro |
 | **CAT-10** | ⬜ | Observabilidade, custos e segurança |
 | **CAT-11** | ⬜ | Hardening, testes e documentação final |
+
+### Subfases da CAT-05
+
+A auditoria de reconciliação (CAT-05A) subdividiu a fase em oito subfases, pelo
+mesmo motivo que levou a CAT-03, a CAT-04 e a CAT-DOM-01 a se subdividirem: a
+fase mistura decisão de produto, contrato, implementação e validação, e sem
+subfase não há onde parar entre uma coisa e outra.
+
+| Subfase | Status | Entregável |
+|---|---|---|
+| **CAT-05A** | ✅ Concluída | Auditoria de reconciliação — 13 itens, blockers B-1 a B-6, divergências doc × código |
+| **CAT-05B** | 🔍 Em andamento | Decisões de produto (B-1, B-2) e contratos das subfases seguintes |
+| **CAT-05C** | ⬜ | `ListingContext` + `ContextSanitizer` |
+| **CAT-05D** | ⬜ | `ListingAssistant` interno, sem provider externo |
+| **CAT-05E** | ⬜ | Antialucinação e `missing_information` |
+| **CAT-05F** | ⬜ | Resiliência e fronteiras |
+| **CAT-05G** | ⬜ | Testes, custo de consulta e segurança |
+| **CAT-05H** | ⬜ | Validação real sobre os 75 itens e documentação final |
 
 ---
 
@@ -299,7 +318,7 @@ de produtos, `migrate:fresh`, Pint global ou enfraquecimento da SEC-02.
 
 ---
 
-## CAT-05 — Assistente de conteúdo ⬜
+## CAT-05 — Assistente de conteúdo 🔍
 
 `ListingContext` → `ListingAssistant` → `ListingSuggestion` estruturado:
 `suggested_name`, `short_description`, `description`, `keywords`,
@@ -307,6 +326,26 @@ de produtos, `migrate:fresh`, Pint global ou enfraquecimento da SEC-02.
 
 Antialucinação com teste explícito: atributo não informado não aparece no texto;
 falta vira pedido de informação.
+
+> **Fase subdividida em CAT-05A…CAT-05H pela auditoria de reconciliação**
+> (2026-09-01). A subdivisão e os seus motivos estão em
+> [`CAT_05A_AUDITORIA_DE_RECONCILIACAO.md`](CAT_05A_AUDITORIA_DE_RECONCILIACAO.md),
+> junto com o estado real do módulo, as divergências entre documentação e código
+> e os seis blockers levantados. A tabela das subfases está em **Fases**, acima.
+
+**Decisões de produto, tomadas na CAT-05B** (detalhe, justificativa e decision
+log em [`CAT_05B_DECISOES_DE_PRODUTO_E_CONTRATOS.md`](CAT_05B_DECISOES_DE_PRODUTO_E_CONTRATOS.md)):
+
+- **B-1 — a CAT-05 só sugere, nunca aplica.** Nenhum caminho da fase escreve em
+  `Product`, chama `SaveProductWithOffer` ou aciona
+  `ProductPolicy::updateCanonical`. `ListingSuggestion` é sempre
+  pré-visualização. Aplicar a sugestão a um item existente — inclusive o caso do
+  lojista sem delegação canônica — é **CAT-09**.
+- **B-2 — a similaridade passa a ler apenas o que está vigente.** `FindSimilarProducts`
+  filtrava `products.is_active` solto, que depois da D-CAT-10 significa validade
+  canônica e não visibilidade. Passou a exigir a mesma vigência de
+  `ProductOffer::scopeVigente()`. Fecha a dívida **M-17**, que já estava
+  endereçada nominalmente a esta fase.
 
 ---
 

@@ -1447,9 +1447,17 @@ Nenhuma foi resolvida nesta fase, que não escreveu código.
 | M-13 CI sem `product_offer_id` nos eventos | **Aberta** |
 | M-14 fallback de expositor no `ProductResource` | **Aberta** |
 | M-16 leitura de `Product::expositor` no AVA | **Aberta** |
-| M-17 `FindSimilarProducts` sem vigência | **Aberta** |
+| M-17 `FindSimilarProducts` sem vigência | ✅ **Fechada na CAT-05B** (D-CAT-05B-2) |
 | D-1 colunas comerciais legadas | **Aberta** — CAT-DOM-02H |
 | Remoção de coluna | Critério da auditoria CAT-DOM-02 permanece obrigatório |
+
+> **M-17.** Fechada fora desta trilha, pela **CAT-05B**, que era o destino que
+> esta tabela e a CAT-DOM-01 já lhe davam. `FindSimilarProducts` deixou de
+> filtrar `products.is_active` solto e passou a exigir a vigência de
+> `ProductOffer::scopeVigente()` para quem é **oferecido** como semelhante — a
+> origem da consulta continua sem filtro, preservando a D-CAT-21. Decisão,
+> justificativa e o conflito que ela expôs num teste da 01G em
+> [`CAT_05B_DECISOES_DE_PRODUTO_E_CONTRATOS.md`](CAT_05B_DECISOES_DE_PRODUTO_E_CONTRATOS.md).
 
 ---
 
