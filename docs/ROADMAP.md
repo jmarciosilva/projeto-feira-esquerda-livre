@@ -2114,8 +2114,8 @@ impede o cadastro manual**.
 | CAT-03 — Base de conhecimento | ✅ Concluída |
 | CAT-04 — Motor de similaridade | ✅ Concluída |
 | CAT-DOM-01 — Produto mestre × oferta do expositor | ✅ Concluída |
-| CAT-05 — Assistente de conteúdo | ⬜ Próxima |
-| CAT-06 — IA externa (opcional) | ⬜ |
+| CAT-05 — Assistente de conteúdo | ✅ Concluída |
+| CAT-06 — IA externa (opcional) | ⬜ Próxima — bloqueada por 3 gates |
 | CAT-07 — Feedback humano e memória | ⬜ |
 | CAT-08 — Interface administrativa | ⬜ |
 | CAT-09 — Integração no cadastro | ⬜ |
@@ -2666,6 +2666,87 @@ seller linking, IA, scoring e similaridade.
 
 Decisões, matrizes de autoridade e ciclo de vida, e os gates de multi-oferta:
 [`CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md`](CAT_DOM_02B_AUTORIDADE_E_CURADORIA_DO_CATALOGO.md).
+
+**CAT-05 (concluída em 2026-09-02).** O assistente de conteúdo — a fase que dá
+ao lojista um resumo, uma descrição e palavras-chave a partir do que a Feira já
+sabe sobre o item. Subdividida em **oito subfases (A→H)** por uma auditoria de
+reconciliação que encontrou seis blockers, dois deles decisões de produto.
+
+**A decisão que define a fase: sugerir não é salvar.** Nenhum caminho da CAT-05
+escreve uma linha — não chama `SaveProductWithOffer`, não aciona
+`ProductPolicy::updateCanonical`, não persiste associação. `ListingSuggestion` é
+sempre pré-visualização, e aplicar ao item é **CAT-09**. O assistente nem sequer
+associa conhecimento ao produto, apesar de ter os candidatos em mãos: sugerir
+texto e afirmar conhecimento são atos diferentes, e o segundo entra na base e
+volta reforçando outros itens.
+
+**Sem provider externo.** `source` é sempre `internal`; `CatalogAiProvider`,
+`PromptGuard` e `SuggestionPolicy` pertencem à CAT-06 e não foram adiantados.
+Três decisões de honestidade: `suggested_name` é sempre nulo (não há base para
+preferir um nome a outro sem geração real), `confidence` fica nula (o score
+ordena, não mede — *"87,3% de similaridade" seria falsa ciência*) e **campo já
+preenchido não recebe proposta**.
+
+**Minimização estrutural, não disciplinar.** `ListingContext` tem campos fixos,
+construtor privado e nenhum parâmetro que aceite `ProductOffer` ou `Expositor` —
+não existe caminho por onde dado comercial ou pessoal entre. O `ContextSanitizer`
+importa de `SaveProductWithOffer` a lista do que é condição de venda, em vez de
+copiá-la.
+
+**As três regras invioláveis ganharam prova.** *Não inventa fatos objetivos*:
+`missing_information` devolve *"informe o material"* em vez de inventar material
+— e a validação final mediu isso em **75 itens reais**, sem uma única invenção de
+material, origem ou medida. *Nada é salvo sem aprovação humana*: teste que
+confere produto, pivot, conceitos e ofertas antes e depois. *Falha da
+inteligência não bloqueia cadastro*: o assistente captura as duas chamadas ao
+motor da CAT-04, degrada **parcialmente** — se cai só a similaridade, a sugestão
+sobrevive — e nenhuma exceção sai dele; há ainda um teste estrutural que falha se
+o caminho de cadastro passar a conhecer o módulo.
+
+**Custo travado:** a CAT-04 media as duas metades do motor em separado (≤3 cada);
+o assistente inteiro tem teto de **6 consultas**, a soma exata, estável de 3 a 32
+conceitos e de 6 a 20 itens semelhantes.
+
+**Validação sobre o catálogo real (CAT-05H).** O backfill de conhecimento foi
+executado em ciclo controlado no MySQL de desenvolvimento e **revertido ao
+final** — 0 → 85 associações → validação → 0. Dos 75 itens, **45 receberam
+proposta e 30 vieram vazios**; 44 ganharam itens semelhantes onde antes eram
+zero. Quatro achados que só corpus real revela foram medidos e endereçados, **sem
+correção oportunista**: o caminho da descrição nunca roda porque todos os 75 já
+têm descrição; as palavras-chave não ponderam por score; o casamento por frase
+exata não alcança *"ajuste de roupa"* dentro de *"Ajuste e Reforma de Roupa"*; e
+8 dos 28 conceitos curados não aparecem em item nenhum — **`Crochê` entre eles**,
+o exemplo canônico de toda a trilha.
+
+**O backfill do catálogo de produção continua pendente**, por decisão: sem
+superfície de curadoria (gate G-1), uma associação automática errada não teria
+tela para ser desfeita.
+
+Suíte: 1104 → **1139 passed · 4028 assertions · 0 failures**.
+
+| Subfase | Status | Entregável |
+|---|---|---|
+| CAT-05A — Auditoria de reconciliação | ✅ Concluída | 6 blockers, subdivisão em A→H, divergências doc × código |
+| CAT-05B — Decisões de produto e contratos | ✅ Concluída | D-CAT-05B-1 a 4; similaridade passa a ler só o vigente (M-17) |
+| CAT-05C — Contexto e minimização | ✅ Concluída | `ListingContext` + `ContextSanitizer`, fronteira estrutural |
+| CAT-05D — Assistente interno | ✅ Concluída | `GenerateListingSuggestion`, sem provider, sem escrita |
+| CAT-05E — Antialucinação e pedidos legíveis | ✅ Concluída | `ListingGap`, keywords por termo comercial e sinônimo |
+| CAT-05F — Resiliência e fronteiras | ✅ Concluída | Degradação parcial, guarda de log, fronteira do cadastro |
+| CAT-05G — Testes, custo e segurança | ✅ Concluída | Teto de 6 consultas, fronteira de prompt |
+| CAT-05H — Validação real e encerramento | ✅ Concluída | 75 itens, ciclo de backfill revertido, 4 achados endereçados |
+
+**A CAT-06 está bloqueada por três gates**, todos nascidos na própria CAT-05 e
+todos com a mesma natureza — coisas que só passam a existir quando o texto sair
+da aplicação, e nenhuma descobrível depois de já estar saindo: **C-2** (redação
+de PII em texto livre — o sanitizer filtra campos, não conteúdo), **F-1** (quem
+recebe a sugestão não distingue *"a base não conhece"* de *"a inteligência
+falhou"*) e **S-1** (teste de prompt injection, que hoje passaria por ausência de
+mecanismo).
+
+Documento da fase e encerramento consolidado:
+[`CAT_05H_VALIDACAO_REAL_E_ENCERRAMENTO.md`](CAT_05H_VALIDACAO_REAL_E_ENCERRAMENTO.md).
+Roadmap executável da trilha, com as oito subfases e todas as dívidas:
+[`ROADMAP_CATALOG_INTELLIGENCE.md`](ROADMAP_CATALOG_INTELLIGENCE.md).
 
 ---
 
