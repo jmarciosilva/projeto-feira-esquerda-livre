@@ -12,7 +12,7 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-05H — validação real e documentação final** (a CAT-05 foi subdividida em A→H) |
+| Fase atual | **CAT-05H — validação real e documentação final** 🔍 (encerra a CAT-05) |
 | Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno; **CAT-05E** — antialucinação; **CAT-05F** — resiliência e fronteiras; **CAT-05G** — custo de consulta e fronteira de prompt |
 | Próxima | CAT-06 — IA externa (opcional), bloqueada pelos gates C-2, F-1 e S-1 |
 | Suíte | 1139 passed · 4028 assertions · 0 failures |
@@ -81,7 +81,7 @@ subfase não há onde parar entre uma coisa e outra.
 | **CAT-05E** | ✅ Concluída | Antialucinação e `missing_information` |
 | **CAT-05F** | ✅ Concluída | Resiliência e fronteiras |
 | **CAT-05G** | ✅ Concluída | Testes, custo de consulta e segurança |
-| **CAT-05H** | ⬜ | Validação real sobre os 75 itens e documentação final |
+| **CAT-05H** | 🔍 Em andamento | Validação real sobre os 75 itens e documentação final — validação concluída, aguardando revisão do diff |
 
 ---
 
@@ -416,6 +416,63 @@ trava a **precondição** — `PromptGuard` não existe, nenhum dos 30 arquivos 
 módulo monta prompt ou nomeia fornecedor. A **S-2** nasce endereçada à CAT-09. A
 revisão das sete dívidas abertas confirmou que **nenhuma** foi resolvida de
 raspão pela CAT-05F.
+
+**CAT-05H — validação real e encerramento**
+([`CAT_05H_VALIDACAO_REAL_E_ENCERRAMENTO.md`](CAT_05H_VALIDACAO_REAL_E_ENCERRAMENTO.md)).
+Sem código: nenhum arquivo de `app/`, nenhum teste, nenhum comando novo. **P-1
+foi executada em ciclo controlado e revertida** — 0 → 85 → validação → 0, os
+quatro momentos registrados lado a lado. O que destravou a decisão foi separar
+dois ambientes que a CAT-05D tratava como um: *"irreversível na prática"* vale
+para produção, e não valia para um pivot vazio, sem associação humana e sem FK
+apontando para ele. **P-1 continua aberta** — o backfill de produção segue sendo
+decisão humana, e depende do G-1. Sobre os 75 itens: **45 com proposta, 30
+vazios**, resumo médio de 82 caracteres, nenhuma invenção de material ou origem
+em 75 de 75, supressão de lacuna funcionando em 45 casos reais, e 44 itens com
+semelhantes onde antes eram 0. Quatro achados que só o corpus real revelou, todos
+**medidos e endereçados, nenhum corrigido**: **D-1** (o caminho da descrição
+nunca roda, porque `description` está cheia em 75/75 — inverso exato da B-4),
+**D-2** (`palavrasChave()` não pondera por score: conceito de peso 3 vira
+palavra-chave igual a um de peso 10), **D-3** (casamento por frase exata não
+alcança *"ajuste de roupa"* dentro de *"Ajuste e Reforma de Roupa"* — o caso que
+motivou a P-4 continua sem casar pelo outro lado) e **D-4** (8 dos 28 conceitos
+sem evidência direta em item nenhum, **`Crochê` entre eles** — o exemplo canônico
+de toda a trilha não existe no catálogo real).
+
+### Encerramento da CAT-05 — quadro consolidado A→H
+
+| Subfase | Entrega | Código |
+|---|---|---|
+| **05A** | Auditoria de reconciliação; 6 blockers; subdivisão em A→H | Não |
+| **05B** | D-CAT-05B-1 a 4; fechamento de M-17 | Mínimo |
+| **05C** | `ListingContext` + `ContextSanitizer`; minimização estrutural | Sim |
+| **05D** | `GenerateListingSuggestion`; `ListingSuggestion`; sem provider | Sim |
+| **05E** | `ListingGap`; keywords por termo; pedidos legíveis | Sim |
+| **05F** | Captura de falha do motor; guarda de log; fronteira do cadastro | Sim |
+| **05G** | Teto de 6 consultas; fronteira de prompt | Só docblock |
+| **05H** | Validação real sobre 75 itens; encerramento | Não |
+
+**Dívidas abertas ao fim da CAT-05, e para onde cada uma foi:**
+
+| # | Item | Endereçada a |
+|---|---|---|
+| **C-2** · **F-1** · **S-1** | Redação de texto livre · sinal de modo degradado · teste de prompt injection | **CAT-06** — os três são **gates**, não "pertence a" |
+| **C-1** · **S-2** | `knownAttributes` por denylist · a sugestão é conteúdo de usuário | **CAT-09** |
+| **D-1** | Caminho da descrição sem cobertura real | **CAT-09** (proposta) |
+| **D-2** | `palavrasChave()` não pondera por score | **CAT-07** (proposta; alternativa CAT-11) |
+| **D-3** | Casamento por frase exata | **CAT-11** (proposta) — reabre a CAT-04 e é troca, não correção |
+| **G-1** · **D-4** | Sem superfície de curadoria · 8 conceitos sem uso | **CAT-08** |
+| **P-1** | Backfill do catálogo de produção | Decisão humana, **depois do G-1** |
+| **B-4** · **E-1** | Corpus de seeder · `KnowledgeTermType::Keyword` sem uso | Sem fase — dependem de catálogo real e de um primeiro registro |
+
+Fechadas ao longo da fase: **B-1**, **B-2**, **M-17** (CAT-05B) e **P-4**
+(CAT-05E).
+
+**As três regras invioláveis, ao fim da CAT-05:** *não inventa fatos objetivos*
+— provado por fixture e **medido em 75 itens reais**; *nada é salvo sem aprovação
+humana* — o assistente não escreve uma linha, com teste que confere produto,
+pivot, conceitos e ofertas antes e depois; *falha da inteligência não bloqueia
+cadastro* — teste explícito na CAT-05F, com a fronteira estrutural que impede o
+cadastro de sequer conhecer o módulo.
 
 ---
 
