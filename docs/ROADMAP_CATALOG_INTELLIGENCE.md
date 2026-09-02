@@ -12,10 +12,10 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-05G — testes, custo de consulta e segurança** 🔍 (a CAT-05 foi subdividida em A→H) |
-| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno; **CAT-05E** — antialucinação; **CAT-05F** — resiliência e fronteiras |
-| Próxima | CAT-05H — validação real sobre os 75 itens e documentação final |
-| Suíte | 1126 passed · 3372 assertions · 0 failures |
+| Fase atual | **CAT-05H — validação real e documentação final** (a CAT-05 foi subdividida em A→H) |
+| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno; **CAT-05E** — antialucinação; **CAT-05F** — resiliência e fronteiras; **CAT-05G** — custo de consulta e fronteira de prompt |
+| Próxima | CAT-06 — IA externa (opcional), bloqueada pelos gates C-2, F-1 e S-1 |
+| Suíte | 1139 passed · 4028 assertions · 0 failures |
 | Código do módulo | `App\CatalogIntelligence`: 6 enums, 3 models, 5 Actions, 5 DTOs, 4 Support, 1 Query, 1 Command, 1 Provider |
 | Branch | `main` |
 
@@ -80,7 +80,7 @@ subfase não há onde parar entre uma coisa e outra.
 | **CAT-05D** | ✅ Concluída | `ListingAssistant` interno, sem provider externo |
 | **CAT-05E** | ✅ Concluída | Antialucinação e `missing_information` |
 | **CAT-05F** | ✅ Concluída | Resiliência e fronteiras |
-| **CAT-05G** | 🔍 Em andamento | Testes, custo de consulta e segurança — implementação concluída, aguardando revisão do diff |
+| **CAT-05G** | ✅ Concluída | Testes, custo de consulta e segurança |
 | **CAT-05H** | ⬜ | Validação real sobre os 75 itens e documentação final |
 
 ---
