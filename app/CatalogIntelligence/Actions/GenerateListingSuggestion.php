@@ -8,6 +8,9 @@ use App\CatalogIntelligence\Enums\ListingGap;
 use App\CatalogIntelligence\Enums\SuggestionSource;
 use App\CatalogIntelligence\Queries\FindSimilarProducts;
 use App\Models\Product;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * O assistente de conteúdo — a única porta que o cadastro conhece (§3.2).
@@ -65,6 +68,21 @@ use App\Models\Product;
  *
  * O model entra aqui e **não** no `ListingContext`: a D-CAT-05B-3 mantém o
  * contexto livre de Eloquent, e é o assistente que faz a ponte.
+ *
+ * ## Falha da inteligência não bloqueia nada (CAT-05F)
+ *
+ * As duas chamadas ao motor da CAT-04 são capturadas aqui dentro. Se o
+ * casamento ou a similaridade lançarem, a sugestão degrada — vazia ou sem
+ * semelhantes — e **nenhuma exceção sai desta Action**. É a regra 3 das
+ * invioláveis implementada no único ponto onde ninguém pode esquecê-la.
+ *
+ * **Limitação conhecida, e é dívida (F-1).** Quem recebe a sugestão não
+ * consegue distinguir *"a base não conhece este item"* de *"a inteligência
+ * falhou"*: os dois devolvem `ListingSuggestion::vazia()`. A §3.3 prevê que a
+ * UI informe o modo degradado, e para isso a distinção precisará existir —
+ * mas dar um campo novo à sugestão reabriria a forma da §3.4, congelada na
+ * CAT-05D. Fica endereçada à **CAT-06**, quando existir um segundo modo de
+ * falha real (provider fora do ar) e a distinção passar a valer o campo.
  */
 class GenerateListingSuggestion
 {
@@ -105,17 +123,97 @@ class GenerateListingSuggestion
      */
     private function completar(ListingContext $contexto, ?Product $produto): ListingContext
     {
-        $completo = $contexto->comConhecimento(
-            ($this->matcher)($contexto->paraBuscaDeConhecimento())
-        );
+        $completo = $contexto;
+
+        try {
+            $completo = $completo->comConhecimento(
+                ($this->matcher)($contexto->paraBuscaDeConhecimento())
+            );
+        } catch (Throwable $falha) {
+            $this->registrarDegradacao('conhecimento', $falha);
+        }
 
         if ($produto === null) {
             return $completo;
         }
 
-        return $completo->comSemelhantes(
-            ($this->semelhantes)($produto, self::SEMELHANTES_NO_CONTEXTO)
-        );
+        try {
+            $completo = $completo->comSemelhantes(
+                ($this->semelhantes)($produto, self::SEMELHANTES_NO_CONTEXTO)
+            );
+        } catch (Throwable $falha) {
+            $this->registrarDegradacao('semelhantes', $falha);
+        }
+
+        return $completo;
+    }
+
+    /**
+     * A falha é registrada e engolida — de propósito (CAT-05F).
+     *
+     * ## Por que capturar em vez de propagar
+     *
+     * A regra 3 das invioláveis: *"Falha da inteligência não bloqueia cadastro.
+     * Provider fora do ar, sem credencial, resposta inválida, timeout — o
+     * cadastro manual continua funcionando integralmente."*
+     *
+     * O assistente é a **única porta** que o cadastro conhece (§3.2). Se ele
+     * propagasse, cada superfície futura precisaria do seu próprio `try/catch`,
+     * e a primeira que esquecesse quebraria a regra 3 sem que nada acusasse. É
+     * o mesmo raciocínio que fez a minimização morar no `ContextSanitizer` em
+     * vez de em quem chama: a garantia mora onde não dá para esquecê-la.
+     *
+     * ## Degradação parcial, não total
+     *
+     * As duas etapas são capturadas **em separado**, e a ordem importa. Se o
+     * casamento falha, não há conceito e `compor()` devolve a sugestão vazia
+     * pelo caminho que já existia. Se falha só a similaridade, o conhecimento
+     * continua de pé e a sugestão sai completa — o que se perde é a lista de
+     * itens semelhantes, que é acessório. Capturar as duas juntas jogaria fora
+     * um resultado bom por causa de um acessório que falhou.
+     *
+     * ## O que fica registrado, e o que não pode ficar
+     *
+     * `Log::warning` com a etapa e a classe da exceção, para que uma base de
+     * conhecimento quebrada não vire silenciosamente "nenhuma sugestão" — que é
+     * o custo real de engolir exceção, e a razão de isto não ser um `catch`
+     * vazio.
+     *
+     * A mensagem passa por `mensagemSegura()`. Ver o porquê lá: a §5.3 proíbe
+     * conteúdo sensível em log, e há um tipo de exceção que carrega o texto do
+     * lojista dentro da própria mensagem.
+     */
+    private function registrarDegradacao(string $etapa, Throwable $falha): void
+    {
+        Log::warning('catalog-intelligence: assistente degradado', [
+            'etapa' => $etapa,
+            'excecao' => $falha::class,
+            'mensagem' => $this->mensagemSegura($falha),
+        ]);
+    }
+
+    /**
+     * A mensagem da exceção, sem o texto do lojista dentro.
+     *
+     * `QueryException::getMessage()` **interpola os bindings no SQL**. Uma falha
+     * no matcher registraria, em texto puro no log, o nome e a descrição que o
+     * lojista digitou — e a dívida **C-2** diz exatamente que esse texto pode
+     * conter telefone ou e-mail que ele escreveu na descrição. O vazamento
+     * aconteceria no log, sem provider externo nenhum.
+     *
+     * A §5.3 é explícita: *"Sem registrar conteúdo sensível em log."* Por isso
+     * a exceção de banco entra pelo código SQLSTATE, que é o que serve ao
+     * diagnóstico, e o SQL fica de fora. Todo o resto entra pela mensagem
+     * normal — uma `RuntimeException` do próprio módulo não carrega dado de
+     * ninguém.
+     */
+    private function mensagemSegura(Throwable $falha): string
+    {
+        if ($falha instanceof QueryException) {
+            return 'QueryException SQLSTATE['.$falha->getCode().'] — SQL e bindings omitidos (§5.3)';
+        }
+
+        return $falha->getMessage();
     }
 
     private function compor(ListingContext $contexto): ListingSuggestion
