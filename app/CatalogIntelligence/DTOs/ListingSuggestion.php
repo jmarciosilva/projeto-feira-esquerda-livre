@@ -40,6 +40,29 @@ use App\CatalogIntelligence\Enums\SuggestionSource;
  *
  * O campo existe porque a §3.4 o nomeia e porque a CAT-06 pode ter uma medida
  * de verdade vinda do provider. Até lá, nulo.
+ *
+ * ## Este texto passou pelo lojista, e a CAT-09 precisa saber (dívida S-2)
+ *
+ * `shortDescription` e `description` são compostos **a partir do texto que o
+ * lojista digitou**: o nome do item abre as duas frases, sempre. O módulo não
+ * escapa nada — não é o papel dele, e escapar aqui gravaria entidade HTML
+ * dentro de um campo que a CAT-09 pode aplicar a `products.description`.
+ *
+ * A consequência é uma obrigação de quem renderiza: **a sugestão é conteúdo de
+ * usuário e tem de ser tratada como tal**. Blade escapa por padrão, então
+ * `{{ $sugestao->description }}` está correto e nada precisa ser feito — o que
+ * não pode acontecer é `{!! !!}`, nem `wire:ignore` com `innerHTML`, nem
+ * `v-html`, sob o raciocínio de que "o texto veio da inteligência". Não veio:
+ * veio do formulário, deu uma volta e voltou.
+ *
+ * É a mesma forma da dívida **C-1** — escrita por extenso ao lado do que a
+ * exige, e não só num documento —, e pela mesma razão: quem for escrever a
+ * tela lê este arquivo, não necessariamente o roadmap.
+ *
+ * Não é prompt injection, que é outra dívida (**S-1**) e outro gate: aquela
+ * trata de texto do lojista virando **instrução** para um provider, e só passa
+ * a existir na CAT-06. Esta trata de texto do lojista virando **marcação** numa
+ * página, e existe desde que a primeira tela renderizar uma sugestão.
  */
 final class ListingSuggestion
 {
