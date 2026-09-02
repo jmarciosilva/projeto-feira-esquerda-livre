@@ -12,9 +12,9 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-05H — validação real e documentação final** 🔍 (encerra a CAT-05) |
-| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno; **CAT-05E** — antialucinação; **CAT-05F** — resiliência e fronteiras; **CAT-05G** — custo de consulta e fronteira de prompt |
-| Próxima | CAT-06 — IA externa (opcional), bloqueada pelos gates C-2, F-1 e S-1 |
+| Fase atual | **CAT-06 — IA externa (opcional)** — bloqueada pelos gates C-2, F-1 e S-1 |
+| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno; **CAT-05E** — antialucinação; **CAT-05F** — resiliência e fronteiras; **CAT-05G** — custo de consulta e fronteira de prompt; **CAT-05H** — validação real. **A CAT-05 está encerrada (A→H)** |
+| Próxima | CAT-07 · CAT-08 · CAT-09 — nenhuma bloqueada; a CAT-08 fecha o G-1, que destrava P-1 e D-4 |
 | Suíte | 1139 passed · 4028 assertions · 0 failures |
 | Código do módulo | `App\CatalogIntelligence`: 6 enums, 3 models, 5 Actions, 5 DTOs, 4 Support, 1 Query, 1 Command, 1 Provider |
 | Branch | `main` |
@@ -57,8 +57,8 @@ Qualquer regressão em relação a esses números precisa ser justificada.
 | **CAT-04** | ✅ Concluída | Motor de similaridade determinístico e explicável |
 | **CAT-DOM-01** | ✅ Concluída | Separação entre produto mestre e oferta do expositor |
 | **CAT-DOM-02** | ✅ Concluída | Fundação do domínio (02A→02I): autoridade, conteúdo por oferta, cutover, isolamento, preparação multi-oferta, remoção do espelho legado e hardening — detalhada no `ROADMAP.md` principal |
-| **CAT-05** | 🔍 Em andamento | Assistente de conteúdo — subdividida em A→H logo abaixo |
-| **CAT-06** | ⬜ | Integração opcional com IA externa |
+| **CAT-05** | ✅ Concluída | Assistente de conteúdo — oito subfases (A→H), detalhadas logo abaixo |
+| **CAT-06** | ⬜ | Integração opcional com IA externa — **bloqueada** pelos gates C-2, F-1 e S-1 |
 | **CAT-07** | ⬜ | Feedback humano e memória |
 | **CAT-08** | ⬜ | Interface administrativa da inteligência |
 | **CAT-09** | ⬜ | Integração no cadastro |
@@ -81,7 +81,7 @@ subfase não há onde parar entre uma coisa e outra.
 | **CAT-05E** | ✅ Concluída | Antialucinação e `missing_information` |
 | **CAT-05F** | ✅ Concluída | Resiliência e fronteiras |
 | **CAT-05G** | ✅ Concluída | Testes, custo de consulta e segurança |
-| **CAT-05H** | 🔍 Em andamento | Validação real sobre os 75 itens e documentação final — validação concluída, aguardando revisão do diff |
+| **CAT-05H** | ✅ Concluída | Validação real sobre os 75 itens e documentação final |
 
 ---
 
@@ -318,7 +318,7 @@ de produtos, `migrate:fresh`, Pint global ou enfraquecimento da SEC-02.
 
 ---
 
-## CAT-05 — Assistente de conteúdo 🔍
+## CAT-05 — Assistente de conteúdo ✅
 
 `ListingContext` → `ListingAssistant` → `ListingSuggestion` estruturado:
 `suggested_name`, `short_description`, `description`, `keywords`,
