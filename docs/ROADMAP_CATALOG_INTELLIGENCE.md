@@ -12,7 +12,7 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-05F — resiliência e fronteiras** (a CAT-05 foi subdividida em A→H) |
+| Fase atual | **CAT-05F — resiliência e fronteiras** 🔍 (a CAT-05 foi subdividida em A→H) |
 | Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno; **CAT-05E** — antialucinação |
 | Próxima | CAT-05G — testes, custo de consulta e segurança |
 | Suíte | 1116 passed · 3352 assertions · 0 failures |
@@ -79,7 +79,7 @@ subfase não há onde parar entre uma coisa e outra.
 | **CAT-05C** | ✅ Concluída | `ListingContext` + `ContextSanitizer` |
 | **CAT-05D** | ✅ Concluída | `ListingAssistant` interno, sem provider externo |
 | **CAT-05E** | ✅ Concluída | Antialucinação e `missing_information` |
-| **CAT-05F** | ⬜ | Resiliência e fronteiras |
+| **CAT-05F** | 🔍 Em andamento | Resiliência e fronteiras — implementação concluída, aguardando revisão do diff |
 | **CAT-05G** | ⬜ | Testes, custo de consulta e segurança |
 | **CAT-05H** | ⬜ | Validação real sobre os 75 itens e documentação final |
 
@@ -383,6 +383,20 @@ lacuna no pedido que a §3.4 exige — *"em vez de inventar material, devolve
 pedido. A subfase alterou o `ContextSanitizer` da CAT-05C, já commitado, e o
 registro disso está no §3 do documento.
 
+**CAT-05F — resiliência e fronteiras**
+([`CAT_05F_RESILIENCIA_E_FRONTEIRAS.md`](CAT_05F_RESILIENCIA_E_FRONTEIRAS.md)).
+A regra 3 das invioláveis ganha o teste explícito que ela própria exige. O
+assistente **captura as duas chamadas ao motor da CAT-04** e nenhuma exceção sai
+dele: se o casamento falha a sugestão vem vazia, se falha só a similaridade o
+conhecimento sobrevive — degradação **parcial**, não total. A falha vai para
+`Log::warning` com a etapa e a classe, e a mensagem passa por um guarda porque
+`QueryException` interpola os bindings e gravaria o texto do lojista em log
+(§5.3). **C-2 foi reclassificada como gate da CAT-06**, não como fase de
+destino — ver o quadro na entrada daquela fase. Timeout ficou fora por decisão:
+não há hoje chamada que penda, e a única forma de impor limite seria atributo
+global de PDO. A linha da **CAT-10** foi reescrita: ela herda a verificação da
+regra 3 com provider acoplado, não a autoria do teste.
+
 ---
 
 ## CAT-06 — IA externa (opcional) ⬜
@@ -390,6 +404,25 @@ registro disso está no §3 do documento.
 `CatalogAiProvider` + `FakeCatalogAiProvider` + `NullCatalogAiProvider`.
 Threshold de fallback configurável e documentado. Sem credencial, sem
 fornecedor, sem segredo versionado. Ausência de IA externa não quebra cadastro.
+
+> ### 🚧 Gates desta fase
+>
+> **C-2 — redação de texto livre.** Nenhum provider externo entra em operação
+> sem que a redação de PII em texto livre exista e tenha teste. O
+> `ContextSanitizer` filtra **campos**; ele não varre `name`,
+> `short_description` e `description` atrás de telefone, e-mail ou CPF que o
+> lojista tenha escrito dentro da própria descrição. Hoje isso é teórico porque
+> o texto não sai da aplicação — a CAT-06 é exatamente o momento em que passa a
+> sair. **Não é "pertence a": é "bloqueia".** Origem em
+> [`CAT_05C_LISTING_CONTEXT_E_SANITIZER.md`](CAT_05C_LISTING_CONTEXT_E_SANITIZER.md) §4.
+>
+> **F-1 — sinal de modo degradado.** Quem recebe uma `ListingSuggestion` não
+> distingue *"a base não conhece este item"* de *"a inteligência falhou"*: as
+> duas devolvem `vazia()`. A §3.3 prevê que a UI informe o modo degradado, e a
+> CAT-06 traz o segundo modo de falha real (provider fora do ar) — é quando a
+> distinção passa a valer um campo na sugestão, cuja forma está congelada desde
+> a CAT-05D. Origem em
+> [`CAT_05F_RESILIENCIA_E_FRONTEIRAS.md`](CAT_05F_RESILIENCIA_E_FRONTEIRAS.md) §5.
 
 ---
 
@@ -422,8 +455,16 @@ seletiva, edição livre, salvamento normal.
 ## CAT-10 — Observabilidade, custos e segurança ⬜
 
 Métricas por chamada externa (provider, modelo, tokens, custo, duração,
-sucesso/falha/fallback) sem conteúdo sensível em log. Teste explícito de que a
-falha da inteligência não impede cadastro manual. Testes de prompt injection.
+sucesso/falha/fallback) sem conteúdo sensível em log. Testes de prompt injection.
+
+**Verificar que a garantia da regra 3 continua valendo com provider externo
+(CAT-06) acoplado.** A autoria do teste é da **CAT-05F**, que o escreveu em
+`ResilienciaDoAssistenteTest` — a CAT-10 **herda a verificação, não a autoria**.
+A linha anterior desta entrada dizia "teste explícito de que a falha da
+inteligência não impede cadastro manual", o que fazia duas fases donas do mesmo
+teste; a CAT-05F o escreveu antes porque o acoplamento chega na CAT-09, e chegar
+lá sem a rede pronta seria construir o acoplamento para só então descobrir se
+ele é seguro.
 
 ---
 
