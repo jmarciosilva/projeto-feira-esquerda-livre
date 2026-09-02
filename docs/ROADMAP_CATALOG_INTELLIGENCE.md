@@ -12,7 +12,7 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-05G — testes, custo de consulta e segurança** (a CAT-05 foi subdividida em A→H) |
+| Fase atual | **CAT-05G — testes, custo de consulta e segurança** 🔍 (a CAT-05 foi subdividida em A→H) |
 | Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno; **CAT-05E** — antialucinação; **CAT-05F** — resiliência e fronteiras |
 | Próxima | CAT-05H — validação real sobre os 75 itens e documentação final |
 | Suíte | 1126 passed · 3372 assertions · 0 failures |
@@ -80,7 +80,7 @@ subfase não há onde parar entre uma coisa e outra.
 | **CAT-05D** | ✅ Concluída | `ListingAssistant` interno, sem provider externo |
 | **CAT-05E** | ✅ Concluída | Antialucinação e `missing_information` |
 | **CAT-05F** | ✅ Concluída | Resiliência e fronteiras |
-| **CAT-05G** | ⬜ | Testes, custo de consulta e segurança |
+| **CAT-05G** | 🔍 Em andamento | Testes, custo de consulta e segurança — implementação concluída, aguardando revisão do diff |
 | **CAT-05H** | ⬜ | Validação real sobre os 75 itens e documentação final |
 
 ---
@@ -397,6 +397,26 @@ não há hoje chamada que penda, e a única forma de impor limite seria atributo
 global de PDO. A linha da **CAT-10** foi reescrita: ela herda a verificação da
 regra 3 com provider acoplado, não a autoria do teste.
 
+**CAT-05G — custo de consulta e fronteira de prompt**
+([`CAT_05G_CUSTO_DE_CONSULTA_E_FRONTEIRA_DE_PROMPT.md`](CAT_05G_CUSTO_DE_CONSULTA_E_FRONTEIRA_DE_PROMPT.md)).
+Subfase de **verificação**: nenhuma linha executável do módulo mudou. A CAT-04
+travava as duas metades do motor em separado (≤3 cada); agora o **assistente
+inteiro tem teto de 6 consultas** — a soma exata das duas, medida com
+`getQueryLog()` e estável de 3 a 32 conceitos e de 6 a 20 vizinhos. A observação
+de custo herdada da CAT-05E foi medida em vez de presumida: **`termosUteis()`
+não introduz consulta nenhuma**, porque o `->with('terms')` é da CAT-04 e sempre
+esteve dentro daquele teto; o N+1 hipotético é real e vale **1 consulta por
+conceito**, agora travado dos dois lados. Achado registrado como observação:
+`ListingContext::deProduct()` custa **1 consulta por ancestral de categoria** não
+carregado, e zero com `with('category.parent')` — custo de quem chama, que é a
+CAT-09. **Prompt injection foi decidido como gate da CAT-06 (S-1)**, não como
+teste desta subfase: sem prompt no caminho, o teste passaria por motivo errado e
+continuaria passando com um provider sem guarda. No lugar dele, `FronteiraDePromptTest`
+trava a **precondição** — `PromptGuard` não existe, nenhum dos 30 arquivos do
+módulo monta prompt ou nomeia fornecedor. A **S-2** nasce endereçada à CAT-09. A
+revisão das sete dívidas abertas confirmou que **nenhuma** foi resolvida de
+raspão pela CAT-05F.
+
 ---
 
 ## CAT-06 — IA externa (opcional) ⬜
@@ -423,6 +443,18 @@ fornecedor, sem segredo versionado. Ausência de IA externa não quebra cadastro
 > distinção passa a valer um campo na sugestão, cuja forma está congelada desde
 > a CAT-05D. Origem em
 > [`CAT_05F_RESILIENCIA_E_FRONTEIRAS.md`](CAT_05F_RESILIENCIA_E_FRONTEIRAS.md) §5.
+>
+> **S-1 — teste de prompt injection.** Nenhum provider externo entra em operação
+> sem que a separação entre instrução do sistema, contexto recuperado e dado do
+> usuário exista em `PromptGuard` e tenha teste. A §5.2 já condicionava esse
+> teste à existência de provider — *"terá teste dedicado quando existir provider
+> externo"* —, e a CAT-05G confirmou por que: sem prompt no caminho, um teste de
+> injection passaria por ausência de mecanismo e continuaria passando com um
+> provider acoplado sem guarda. A precondição está travada em
+> `FronteiraDePromptTest`, que cai no dia em que um prompt aparecer. **Não é
+> "pertence a": é "bloqueia".** A CAT-10 herda a verificação sob
+> observabilidade, não a autoria. Origem em
+> [`CAT_05G_CUSTO_DE_CONSULTA_E_FRONTEIRA_DE_PROMPT.md`](CAT_05G_CUSTO_DE_CONSULTA_E_FRONTEIRA_DE_PROMPT.md) §5.
 
 ---
 
@@ -449,6 +481,28 @@ seletiva, edição livre, salvamento normal.
 **Aplicar sugestão não salva o produto.**
 
 > O risco de autorização do `ProdutoForm` foi resolvido pela SEC-02.
+
+> ### 🚧 Obrigações que esta fase herda
+>
+> **S-2 — a sugestão é conteúdo de usuário.** `shortDescription` e `description`
+> são compostos a partir do texto que o lojista digitou — o nome do item abre as
+> duas frases, sempre. O módulo não escapa nada, e não deve: escapar ali gravaria
+> entidade HTML dentro de um campo que esta fase pode aplicar a
+> `products.description`. Blade escapa por padrão, então `{{ $sugestao->description }}`
+> está correto; o que não pode acontecer é `{!! !!}`, `wire:ignore` com
+> `innerHTML` ou `v-html`, sob o raciocínio de que "o texto veio da
+> inteligência" — não veio, veio do formulário e voltou. Escrita por extenso no
+> docblock de `ListingSuggestion`, na mesma forma da **C-1**. Origem em
+> [`CAT_05G_CUSTO_DE_CONSULTA_E_FRONTEIRA_DE_PROMPT.md`](CAT_05G_CUSTO_DE_CONSULTA_E_FRONTEIRA_DE_PROMPT.md) §6.2.
+>
+> **C-1 — `knownAttributes` é lista de proibição.** Quem populá-lo a partir do
+> formulário deve mapear campo a campo, e nunca repassar `$request->all()` nem o
+> array de propriedades do Livewire em bloco. Origem em
+> [`CAT_05C_LISTING_CONTEXT_E_SANITIZER.md`](CAT_05C_LISTING_CONTEXT_E_SANITIZER.md) §4.
+>
+> **Custo de montar o contexto.** `ListingContext::deProduct()` custa uma
+> consulta por ancestral de categoria não carregado; `->with('category.parent')`
+> zera a conta. Medido e travado em `CustoDoAssistenteTest`.
 
 ---
 
