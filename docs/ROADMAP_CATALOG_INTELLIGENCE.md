@@ -16,7 +16,7 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 | Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno; **CAT-05E** — antialucinação; **CAT-05F** — resiliência e fronteiras; **CAT-05G** — custo de consulta e fronteira de prompt; **CAT-05H** — validação real. **A CAT-05 está encerrada (A→H)**; **CAT-06A** — auditoria de reconciliação; **CAT-06B** — decisões de produto (F-1, C-2); **CAT-06C** — `SuggestionPolicy` e config do módulo |
 | Próxima | **CAT-06E** — `FreeTextRedactor`, que **fecha o gate C-2**. Fora da CAT-06: CAT-07 · CAT-08 · CAT-09 — nenhuma bloqueada; a CAT-08 fecha o G-1, que destrava P-1 e D-4 |
 | Suíte | 1151 passed · 4102 assertions · 0 failures |
-| Código do módulo | `App\CatalogIntelligence`: **32 arquivos** — 9 enums, 3 models, 6 Actions, 6 DTOs, 5 Support, 1 Query, 1 Command, 1 Provider (a CAT-06C somou `Enums/KnowledgeSufficiency` e `Support/SuggestionPolicy` aos 30 recontados na CAT-06A §1) |
+| Código do módulo | `App\CatalogIntelligence`: **37 arquivos** — 10 enums, 3 models, 6 Actions, 6 DTOs, 6 Support, 1 Contract, 2 Providers, 1 Query, 1 Command, 1 ServiceProvider. Os namespaces `Contracts/` e `Providers/` nasceram na CAT-06D, por D-CAT-05B-5 |
 | Branch | `main` |
 
 ---
@@ -96,7 +96,7 @@ outra entrega não tem onde ser revisado.
 | **CAT-06A** | ✅ Concluída | Auditoria de reconciliação — contratos exatos, blockers B-1 a B-6, decisão de F-1 e C-2 |
 | **CAT-06B** | ✅ Concluída | Decisões de produto (B-1, B-2) formalizadas e contratos das subfases seguintes — **sem código** |
 | **CAT-06C** | ✅ Concluída | `SuggestionPolicy` + `config/catalog-intelligence.php`, ainda sem provider. Veredito é o enum `KnowledgeSufficiency` de três casos, não booleano — [`CAT_06C_SUGGESTION_POLICY_E_CONFIG.md`](CAT_06C_SUGGESTION_POLICY_E_CONFIG.md) |
-| **CAT-06D** | ⬜ | `Contracts/` + `NullCatalogAiProvider` + `FakeCatalogAiProvider`; decide **B-4** |
+| **CAT-06D** | 🔍 **Em andamento** | `Contracts/CatalogAiProvider` + `Null` + `Fake`; decide **B-4** com `ProviderResponseValidator`. `EmbeddingProvider` **não** foi criado — B-3 segue em aberto — [`CAT_06D_CONTRATOS_NULL_E_FAKE.md`](CAT_06D_CONTRATOS_NULL_E_FAKE.md) |
 | **CAT-06E** | ⬜ | `FreeTextRedactor` — **fecha o gate C-2** |
 | **CAT-06F** | ⬜ | `PromptGuard` + reescrita do `FronteiraDePromptTest` — **fecha o gate S-1** |
 | **CAT-06G** | ⬜ | Fallback ligado + DTO de desfecho — **fecha o gate F-1** |
