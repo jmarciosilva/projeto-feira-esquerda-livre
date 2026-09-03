@@ -2115,7 +2115,7 @@ impede o cadastro manual**.
 | CAT-04 — Motor de similaridade | ✅ Concluída |
 | CAT-DOM-01 — Produto mestre × oferta do expositor | ✅ Concluída |
 | CAT-05 — Assistente de conteúdo | ✅ Concluída |
-| CAT-06 — IA externa (opcional) | ⬜ Próxima — bloqueada por 3 gates |
+| CAT-06 — IA externa (opcional) | 🔍 Em andamento — subdividida em A→H; 06A concluída, 06B em curso; os 3 gates fecham em 06E/06F/06G |
 | CAT-07 — Feedback humano e memória | ⬜ |
 | CAT-08 — Interface administrativa | ⬜ |
 | CAT-09 — Integração no cadastro | ⬜ |
@@ -2735,17 +2735,28 @@ Suíte: 1104 → **1139 passed · 4028 assertions · 0 failures**.
 | CAT-05G — Testes, custo e segurança | ✅ Concluída | Teto de 6 consultas, fronteira de prompt |
 | CAT-05H — Validação real e encerramento | ✅ Concluída | 75 itens, ciclo de backfill revertido, 4 achados endereçados |
 
-**A CAT-06 está bloqueada por três gates**, todos nascidos na própria CAT-05 e
-todos com a mesma natureza — coisas que só passam a existir quando o texto sair
-da aplicação, e nenhuma descobrível depois de já estar saindo: **C-2** (redação
-de PII em texto livre — o sanitizer filtra campos, não conteúdo), **F-1** (quem
+**A CAT-06 nasce com três gates**, todos vindos da própria CAT-05 e todos com a
+mesma natureza — coisas que só passam a existir quando o texto sair da
+aplicação, e nenhuma descobrível depois de já estar saindo: **C-2** (redação de
+PII em texto livre — o sanitizer filtra campos, não conteúdo), **F-1** (quem
 recebe a sugestão não distingue *"a base não conhece"* de *"a inteligência
 falhou"*) e **S-1** (teste de prompt injection, que hoje passaria por ausência de
 mecanismo).
 
+Os três **seguem abertos**, mas deixaram de bloquear a fase de fora: a
+**CAT-06A** subdividiu a CAT-06 em oito subfases e atribuiu cada gate à subfase
+que o fecha — **C-2 → 06E**, **S-1 → 06F**, **F-1 → 06G** —, com redator e guard
+existindo **antes** de a saída ser ligada. A mesma auditoria revisou o F-1: ele
+**não é binário**, porque provider ausente por falta de credencial é estado
+normal e não falha — são pelo menos 4 estados. **Ao fim da CAT-06 nenhum texto
+sai da aplicação:** a fase entrega contrato, `Fake`, `Null`, threshold, redator
+e guard, sem fornecedor, credencial ou segredo versionado.
+
 Documento da fase e encerramento consolidado:
 [`CAT_05H_VALIDACAO_REAL_E_ENCERRAMENTO.md`](CAT_05H_VALIDACAO_REAL_E_ENCERRAMENTO.md).
-Roadmap executável da trilha, com as oito subfases e todas as dívidas:
+Auditoria que abriu a CAT-06:
+[`CAT_06A_AUDITORIA_DE_RECONCILIACAO.md`](CAT_06A_AUDITORIA_DE_RECONCILIACAO.md).
+Roadmap executável da trilha, com as subfases e todas as dívidas:
 [`ROADMAP_CATALOG_INTELLIGENCE.md`](ROADMAP_CATALOG_INTELLIGENCE.md).
 
 ---

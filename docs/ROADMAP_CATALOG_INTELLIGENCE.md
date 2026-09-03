@@ -12,11 +12,11 @@ Trilha independente de CI-01…CI-09, SEC-01 e GOV-01. Não antecipa a GOV-02.
 
 | | |
 |---|---|
-| Fase atual | **CAT-06 — IA externa (opcional)** — bloqueada pelos gates C-2, F-1 e S-1 |
-| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno; **CAT-05E** — antialucinação; **CAT-05F** — resiliência e fronteiras; **CAT-05G** — custo de consulta e fronteira de prompt; **CAT-05H** — validação real. **A CAT-05 está encerrada (A→H)** |
-| Próxima | CAT-07 · CAT-08 · CAT-09 — nenhuma bloqueada; a CAT-08 fecha o G-1, que destrava P-1 e D-4 |
+| Fase atual | **CAT-06B — Decisões de produto e contratos**. Os gates C-2, F-1 e S-1 seguem **abertos**: eles bloqueiam **provider externo entrar em operação**, não o avanço das subfases, e cada um fecha dentro da própria CAT-06 |
+| Concluído antes | **CAT-DOM-02** (02A→02I) — fundação do domínio; **CAT-05A** — auditoria; **CAT-05B** — decisões e contratos; **CAT-05C** — contexto e minimização; **CAT-05D** — assistente interno; **CAT-05E** — antialucinação; **CAT-05F** — resiliência e fronteiras; **CAT-05G** — custo de consulta e fronteira de prompt; **CAT-05H** — validação real. **A CAT-05 está encerrada (A→H)**; **CAT-06A** — auditoria de reconciliação da CAT-06 |
+| Próxima | **CAT-06C** — `SuggestionPolicy` + `config/catalog-intelligence.php`, ainda sem provider. Fora da CAT-06: CAT-07 · CAT-08 · CAT-09 — nenhuma bloqueada; a CAT-08 fecha o G-1, que destrava P-1 e D-4 |
 | Suíte | 1139 passed · 4028 assertions · 0 failures |
-| Código do módulo | `App\CatalogIntelligence`: 6 enums, 3 models, 5 Actions, 5 DTOs, 4 Support, 1 Query, 1 Command, 1 Provider |
+| Código do módulo | `App\CatalogIntelligence`: **30 arquivos** — 8 enums, 3 models, 6 Actions, 6 DTOs, 4 Support, 1 Query, 1 Command, 1 Provider (recontado na CAT-06A §1; a contagem anterior desta linha estava defasada) |
 | Branch | `main` |
 
 ---
@@ -58,7 +58,7 @@ Qualquer regressão em relação a esses números precisa ser justificada.
 | **CAT-DOM-01** | ✅ Concluída | Separação entre produto mestre e oferta do expositor |
 | **CAT-DOM-02** | ✅ Concluída | Fundação do domínio (02A→02I): autoridade, conteúdo por oferta, cutover, isolamento, preparação multi-oferta, remoção do espelho legado e hardening — detalhada no `ROADMAP.md` principal |
 | **CAT-05** | ✅ Concluída | Assistente de conteúdo — oito subfases (A→H), detalhadas logo abaixo |
-| **CAT-06** | ⬜ | Integração opcional com IA externa — **bloqueada** pelos gates C-2, F-1 e S-1 |
+| **CAT-06** | 🔍 Em andamento | Integração opcional com IA externa — oito subfases (A→H), detalhadas logo abaixo. Os gates seguem **abertos** e fecham dentro da própria fase: **C-2 → 06E**, **S-1 → 06F**, **F-1 → 06G** |
 | **CAT-07** | ⬜ | Feedback humano e memória |
 | **CAT-08** | ⬜ | Interface administrativa da inteligência |
 | **CAT-09** | ⬜ | Integração no cadastro |
@@ -82,6 +82,35 @@ subfase não há onde parar entre uma coisa e outra.
 | **CAT-05F** | ✅ Concluída | Resiliência e fronteiras |
 | **CAT-05G** | ✅ Concluída | Testes, custo de consulta e segurança |
 | **CAT-05H** | ✅ Concluída | Validação real sobre os 75 itens e documentação final |
+
+### Subfases da CAT-06
+
+A auditoria de reconciliação (CAT-06A) subdividiu a fase em oito subfases, pelo
+mesmo motivo da CAT-05 — a fase mistura decisão de produto, contrato,
+implementação e validação — e por um motivo próprio: **os três gates são
+fechados dentro dela**, cada um na sua subfase, e um gate fechado no meio de
+outra entrega não tem onde ser revisado.
+
+| Subfase | Status | Entregável |
+|---|---|---|
+| **CAT-06A** | ✅ Concluída | Auditoria de reconciliação — contratos exatos, blockers B-1 a B-6, decisão de F-1 e C-2 |
+| **CAT-06B** | 🔍 **Em andamento** | Decisões de produto (B-1, B-2) formalizadas e contratos das subfases seguintes — **sem código** |
+| **CAT-06C** | ⬜ | `SuggestionPolicy` + `config/catalog-intelligence.php`, ainda sem provider |
+| **CAT-06D** | ⬜ | `Contracts/` + `NullCatalogAiProvider` + `FakeCatalogAiProvider`; decide **B-4** |
+| **CAT-06E** | ⬜ | `FreeTextRedactor` — **fecha o gate C-2** |
+| **CAT-06F** | ⬜ | `PromptGuard` + reescrita do `FronteiraDePromptTest` — **fecha o gate S-1** |
+| **CAT-06G** | ⬜ | Fallback ligado + DTO de desfecho — **fecha o gate F-1** |
+| **CAT-06H** | ⬜ | Validação, reconciliação de nomenclatura e encerramento |
+
+**A ordem 06E/06F antes de 06G é deliberada:** o redator e o guard existem antes
+de a saída ser ligada — resiliência antes do acoplamento, como na CAT-05F.
+
+**Ao fim da CAT-06 nenhum texto sai da aplicação.** A fase entrega contrato,
+`Fake`, `Null`, threshold, redator e guard; nenhum fornecedor real é integrado,
+nenhuma credencial criada, nenhum segredo versionado.
+
+Documento da auditoria:
+[`CAT_06A_AUDITORIA_DE_RECONCILIACAO.md`](CAT_06A_AUDITORIA_DE_RECONCILIACAO.md).
 
 ---
 
@@ -476,11 +505,16 @@ cadastro de sequer conhecer o módulo.
 
 ---
 
-## CAT-06 — IA externa (opcional) ⬜
+## CAT-06 — IA externa (opcional) 🔍
 
 `CatalogAiProvider` + `FakeCatalogAiProvider` + `NullCatalogAiProvider`.
 Threshold de fallback configurável e documentado. Sem credencial, sem
 fornecedor, sem segredo versionado. Ausência de IA externa não quebra cadastro.
+
+**Subdividida em A→H pela CAT-06A** — ver a tabela de subfases acima e
+[`CAT_06A_AUDITORIA_DE_RECONCILIACAO.md`](CAT_06A_AUDITORIA_DE_RECONCILIACAO.md).
+Os três gates abaixo seguem **abertos**; a auditoria atribuiu cada um à subfase
+que o fecha: **C-2 → 06E**, **S-1 → 06F**, **F-1 → 06G**.
 
 > ### 🚧 Gates desta fase
 >
@@ -493,13 +527,26 @@ fornecedor, sem segredo versionado. Ausência de IA externa não quebra cadastro
 > sair. **Não é "pertence a": é "bloqueia".** Origem em
 > [`CAT_05C_LISTING_CONTEXT_E_SANITIZER.md`](CAT_05C_LISTING_CONTEXT_E_SANITIZER.md) §4.
 >
+> 📐 **Escopo precisado pela CAT-06A §2 e §6.** O **canal de log já está
+> fechado** pela CAT-05F (`mensagemSegura()`), então resta **só a fronteira de
+> saída para o provider**. A redação vai em `Support/FreeTextRedactor` próprio,
+> **não dentro do `ContextSanitizer`** — o sanitizer serve os dois caminhos, e
+> redigir ali degradaria o texto do assistente interno, que nunca sai da
+> aplicação. Fechado na **06E**.
+>
 > **F-1 — sinal de modo degradado.** Quem recebe uma `ListingSuggestion` não
 > distingue *"a base não conhece este item"* de *"a inteligência falhou"*: as
 > duas devolvem `vazia()`. A §3.3 prevê que a UI informe o modo degradado, e a
-> CAT-06 traz o segundo modo de falha real (provider fora do ar) — é quando a
-> distinção passa a valer um campo na sugestão, cuja forma está congelada desde
-> a CAT-05D. Origem em
+> CAT-06 traz o segundo modo de falha real (provider fora do ar). Origem em
 > [`CAT_05F_RESILIENCIA_E_FRONTEIRAS.md`](CAT_05F_RESILIENCIA_E_FRONTEIRAS.md) §5.
+>
+> ⚠️ **Revisado pela CAT-06A §2: o gate não é binário.** A CAT-06 traz **três**
+> modos, e um deles **não é falha** — provider ausente por falta de credencial é
+> **estado normal** de operação, não erro. Somado ao caso original, são **pelo
+> menos 4 estados**, e um booleano de "degradado" não os representa. A forma da
+> `ListingSuggestion` (sete chaves, congelada desde a CAT-05D) **não é
+> reaberta**: o desfecho vira **DTO próprio**, devolvido por `comContexto()` ao
+> lado da sugestão e do contexto. Fechado na **06G**.
 >
 > **S-1 — teste de prompt injection.** Nenhum provider externo entra em operação
 > sem que a separação entre instrução do sistema, contexto recuperado e dado do
@@ -510,7 +557,15 @@ fornecedor, sem segredo versionado. Ausência de IA externa não quebra cadastro
 > provider acoplado sem guarda. A precondição está travada em
 > `FronteiraDePromptTest`, que cai no dia em que um prompt aparecer. **Não é
 > "pertence a": é "bloqueia".** A CAT-10 herda a verificação sob
-> observabilidade, não a autoria. Origem em
+> observabilidade, não a autoria.
+>
+> 🔁 **Precisado pela CAT-06A §7: o arquivo é reescrito, não substituído.** O
+> gatilho é **combinado** — dos 4 testes, **3 precondições caem** e são trocadas
+> pelo que vigiavam, e **1 sobrevive**
+> (`test_texto_hostil_do_lojista_atravessa_como_dado_e_nao_como_instrucao`),
+> virando a base do teste de injection real. `PromptGuard` mantém instrução,
+> contexto e dado em canais **estruturalmente** separados, nunca concatenados em
+> string. Fechado na **06F**. Origem em
 > [`CAT_05G_CUSTO_DE_CONSULTA_E_FRONTEIRA_DE_PROMPT.md`](CAT_05G_CUSTO_DE_CONSULTA_E_FRONTEIRA_DE_PROMPT.md) §5.
 
 ---
