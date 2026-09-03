@@ -20,9 +20,26 @@ use Tests\TestCase;
  * do usuário, em `PromptGuard`. **Terá teste dedicado quando existir provider
  * externo.**"*
  *
- * `PromptGuard` está previsto na §3.1 e **não existe como arquivo** — junto com
- * `SuggestionPolicy`, e pelo mesmo padrão que a CAT-05B aplicou aos providers:
- * o que a CAT-06 vai desenhar não é adiantado por palpite.
+ * `PromptGuard` está previsto na §3.1 e **não existe como arquivo**, pelo mesmo
+ * padrão que a CAT-05B aplicou aos providers: o que a CAT-06 vai desenhar não é
+ * adiantado por palpite.
+ *
+ * ## `SuggestionPolicy` saiu desta trava na CAT-06C — e o que ficou no lugar
+ *
+ * Até a CAT-06B a trava cobria as **duas** classes previstas na §3.1. A CAT-06C
+ * criou a `SuggestionPolicy` deliberadamente, sob a D-CAT-06B-3, e a trava
+ * disparou — que é exatamente o que ela existia para fazer.
+ *
+ * A resposta certa a um gatilho que dispara corretamente é **registrar a
+ * decisão e soltar aquela lingueta**, não contornar o teste. `PromptGuard`
+ * continua travado, porque o S-1 continua aberto.
+ *
+ * A lingueta não foi apagada: virou a garantia positiva de
+ * `test_a_suggestion_policy_existe_e_nao_conhece_provider`. Antes o teste
+ * afirmava *"a política não existe"*; agora afirma *"a política existe e não
+ * sabe o que é um provider"* — que é a propriedade que de fato interessava. As
+ * duas varreduras de módulo abaixo continuam valendo sobre ela como sobre
+ * qualquer arquivo novo.
  *
  * ## Por que um teste de injection agora seria segurança falsa
  *
@@ -97,18 +114,68 @@ class FronteiraDePromptTest extends TestCase
     // ── A precondição ─────────────────────────────────────────────────────────
 
     /**
-     * `PromptGuard` é o gatilho combinado: enquanto ele não existe, não há o
-     * que testar; quando existir, este teste cai e o gate da CAT-06 vence.
+     * `PromptGuard` é o gatilho: enquanto ele não existe, não há o que testar;
+     * quando existir, este teste cai e o gate S-1 da CAT-06 vence.
+     *
+     * A CAT-06C tirou `SuggestionPolicy` deste laço — ver o cabeçalho do
+     * arquivo e `test_a_suggestion_policy_existe_e_nao_conhece_provider`.
      */
     public function test_prompt_guard_ainda_nao_existe_e_e_por_isso_que_nao_ha_teste_de_injection(): void
     {
-        foreach (['PromptGuard', 'SuggestionPolicy'] as $classe) {
-            $this->assertFalse(
-                class_exists("App\\CatalogIntelligence\\Support\\{$classe}"),
-                "{$classe} apareceu — é o momento previsto pela §5.2. Escreva o teste de prompt injection ".
-                'de verdade (dívida S-1, gate da CAT-06) e revise este arquivo junto.',
+        $this->assertFalse(
+            class_exists('App\\CatalogIntelligence\\Support\\PromptGuard'),
+            'PromptGuard apareceu — é o momento previsto pela §5.2. Escreva o teste de prompt injection '.
+            'de verdade (dívida S-1, gate da CAT-06) e revise este arquivo junto.',
+        );
+    }
+
+    /**
+     * O que substituiu a lingueta da `SuggestionPolicy`.
+     *
+     * A trava antiga garantia que a política **não existisse**. Agora que ela
+     * existe por decisão (D-CAT-06B-3), a propriedade que interessa é outra e
+     * mais forte: a política decide *se valeria consultar* sem saber o que é um
+     * provider — nem por importação, nem por nome, nem por config de conexão.
+     *
+     * É isso que permite testá-la sem dublê nenhum, e é isso que impede que a
+     * CAT-06D "aproveite" a política para injetar o `Fake` por atalho.
+     */
+    public function test_a_suggestion_policy_existe_e_nao_conhece_provider(): void
+    {
+        $classe = 'App\\CatalogIntelligence\\Support\\SuggestionPolicy';
+
+        $this->assertTrue(class_exists($classe), 'a CAT-06C entrega a SuggestionPolicy');
+
+        // A asserção é sobre as **importações**, não sobre o texto do arquivo: o
+        // docblock da política fala de provider o tempo todo, justamente para
+        // explicar que não conhece nenhum. Varrer prosa daria falso positivo na
+        // primeira frase honesta.
+        $fonte = file_get_contents(app_path('CatalogIntelligence/Support/SuggestionPolicy.php'));
+
+        preg_match_all('/^use\s+([^;]+);/m', $fonte, $encontrados);
+
+        $permitidas = [
+            'App\CatalogIntelligence\DTOs\ListingContext',
+            'App\CatalogIntelligence\Enums\KnowledgeSufficiency',
+            'App\CatalogIntelligence\Enums\ListingGap',
+        ];
+
+        foreach ($encontrados[1] as $importacao) {
+            $this->assertContains(
+                $importacao,
+                $permitidas,
+                "SuggestionPolicy importa {$importacao} — ela decide se valeria consultar, nunca consulta, ".
+                'e só enxerga o contexto e os dois enums. Provider é CAT-06D; acoplamento é CAT-06G.',
             );
         }
+
+        $construtor = (new \ReflectionClass($classe))->getConstructor();
+
+        $this->assertNull(
+            $construtor,
+            'a política ganhou dependência de construtor — se for provider, é a CAT-06G; '.
+            'se for o limiar, ele vem do config no ponto de uso.',
+        );
     }
 
     /**
