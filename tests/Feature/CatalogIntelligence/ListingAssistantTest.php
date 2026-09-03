@@ -121,16 +121,34 @@ class ListingAssistantTest extends TestCase
         $this->assertTrue($sugestao->source->isInternal());
     }
 
-    public function test_nenhuma_interface_de_provider_externo_existe(): void
+    /**
+     * A trava sobrou para o `EmbeddingProvider` — e é onde ela ainda faz sentido.
+     *
+     * Até a CAT-06C esta lista prendia quatro nomes. A **CAT-06D** entregou três
+     * deles deliberadamente (`CatalogAiProvider`, `Null`, `Fake`), e a trava
+     * disparou — que é o que ela existia para fazer. A resposta foi registrar a
+     * decisão e soltar aquelas três linguetas, como a 06C fez com a
+     * `SuggestionPolicy`; as garantias positivas que ficaram no lugar estão em
+     * `ContratosDeProviderTest`.
+     *
+     * **`EmbeddingProvider` continua preso, e não por inércia:** a **B-3** segue
+     * explicitamente **sem decisão** — o contrato está na spec §3.3, nenhuma
+     * fase do roadmap o reivindica, e a CAT-06A §9 o registrou como achado em
+     * aberto. Criá-lo sem consumidor seria o erro que a CAT-05B recusou para os
+     * providers de conteúdo.
+     *
+     * A trava agora guarda exatamente o que ainda não foi decidido, que é a
+     * única coisa que uma trava deveria guardar.
+     */
+    public function test_o_embedding_provider_continua_sem_existir_porque_a_b3_segue_em_aberto(): void
     {
-        foreach (['CatalogAiProvider', 'FakeCatalogAiProvider', 'NullCatalogAiProvider', 'EmbeddingProvider'] as $classe) {
-            $this->assertFalse(
-                class_exists("App\\CatalogIntelligence\\Contracts\\{$classe}")
-                || interface_exists("App\\CatalogIntelligence\\Contracts\\{$classe}")
-                || class_exists("App\\CatalogIntelligence\\Providers\\{$classe}"),
-                "{$classe} pertence à CAT-06 e não deve existir ainda",
-            );
-        }
+        $this->assertFalse(
+            interface_exists('App\\CatalogIntelligence\\Contracts\\EmbeddingProvider')
+            || class_exists('App\\CatalogIntelligence\\Contracts\\EmbeddingProvider')
+            || class_exists('App\\CatalogIntelligence\\Providers\\EmbeddingProvider'),
+            'EmbeddingProvider apareceu, mas a B-3 nunca foi decidida: nenhuma fase do roadmap '.
+            'o reivindica. Decida o destino dele antes de criá-lo, e revise este teste junto.',
+        );
     }
 
     public function test_o_assistente_nao_depende_de_nenhum_provider(): void
