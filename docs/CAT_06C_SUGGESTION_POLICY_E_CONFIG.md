@@ -87,6 +87,32 @@ Registrado em `CatalogIntelligenceServiceProvider::register()` com
 verificado antes de escrever e não inventado. `mergeConfigFrom` e não
 `publishes`: o arquivo é da aplicação e versionado, não um stub a copiar.
 
+### O merge é redundante para resolução, e isso ficou registrado
+
+O `register()` recebeu, na revisão, uma correção que vale registrar aqui porque
+ela desmente uma justificativa plausível e errada.
+
+A primeira redação do docblock afirmava que o merge *"garante que o limiar
+exista mesmo se alguém apagar a chave"*. **É falso.** O Laravel já carrega todo
+arquivo em `config/`, e `config('catalog-intelligence.…')` resolveria sem o
+merge — verificado empiricamente com `orders.php` e `frenet.php`, que nenhum
+provider mescla e ainda assim resolvem. Mesclar o **mesmo arquivo** que já foi
+carregado não cria fonte nova: apagar a chave do arquivo a remove das duas.
+
+Quem garante o limiar na ausência da chave é o `LIMIAR_PADRAO = 5` da própria
+`SuggestionPolicy`, no `config()` do ponto de uso — e é ele que está testado.
+
+O `mergeConfigFrom` **fica**, por dois motivos que continuam válidos: simetria
+com o módulo irmão, e tornar explícita no registro do módulo a dependência
+daquele arquivo. O que mudou foi só a justificativa escrita, não o código.
+
+> **Por que isso está num documento de subfase.** Uma justificativa errada num
+> docblock é pior que docblock nenhum: ela sobrevive à revisão, é citada como
+> fonte e vira premissa de quem vier depois. O erro foi encontrado **antes do
+> commit**, ao verificar a própria afirmação em vez de confiar nela — e a
+> correção exigiu suíte nova sobre a versão final, pela mesma regra da CAT-05C:
+> comentário alterado não é exceção.
+
 ### É arquivo de política, não de conexão
 
 A **D-CAT-06B-2** proíbe nominalmente credencial, fornecedor, endpoint e
