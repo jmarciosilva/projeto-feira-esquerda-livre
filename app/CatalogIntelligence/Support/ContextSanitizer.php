@@ -73,8 +73,12 @@ use Illuminate\Support\Str;
  * Registrado aqui porque a §5.1 lista telefone e e-mail entre o que nunca sai
  * para provider externo, e essa promessa só é integralmente verdadeira no
  * nível de campo. Enquanto não houver provider (CAT-06), a diferença é teórica
- * — o texto não sai da aplicação. Decidir se a redação de texto livre entra, e
- * onde, é assunto da CAT-05F ou da CAT-10.
+ * — o texto não sai da aplicação.
+ *
+ * A redação desse conteúdo **não entra aqui**, por decisão (D-CAT-06B-2): esta
+ * classe serve também o caminho interno, que não sai da aplicação. Ela vive em
+ * `FreeTextRedactor` (CAT-06E), aplicada só na fronteira de saída para o
+ * provider.
  */
 class ContextSanitizer
 {

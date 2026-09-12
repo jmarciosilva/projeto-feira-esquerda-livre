@@ -1031,7 +1031,7 @@ ListingContext::paraItemNovo() | ::deProduct()
 `Null`, `Fake`, limiar, redator e guard; nenhum fornecedor real, credencial ou
 segredo. O domínio não conhece nome de fornecedor nem de modelo.
 
-Entregue (06C, 06D):
+Entregue (06C, 06D, 06E):
 
 ```php
 interface CatalogAiProvider          // App\CatalogIntelligence\Contracts
@@ -1048,6 +1048,7 @@ interface CatalogAiProvider          // App\CatalogIntelligence\Contracts
 | `ProviderResponseValidator` | valida só o que o tipo não garante — texto em branco, keywords e missing_information malformadas, confiança fora de `[0,1]`, procedência incorreta; devolve lista de `ProviderResponseViolation` e nunca lança |
 | `SuggestionPolicy` | lê `ListingContext::lacunas()` (não reconta); devolve `KnowledgeSufficiency`: `Sufficient` · `ExternalMayHelp` (falta **texto**) · `AwaitsMerchant` (falta **fato** — consultar seria pagar por invenção) |
 | `config/catalog-intelligence.php` | só `fallback.minimum_gaps` (`CATALOG_AI_MINIMUM_GAPS`, padrão 3; padrão de segurança 5 se a chave sumir); **proibido** credencial, fornecedor ou endpoint (há teste) |
+| `FreeTextRedactor` (06E) | `Support/`, `redigir(string): string`, marcador único `[redigido]`. D-CAT-06B-2 sem reabertura: telefone, e-mail, CPF/CNPJ (inclusive o alfanumérico) e CEP **sempre**; medidas, preço, quantidade **nunca**; URL e `@handle` **não por padrão** — dado pessoal dentro de URL é redigido e a URL fica. Sem máscara, CPF/CNPJ só com dígito verificador válido e CEP só depois da palavra "CEP"; fixo sem máscara e fixo sem DDD **não** são reconhecidos (limitação declarada). Preserva o resto byte a byte, é idempotente, não tem dependência, não registra e nunca lança; texto ilegível **falha fechado** (sai só o marcador). **Ninguém o chama ainda**: não há saída ligada — **fecha C-2** |
 
 Nenhum binding de provider no `CatalogIntelligenceServiceProvider`;
 `EmbeddingProvider` **não existe** (B-3 em aberto, trava de teste guarda só ele).
@@ -1056,9 +1057,8 @@ A construir, com contratos já decididos:
 
 | Subfase | Peça | Contrato |
 |---|---|---|
-| **06E** | `Support/FreeTextRedactor` | Aplicado **só na fronteira de saída para o provider**, nunca no `ContextSanitizer` (que serve também o caminho interno). Telefone, e-mail, CPF/CNPJ, CEP **sempre** redigidos; medidas, preço, quantidade **nunca**; URL e `@handle` **não por padrão**. Teste positivo e negativo para cada faixa — **fecha C-2** |
 | **06F** | `PromptGuard` | Instrução, contexto e dado em **canais estruturalmente separados**, nunca concatenados em string. `FronteiraDePromptTest` é **reescrito**: 3 precondições caem, `test_texto_hostil_do_lojista_atravessa_como_dado_e_nao_como_instrucao` sobrevive como base do teste real — **fecha S-1** |
-| **06G** | Fallback + DTO de desfecho | Desfecho **fora** da `ListingSuggestion` e fora de `missing_information`, devolvido por `comContexto()` ao lado da sugestão e do contexto. Quatro estados: provider ausente (normal, silêncio) · base não conhece (lacuna) · provider falhou (transitório, pode repetir) · resposta inválida (contrato, não repetir). Nome não decidido. Decide timeout (B-5) — **fecha F-1** |
+| **06G** | Fallback + DTO de desfecho | Desfecho **fora** da `ListingSuggestion` e fora de `missing_information`, devolvido por `comContexto()` ao lado da sugestão e do contexto. Quatro estados: provider ausente (normal, silêncio) · base não conhece (lacuna) · provider falhou (transitório, pode repetir) · resposta inválida (contrato, não repetir). Nome não decidido. Decide timeout (B-5). A saída ligada aqui passa o texto livre pelo `FreeTextRedactor` antes de ir embora (D-CAT-06B-2) — se sobre uma cópia redigida do contexto ou no canal de dado do `PromptGuard`, fica para a 06F/06G — **fecha F-1** |
 | **06H** | Encerramento | Reconciliação de nomenclatura e varredura de travas de asserção |
 
 Ordem **06E/06F antes de 06G** (D-CAT-06B-6): resiliência antes do acoplamento.
@@ -1068,8 +1068,11 @@ Ordem **06E/06F antes de 06G** (D-CAT-06B-6): resiliência antes do acoplamento.
 - **Nunca sai para provider**: nome, e-mail, CPF, CNPJ, endereço, telefone,
   cookies, `visitor_uuid`, `session_uuid`, IP, dados de pedido e qualquer campo de
   `ProductOffer`.
-- Campos são filtrados pelo `ContextSanitizer`; **conteúdo** de texto livre só
-  será redigido pelo `FreeTextRedactor` (06E).
+- Campos são filtrados pelo `ContextSanitizer`; **conteúdo** de texto livre é
+  redigido pelo `FreeTextRedactor` (06E), só na saída — o caminho interno recebe o
+  texto como o lojista o escreveu. A D-CAT-06B-2 cobre telefone, e-mail, CPF/CNPJ e
+  CEP: nome de pessoa, endereço sem CEP, credencial e token escritos no texto livre
+  **não** são procurados.
 - Nenhuma classe do módulo importa cliente HTTP, monta prompt ou nomeia fornecedor
   — varreduras em `FronteiraDePromptTest` e `ContratosDeProviderTest`, com duas
   camadas independentes.
@@ -1220,7 +1223,7 @@ Decisões:
 | Segredos | Nunca versionados; `.env.example` só com chaves vazias ou exemplos; `.gitignore` cobre `.env*`, `*.backup`, `*.bak` |
 | Credencial legada (SEC-01) | Revogada na origem; histórico do Git não reescrito (string inerte) — reescrever quebraria clones e não desfaria a exposição |
 | PII em log (CAT-05F) | `QueryException` do módulo de IA registrada só pelo SQLSTATE |
-| IA externa (CAT-06) | Nenhum provider opera antes de C-2 (redação) e S-1 (PromptGuard) fecharem |
+| IA externa (CAT-06) | Nenhum provider opera antes de C-2 (redação) e S-1 (PromptGuard) fecharem. C-2 fechado na 06E (`FreeTextRedactor`); S-1 aberto |
 | Download de material AVA | URL assinada temporária + matrícula ativa |
 
 ### 19.2 Dívidas de segurança abertas
@@ -1232,7 +1235,7 @@ Estado e destino em [`ROADMAP.md`](../ROADMAP.md) §17.
 - **F-06** — webhook sem verificação de assinatura; risco residual limitado a ruído
   na fila de conflitos.
 - **LGPD-01** — CPF/CNPJ de `lojista_solicitacoes` sem criptografia.
-- **C-1**, **C-2**, **S-1**, **S-2** — Catalog Intelligence.
+- **C-1**, **S-1**, **S-2** — Catalog Intelligence (**C-2** fechado na CAT-06E).
 
 ---
 
@@ -1607,7 +1610,7 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 | **D-CAT-05H-4** | Script de validação descartável e não versionado | Subfase sem código | HISTÓRICA |
 | CAT-06A `(sem ID)` | Subdivisão A→H; gates atribuídos (C-2→06E, S-1→06F, F-1→06G); F-1 não é binário (≥ 4 estados); validação de resposta mapeada para 06D; `EmbeddingProvider` registrado como órfão sem decisão | Gate fechado no meio de outra entrega não tem onde ser revisado | VIGENTE — decisões de produto formalizadas na 06B |
 | **D-CAT-06B-1** | Desfecho da sugestão é DTO próprio, devolvido por `comContexto()`; 4 estados, um deles não é falha; `ListingSuggestion` não é reaberta; desfecho fora de `missing_information` | Operação normal sem IA não pode parecer avaria | VIGENTE (a implementar na 06G) |
-| **D-CAT-06B-2** | Redação de PII em `Support/FreeTextRedactor`, só na fronteira de saída; telefone/e-mail/CPF/CNPJ/CEP sempre; medidas/preço/quantidade nunca; URL e `@handle` não por padrão; teste positivo e negativo por faixa | Sanitizer serve o caminho interno, que não sai da aplicação | VIGENTE (a implementar na 06E) |
+| **D-CAT-06B-2** | Redação de PII em `Support/FreeTextRedactor`, só na fronteira de saída; telefone/e-mail/CPF/CNPJ/CEP sempre; medidas/preço/quantidade nunca; URL e `@handle` não por padrão; teste positivo e negativo por faixa | Sanitizer serve o caminho interno, que não sai da aplicação | VIGENTE (implementada na 06E) |
 | **D-CAT-06B-3** | `SuggestionPolicy` lê `lacunas()`, limiar em config, não conhece provider | Testável sem dublê | VIGENTE (implementada na 06C) |
 | **D-CAT-06B-4** | Validação de resposta nasce junto dos contratos, na 06D | Produz o quarto estado do desfecho | VIGENTE (implementada na 06D) |
 | **D-CAT-06B-5** | Operar sem IA externa é estado normal; `Null` é o caminho padrão de produção | — | VIGENTE |
@@ -1652,7 +1655,7 @@ arquitetura.
 | **F-06** | Integridade do pagamento depende de a verdade vir da API do gateway, não do webhook |
 | **SEC-DEP-01** | Dependência de Markdown com advisories HIGH, usada em runtime pelo painel |
 | **LGPD-01 · LGPD-02** | Princípios de proteção declarados e nunca implementados |
-| **C-2 · S-1 · F-1 · B-5** | Nenhum provider externo pode ser acoplado antes da 06E, 06F e 06G |
+| **S-1 · F-1 · B-5** | Nenhum provider externo pode ser acoplado antes da 06F e 06G. **C-2** fechado na 06E: o redator existe e tem teste, e a saída ligada na 06G é obrigada a passar por ele |
 | **B-3 · B-6** | Embeddings e custo/rate limit sem decisão; qualquer provider real precisa delas |
 | **D-3 (CAT-05H)** | Casamento por frase exata limita o alcance; mudar reabre a CAT-04 e troca falso negativo por falso positivo |
 | **GOV-02** | Consentimento avaliado na requisição de origem não cobre eventos assíncronos |
