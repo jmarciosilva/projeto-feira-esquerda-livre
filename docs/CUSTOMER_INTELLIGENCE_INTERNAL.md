@@ -2,6 +2,13 @@
 
 Documentação do módulo nativo de Customer Intelligence da Feira Esquerda Livre.
 
+> **Este arquivo é exibido dentro do painel administrativo**, em
+> `/admin/customer-intelligence/documentacao`, e por isso é mantido fora dos três
+> documentos principais do projeto. Arquitetura, invariantes e decisões do módulo
+> estão consolidadas em `docs/ARCHITECTURE.md` (seção *Customer Intelligence*),
+> que prevalece em caso de divergência; o estado das fases está em `ROADMAP.md`.
+> Mudanças de comportamento do módulo atualizam os dois.
+
 > **O Customer Intelligence é 100% interno.** Desde a CI-08 não existe mais SDK
 > externo: nem no Composer, nem no Docker, nem no ambiente. O projeto funciona
 > com um único `git clone`.
@@ -139,11 +146,15 @@ pedidos de eliminação sem encerrar a conta.
 **Limpeza.** Comentários que narravam a migração deram lugar a comentários que
 descrevem o sistema atual. Oito arquivos órfãos removidos.
 
-### O que ficou de fora, por decisão de produto
+### O que ficou de fora da CI-09
 
-- **banner de consentimento** para rastreamento comportamental;
-- **auditoria de quem consulta o painel** — o acesso é restrito pela permissão
-  `customer_intelligence.visualizar`, mas não há trilha de quem olhou o quê;
+Os dois primeiros itens abaixo ficaram fora **da CI-09** e foram entregues
+depois, pela **GOV-01** — ver as seções *Consentimento (GOV-01)* e *Auditoria
+administrativa (GOV-01)* adiante:
+
+- banner de consentimento — **já implementado, na GOV-01**, modelo opt-in;
+- auditoria de quem consulta o painel — **já implementada, na GOV-01**
+  (`ci_audit_logs`, permissão `customer_intelligence.auditoria`);
 - as views em `resources/views/plugins/jmf-ci/` e os três componentes
   `x-jmf-ci-*` restantes continuam com os nomes antigos. Estão em uso e o
   prefixo é apenas nominal; renomear seria cosmética com risco desnecessário;
@@ -927,7 +938,10 @@ que a retenção existe para limitar — e, no limite, uma trilha que nunca esva
 ---
 
 
----|---|
+## Cookies de coleta — nomes e validade
+
+| Cookie | Validade | Papel |
+|---|---|---|
 | `jmf_ci_visitor_id` | 2 anos | identidade anônima persistente |
 | `jmf_ci_session_id` | 30 minutos, rolante | janela de navegação |
 
@@ -1123,9 +1137,13 @@ carrinho precisa despachar o job do módulo, e o evento precisa cair na fila
 como um navegador faria, e confirma que o mesmo navegador continua sendo um
 único visitante.
 
-Dois cobrem o risco da coexistência com o SDK: que o middleware do módulo está
-na pilha **depois** do middleware do SDK, e que sai **um único** `Set-Cookie` de
-cada nome.
+Dois preservam as garantias herdadas do período em que o SDK externo convivia
+com o módulo — o SDK não existe mais no projeto desde a CI-08: um confirma que
+nenhum middleware `JmfSystem\` participa do grupo `web` e que
+`TrackVisitorSession` continua registrado nele; o outro, que cada resposta envia
+**um único** `Set-Cookie` de visitante e de sessão. O teste de ordem na pilha,
+que só fazia sentido com o middleware do SDK presente, foi substituído pelo de
+ausência.
 
 Dois cobrem a resiliência do fluxo de compra: com o módulo lançando exceção, o
 item ainda entra no carrinho e o pedido ainda é criado.

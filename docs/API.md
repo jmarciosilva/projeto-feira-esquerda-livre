@@ -1,5 +1,11 @@
 # API REST — Feira Esquerda Livre (app mobile Flutter)
 
+> **Contrato público da API.** Este documento é mantido fora dos três documentos
+> principais porque o app Flutter e `routes/api.php` o referenciam. Atualize-o
+> junto com qualquer mudança de rota, payload ou resposta. Regras de domínio por
+> trás do contrato: [`ARCHITECTURE.md`](ARCHITECTURE.md). Estado da API e do app:
+> [`ROADMAP.md`](../ROADMAP.md).
+
 API versionada consumida pelo app mobile em Flutter (cliente comprador e lojista). Toda a lógica de negócio é reaproveitada dos mesmos Services usados pelo site web (`CartService`, `OrderService`, `MercadoPagoService`, `Shipping\MelhorEnvioService`, `AvaEnrollmentService`) — o comportamento é equivalente ao do site, apenas exposto em JSON.
 
 ---
@@ -113,7 +119,7 @@ Lojistas **não se cadastram** por aqui — a conta é criada quando a administr
 | Método | Rota | Descrição |
 |---|---|---|
 | GET | `/carrinho` | `{ "stores": [{ "expositor_id", "expositor_name", "subtotal", "items": [...] }], "total", "count" }` |
-| POST | `/carrinho/itens` | Body: `product_id, quantity?` (default 1) |
+| POST | `/carrinho/itens` | Body: `product_id, product_offer_id?, quantity?` (default 1). Ver nota abaixo |
 | PATCH | `/carrinho/itens/{item}` | Body: `quantity` (0 remove o item) |
 | DELETE | `/carrinho/itens/{item}` | Remove o item |
 
@@ -127,16 +133,29 @@ Lojistas **não se cadastram** por aqui — a conta é criada quando a administr
 
 Carrinho **exige login** no app — não existe carrinho anônimo por dispositivo nesta versão.
 
+> **`product_offer_id` no carrinho (CAT-DOM-02G).** Opcional, com o mesmo contrato
+> das perguntas: informado, é validado contra o produto; ausente, resolve só
+> quando o item tem **exatamente uma** oferta vigente; com zero ou mais de uma,
+> **422**. A API **nunca** escolhe a oferta mais barata pelo cliente.
+
 ### Checkout e pedidos
 
 | Método | Rota | Descrição |
 |---|---|---|
-| POST | `/checkout` | Cria o pedido a partir do carrinho. Body: `customer_name, customer_whatsapp, customer_email?, delivery_type (retirada\|entrega), customer_address_id? (obrigatório se entrega e houver item físico), shipping_total?, shipping_note?`. Resposta: `{ "order": {...} }`. Se Mercado Pago estiver ativo, `order.mercado_pago_checkout_url` já vem preenchido |
+| POST | `/checkout` | Cria o pedido a partir do carrinho. Body: `customer_name, customer_whatsapp, customer_email?, delivery_type (retirada\|entrega), customer_address_id? (obrigatório se entrega e houver item físico), shipping_options[{expositor_id, service_id}] (uma escolha por loja com item físico, em entrega), shipping_total? (depreciado — ver nota), shipping_note?`. Resposta: `{ "order": {...} }`. Se Mercado Pago estiver ativo, `order.mercado_pago_checkout_url` já vem preenchido |
 | GET | `/pedidos` | Pedidos do usuário autenticado (paginado) |
 | GET | `/pedidos/{reference}` | Detalhe do pedido, com itens e splits por loja |
 | GET | `/pedidos/{reference}/pagar` | Gera/retorna a URL de pagamento Mercado Pago: `{ "checkout_url": "..." }` |
 | GET | `/pedidos/splits/{split}/mensagens` | Histórico do chat daquele split (marca como lidas as mensagens da outra parte) |
 | POST | `/pedidos/splits/{split}/mensagens` | Envia mensagem. Body: `body` (máx. 2000 chars). Acesso: cliente dono do pedido OU lojista dono da loja do split |
+
+> **Frete no checkout da API (FIN-SEC-01C.1).** O cliente informa **qual**
+> serviço escolheu por loja em `shipping_options`, e o servidor recota com o
+> endereço selecionado e o carrinho atual para saber o preço. Em entrega com item
+> físico, toda loja precisa de exatamente uma escolha válida; loja repetida,
+> serviço inexistente ou falha do provedor recusam o pedido (**422**), nunca viram
+> frete zero. `shipping_total` está **depreciado**: não decide nada, e, se enviado
+> com valor diferente do cotado, o pedido é recusado.
 
 ### Endereços
 
