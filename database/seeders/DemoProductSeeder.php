@@ -94,17 +94,17 @@ class DemoProductSeeder extends Seeder
                 }
             });
 
-        $demo = [
+        // Preco e status de venda sao da oferta. O espelho comercial em
+        // `products` saiu na CAT-DOM-02H; do produto so resta `is_active`, que
+        // la e validade canonica (D-CAT-10), e nao copia do status de venda.
+        ProductOffer::query()->update([
             'price' => self::DEMO_PRICE,
             'price_type' => 'fixo',
             'is_active' => true,
-        ];
+        ]);
 
-        // Preco e status de venda sao da oferta; `products` recebe o espelho
-        // legado (divida D-1) para nao guardar valor diferente.
-        ProductOffer::query()->update($demo);
-        Product::query()->update($demo);
+        Product::query()->update(['is_active' => true]);
 
-        $this->command->info("DemoProductSeeder: {$created} itens de demonstração garantidos. Todos os produtos ficaram com preço R$ 0,01.");
+        $this->command->info("DemoProductSeeder: {$created} itens de demonstração garantidos. Todas as ofertas ficaram com preço R$ 0,01.");
     }
 }
