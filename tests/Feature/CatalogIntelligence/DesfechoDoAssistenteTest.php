@@ -32,6 +32,7 @@ use App\Enums\ItemType;
 use App\Models\ContentCategory;
 use App\Models\Expositor;
 use App\Models\Product;
+use Error;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -651,6 +652,49 @@ class DesfechoDoAssistenteTest extends TestCase
         } catch (Throwable $erro) {
             $this->assertSame(TypeError::class, $erro::class);
         }
+    }
+
+    /** `Error` é defeito de execução, não indisponibilidade: sobe inteiro. */
+    public function test_error_do_provider_nao_e_mascarado_como_falha_do_provider(): void
+    {
+        $this->comProvider($this->providerQueLanca(new Error('chamada a método inexistente no adaptador')));
+
+        try {
+            $this->gerar($this->itemQueFaltaTexto());
+            $this->fail('um Error foi mascarado como falha do provider');
+        } catch (Throwable $erro) {
+            $this->assertSame(Error::class, $erro::class);
+        }
+    }
+
+    /** A fronteira estreita vale para as duas chamadas: exceção genérica ao perguntar disponibilidade também sobe. */
+    public function test_excecao_generica_ao_perguntar_disponibilidade_nao_e_engolida(): void
+    {
+        $provider = $this->comProvider(new class implements CatalogAiProvider
+        {
+            public int $sugestoes = 0;
+
+            public function isAvailable(): bool
+            {
+                throw new RuntimeException('defeito ao ler a configuração do adaptador');
+            }
+
+            public function suggest(GuardedPrompt $prompt): ListingSuggestion
+            {
+                $this->sugestoes++;
+
+                return ListingSuggestion::vazia();
+            }
+        });
+
+        try {
+            $this->gerar($this->itemQueFaltaTexto());
+            $this->fail('uma RuntimeException de isAvailable() foi tratada como falha esperada do provider');
+        } catch (Throwable $erro) {
+            $this->assertSame(RuntimeException::class, $erro::class);
+        }
+
+        $this->assertSame(0, $provider->sugestoes);
     }
 
     /** Registrada, não engolida — e sem a mensagem, que é do adaptador e pode carregar prompt. */
