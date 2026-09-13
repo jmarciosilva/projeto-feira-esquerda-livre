@@ -74,15 +74,13 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 
 | | |
 |---|---|
-| **Fase atual** | **CAT-06 — IA externa (opcional)**, em andamento. Subfases 06A–06F concluídas; **CAT-06G implementada e validada; aguardando revisão pré-commit** |
-| **Última fase concluída** | **CAT-06F** — `PromptGuard`, fecha o gate **S-1**. Publicada em `f7b39c2` |
-| **Última fase com commit** | **CAT-06F** — commit `f7b39c2` |
-| **Último commit de código** | `f7b39c2` — CAT-06F, `PromptGuard` |
-| **Fase em revisão** | **CAT-06G — fallback ligado e desfecho**: **F-1** fechado, **B-5** decidido. Implementada e validada; **aguardando revisão pré-commit** |
+| **Fase atual** | **CAT-06 — IA externa (opcional)**, em andamento. Subfases 06A–06G concluídas e publicadas; próxima: **CAT-06H** |
+| **Última fase concluída** | **CAT-06G** — fallback ligado e desfecho: **F-1** fechado, **B-5** decidido. Publicada em `5a667b4` |
+| **Última fase com commit** | **CAT-06G** — commit `5a667b4` |
+| **Último commit de código** | `5a667b4` — CAT-06G, fallback e desfecho |
 | **Próxima implementação** | **CAT-06H** — validação e encerramento da CAT-06 |
-| **Suíte da CAT-06G** | **1289 passed · 5603 assertions · 0 failures** · 839,90s (2026-09-13, sobre o código da 06G ainda sem commit, já com os ajustes da revisão pré-commit; +46 testes e +370 assertions sobre o baseline; container `app`, SQLite em memória) |
-| **Baseline publicado** | `main` · `f7b39c2b74a5d91ea802eab4e9b1a07eb97c9246` = `origin/main` |
-| **Suíte no baseline** | **1243 passed · 5233 assertions · 0 failures** · 628,81s (2026-09-12, sobre o código publicado em `f7b39c2`, medida antes do commit; container `app`, SQLite em memória) |
+| **Baseline publicado** | `main` · `5a667b4132919fc9b650234227cd3e7c0215c976` = `origin/main` |
+| **Suíte no baseline** | **1289 passed · 5603 assertions · 0 failures** · 839,90s (2026-09-13, sobre o código publicado em `5a667b4`, medida antes do commit — depois dela só mudou documentação; container `app`, SQLite em memória) |
 | **Documentação** | DOC-CONSOLIDATION-01 concluída — três documentos principais, commit `962eb5a` |
 
 > **Nota de reconciliação sobre a CAT-06D.** O roadmap anterior da trilha ainda a
@@ -97,7 +95,7 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 
 | # | Bloqueia | Situação |
 |---|---|---|
-| **B-3 · B-6** | **Provider externo real entrar em operação** — não bloqueia as subfases | Abertos, sem fase. Os três gates estão fechados: **C-2** na **06E** (`FreeTextRedactor`), **S-1** na **06F** (`PromptGuard`) e **F-1** na **06G** (desfecho e fallback; aguardando revisão pré-commit) |
+| **B-3 · B-6** | **Provider externo real entrar em operação** — não bloqueia as subfases | Abertos, sem fase. Os três gates estão fechados: **C-2** na **06E** (`FreeTextRedactor`), **S-1** na **06F** (`PromptGuard`) e **F-1** na **06G** (desfecho e fallback, `5a667b4`) |
 | **G-1** | Multi-oferta, backfill de conhecimento em produção (P-1) e revisão de conceitos sem uso (D-4) | Aberto. Não existe superfície de curadoria — **CAT-08** |
 | **F-06** | Produção endurecida do webhook Mercado Pago | Aberto, mitigado por desenho (security debt) |
 | **SEC-DEP-01** | `league/commonmark` 2.9.0 com 4 advisories HIGH | Aberto — atualizar para `>=2.10.0` em fase própria |
@@ -142,7 +140,7 @@ Nada acima impede a **CAT-06H** de começar.
 | FIN-SEC-01 — integridade comercial | `[x]` | [§8](#8-checkout-e-pagamentos) |
 | CAT-DOM-01 · CAT-DOM-02 (02A→02I) | `[x]` | [§13](#13-catalog-domain) |
 | CAT-01 → CAT-05 | `[x]` | [§14](#14-catalog-intelligence) |
-| **CAT-06 — IA externa (opcional)** | **`[~]` 06A–06F concluídas · 06G implementada e validada, aguardando revisão pré-commit · próxima 06H** | [§14](#14-catalog-intelligence) |
+| **CAT-06 — IA externa (opcional)** | **`[~]` 06A–06G concluídas e publicadas · próxima 06H** | [§14](#14-catalog-intelligence) |
 | CAT-07 → CAT-11 | `[ ]` | [§14](#14-catalog-intelligence) |
 | FIN-DOM-01 — domínio financeiro (repasse, ledger) | `[ ]` não iniciada | [§18](#18-próximas-fases) |
 
@@ -504,7 +502,7 @@ Suíte 1048 → 1139 ao longo da fase.
 | 06D | `[x]` | `Contracts/CatalogAiProvider`, `NullCatalogAiProvider`, `FakeCatalogAiProvider`, `ProviderResponseValidator` (B-4) | `9e105bd` · `be8833d` |
 | 06E | `[x]` | `Support/FreeTextRedactor` — **fecha C-2**. 29 testes: positivo e negativo por faixa, idempotência, falha fechada; controle negativo por mutação | `101748a` |
 | 06F | `[x]` | `Support/PromptGuard`, `DTOs/GuardedPrompt`, `Enums/ProviderInstruction`; `FronteiraDePromptTest` reescrito — **fecha S-1**. 21 testes (11 de estrutura, 10 de fronteira); controle negativo por mutação | `f7b39c2` |
-| 06G | `[x]` | Fallback ligado: `suggest(GuardedPrompt)`, `Support/GuardedPromptRedactor`, `Exceptions/CatalogAiProviderException`, desfecho `ListingOutcome` de 8 estados, composição conservadora da resposta externa (nome equivalente não é contribuição), `Null` como binding padrão; `minimum_gaps` = 3 revalidado nos 75 itens reais — **fecha F-1**, **decide B-5** (8 s, 0 novas tentativas). 46 testes novos; 12 controles negativos por mutação | implementada e validada; aguardando revisão pré-commit |
+| 06G | `[x]` | Fallback ligado: `suggest(GuardedPrompt)`, `Support/GuardedPromptRedactor`, `Exceptions/CatalogAiProviderException`, desfecho `ListingOutcome` de 8 estados, composição conservadora da resposta externa (nome equivalente não é contribuição), `Null` como binding padrão; `minimum_gaps` = 3 revalidado nos 75 itens reais — **fecha F-1**, **decide B-5** (8 s, 0 novas tentativas). 46 testes novos; 12 controles negativos por mutação | `5a667b4` |
 | 06H | `[ ]` | Validação, reconciliação de nomenclatura (`ListingAssistant` × `GenerateListingSuggestion`), varredura de travas `assertFalse(class_exists`, encerramento | — |
 
 A ordem 06E/06F antes de 06G é deliberada (D-CAT-06B-6): redator e guard existem
@@ -520,8 +518,9 @@ positivo e negativo.
 Entregue: `redigir(string): string`, marcador `[redigido]`, sem dependência, sem
 log e sem exceção; texto ilegível falha fechado. Sem máscara, CPF/CNPJ só com
 dígito verificador válido e CEP só depois da palavra "CEP"; fixo sem máscara e
-fixo sem DDD não são reconhecidos (limitação declarada). **Ninguém o chama
-ainda** — a saída ligada na 06G passa por ele.
+fixo sem DDD não são reconhecidos (limitação declarada). Desde a CAT-06G, o
+`FreeTextRedactor` é aplicado na fronteira de saída por meio do
+`GuardedPromptRedactor`, antes da chamada ao provider.
 
 Escopo da **06F** (D-CAT-06F-1…5): instrução, contexto recuperado e dado do
 lojista em três propriedades de `GuardedPrompt`, nunca juntas em texto. A
@@ -555,7 +554,7 @@ G-1, E-1, D-1…D-4 (CAT-05H), B-3, B-5, B-6 (CAT-06A).
 | Extensões de isolamento | `[x]` | Conteúdo por oferta (02F), autoridade canônica × ownership comercial (02C/02F/02I) | ver §13 |
 | Gate de IA externa C-2 — redação de PII em texto livre | `[x]` | `FreeTextRedactor` na fronteira de saída | CAT-06E · `101748a` |
 | Gate de IA externa S-1 — separação de prompt | `[x]` | `PromptGuard`: instrução, contexto e dado em canais estruturais do `GuardedPrompt` | CAT-06F · `f7b39c2` |
-| Gate de IA externa F-1 — desfecho e fallback | `[x]` | O provider só recebe `GuardedPrompt` redigido; só a falha tipada vira fallback; `TypeError` e defeito interno sobem; log sem mensagem | CAT-06G (aguardando revisão pré-commit) |
+| Gate de IA externa F-1 — desfecho e fallback | `[x]` | O provider só recebe `GuardedPrompt` redigido; só a falha tipada vira fallback; `TypeError` e defeito interno sobem; log sem mensagem | CAT-06G · `5a667b4` |
 
 Dívidas de segurança abertas: **SEC-DEP-01** (commonmark), **F-06** (assinatura
 do webhook), **LGPD-01** (CPF/CNPJ em claro), **C-1**, **S-2** — ver
@@ -684,7 +683,7 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 
 Ordem recomendada, sem prejuízo de decisão de produto:
 
-1. **CAT-06H — validação e encerramento da CAT-06** (próxima implementação). A CAT-06G está implementada e validada, aguardando revisão pré-commit.
+1. **CAT-06H — validação e encerramento da CAT-06** (próxima implementação). A CAT-06G foi publicada em `5a667b4`.
 2. **CAT-08 — interface administrativa**: fecha G-1 e destrava P-1 e D-4. A CAT-05H
    registrou que ela pode ser mais útil que a CAT-07; a ordem entre 07 e 08 é
    decisão de produto.
@@ -723,17 +722,37 @@ O detalhe de cada fase está no Git. Marcos de suíte (`passed · assertions`):
 | Baseline `6ae5981` (código idêntico em `962eb5a`) | 1198 · 4485 |
 | Fim da CAT-06E (`101748a`) | 1227 · 4629 |
 | Fim da CAT-06F (`f7b39c2`) | 1243 · 5233 |
-| **CAT-06G, implementada e validada, aguardando revisão pré-commit** | **1289 · 5603** |
+| **Fim da CAT-06G (`5a667b4`)** | **1289 · 5603** |
 
 Critério permanente: nenhuma fase é concluída com teste vermelho, e o número de
 testes nunca cai sem justificativa escrita.
 
 ### Protocolo de fase
 
-1. Baseline confirmado (branch, HEAD, working tree limpo) — parar se divergir.
-2. Auditoria antes de implementar — parar em decisão de produto.
-3. Implementação dentro do escopo; controle negativo para teste novo.
-4. Suíte completa sobre o código final (`docker compose exec -T app php artisan test`).
-5. `git status`, `git diff --check`, `git diff --stat` e diffs no relatório.
-6. **Parar antes do commit.** `git add` nominal; push só com autorização explícita.
-7. Atualizar **este ROADMAP** e, havendo decisão, o **ARCHITECTURE** — nunca um documento novo por fase.
+Vigente a partir da **CAT-06H**: código/testes e documentação são publicados em
+ciclos separados.
+
+1. Baseline confirmado (branch, HEAD, `origin/main`, working tree limpo) — parar se divergir.
+2. Auditoria antes de implementar — parar em decisão humana quando necessário.
+3. Implementação exclusivamente técnica, dentro do escopo.
+4. Testes dirigidos + suíte necessária ou completa sobre o código final (`docker compose exec -T app php artisan test`) + controles negativos para teste novo.
+5. Revisão de `git status`, `git diff --check`, diff/stat e escopo no relatório.
+6. **Parar para revisão pré-commit técnico.**
+7. Após autorização, criar somente o commit técnico de código/testes, com `git add` nominal.
+8. **Parar para revisão pós-commit técnico.**
+9. Após autorização, o operador humano faz o push manual.
+10. Confirmar o SHA técnico no repositório remoto.
+11. Somente após a confirmação remota, atualizar ROADMAP / ARCHITECTURE / README conforme o caso — nunca um documento novo por fase.
+12. **Parar para revisão documental pré-commit.**
+13. Após autorização, criar commit exclusivamente documental.
+14. **Parar para revisão pós-commit documental.**
+15. Após autorização, o operador humano faz o push manual do commit documental.
+16. Confirmar o commit documental no repositório remoto.
+17. Só então declarar a fase PUBLISHED / CLOSED / FROZEN e iniciar a próxima.
+
+Regras explícitas:
+
+- Commit técnico não antecipa estado documental de concluído.
+- Commit documental registra somente fatos já ocorridos e SHAs já publicados.
+- Coding AI nunca faz push.
+- Código/testes e documentação não entram no mesmo commit a partir da CAT-06H.
