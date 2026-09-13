@@ -7,6 +7,7 @@ use App\CatalogIntelligence\Actions\AttachKnowledgeTerm;
 use App\CatalogIntelligence\Actions\CreateOrUpdateKnowledge;
 use App\CatalogIntelligence\Actions\GenerateListingSuggestion;
 use App\CatalogIntelligence\Actions\MatchProductKnowledge;
+use App\CatalogIntelligence\Contracts\CatalogAiProvider;
 use App\CatalogIntelligence\DTOs\ListingContext;
 use App\CatalogIntelligence\DTOs\ListingSuggestion;
 use App\CatalogIntelligence\DTOs\ProductKnowledgeInput;
@@ -17,6 +18,8 @@ use App\CatalogIntelligence\Enums\KnowledgeTermType;
 use App\CatalogIntelligence\Enums\ListingGap;
 use App\CatalogIntelligence\Enums\SuggestionSource;
 use App\CatalogIntelligence\Models\KnowledgeEntry;
+use App\CatalogIntelligence\Providers\FakeCatalogAiProvider;
+use App\CatalogIntelligence\Providers\NullCatalogAiProvider;
 use App\Enums\ItemType;
 use App\Models\ContentCategory;
 use App\Models\Product;
@@ -151,16 +154,29 @@ class ListingAssistantTest extends TestCase
         );
     }
 
-    public function test_o_assistente_nao_depende_de_nenhum_provider(): void
+    /**
+     * O que substituiu `test_o_assistente_nao_depende_de_nenhum_provider` (CAT-05D).
+     *
+     * A trava afirmava que o construtor não tinha tipo `Provider`, num mundo em
+     * que nenhum existia. A **CAT-06G** ligou o provider por decisão, e a trava
+     * disparou — que é o que ela existia para fazer. A garantia que ela
+     * representava continua de pé, e mais forte: o assistente conhece **o
+     * contrato**, nunca uma implementação, e nenhum cliente HTTP.
+     */
+    public function test_o_assistente_depende_so_do_contrato_do_provider(): void
     {
         $construtor = (new \ReflectionClass(GenerateListingSuggestion::class))->getConstructor();
 
         $tipos = collect($construtor->getParameters())
             ->map(fn (\ReflectionParameter $p) => (string) $p->getType())
-            ->implode(' ');
+            ->all();
 
-        $this->assertStringNotContainsString('Provider', $tipos);
-        $this->assertStringNotContainsString('Http', $tipos);
+        $this->assertContains(CatalogAiProvider::class, $tipos, 'o provider entra pelo contrato');
+
+        foreach ($tipos as $tipo) {
+            $this->assertNotContains($tipo, [NullCatalogAiProvider::class, FakeCatalogAiProvider::class], "o assistente passou a depender da implementação {$tipo}");
+            $this->assertStringNotContainsString('Http', $tipo);
+        }
     }
 
     // ── Antialucinação estrutural: nada além do contexto ──────────────────────

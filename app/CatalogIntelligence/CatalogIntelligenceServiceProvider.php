@@ -3,6 +3,8 @@
 namespace App\CatalogIntelligence;
 
 use App\CatalogIntelligence\Console\AssociateProductsCommand;
+use App\CatalogIntelligence\Contracts\CatalogAiProvider;
+use App\CatalogIntelligence\Providers\NullCatalogAiProvider;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -17,10 +19,15 @@ use Illuminate\Support\ServiceProvider;
  * fallback. Antes dela este docblock dizia *"continua sem config a mesclar"* —
  * deixou de ser verdade, e a linha foi reescrita em vez de mantida por inércia.
  *
- * Continua sem middleware e sem binding: as Actions, o normalizador e a
- * `SuggestionPolicy` são resolvidos pelo container por injeção de construtor —
- * a política não tem dependência para amarrar, porque lê o limiar do config no
- * ponto de uso e não conhece provider algum.
+ * A CAT-06G trouxe a terceira, e o único binding do módulo: o contrato
+ * `CatalogAiProvider` resolve para `NullCatalogAiProvider` (D-CAT-06G-9). Sem
+ * credencial, operar sem IA externa é o estado normal (D-CAT-06B-5), e o
+ * assistente precisa de um provider a quem perguntar `isAvailable()`. Um provider
+ * real, quando existir, troca esta linha — e o `Fake` nunca é registrado aqui.
+ *
+ * Continua sem middleware. As Actions, o normalizador, a `SuggestionPolicy`, o
+ * guard, os redatores e o validador são resolvidos por injeção de construtor, sem
+ * binding: nenhum deles tem dependência que o container não saiba montar.
  */
 class CatalogIntelligenceServiceProvider extends ServiceProvider
 {
@@ -44,6 +51,8 @@ class CatalogIntelligenceServiceProvider extends ServiceProvider
             __DIR__.'/../../config/catalog-intelligence.php',
             'catalog-intelligence'
         );
+
+        $this->app->bind(CatalogAiProvider::class, NullCatalogAiProvider::class);
     }
 
     public function boot(): void

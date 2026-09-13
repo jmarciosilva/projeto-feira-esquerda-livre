@@ -74,14 +74,15 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 
 | | |
 |---|---|
-| **Fase atual** | **CAT-06 — IA externa (opcional)**, em andamento. Subfases 06A–06F concluídas; nenhuma subfase em execução |
-| **Última fase concluída** | **CAT-06F** — `PromptGuard`, fecha o gate **S-1**. Implementada, validada e aprovada; **aguardando commit** |
-| **Última fase com commit** | **CAT-06E** — `FreeTextRedactor`, fecha o gate **C-2**. Commit `101748a` |
-| **Último commit de código** | `101748a` — CAT-06E, `FreeTextRedactor` |
-| **Próxima implementação** | **CAT-06G — fallback ligado e desfecho**, que fecha o gate **F-1** e decide o timeout (**B-5**) |
-| **Suíte da CAT-06F** | **1243 passed · 5233 assertions · 0 failures** · 628,81s (2026-09-12, sobre o código da 06F ainda sem commit; container `app`, SQLite em memória) |
-| **Baseline publicado** | `main` · `101748a9ca8c7cd0af8c77602b4fc767ec27d1c0` = `origin/main` |
-| **Suíte no baseline** | **1227 passed · 4629 assertions · 0 failures** · 849,38s (2026-09-12, sobre o código de `101748a`; container `app`, SQLite em memória) |
+| **Fase atual** | **CAT-06 — IA externa (opcional)**, em andamento. Subfases 06A–06F concluídas; **CAT-06G implementada e validada; aguardando revisão pré-commit** |
+| **Última fase concluída** | **CAT-06F** — `PromptGuard`, fecha o gate **S-1**. Publicada em `f7b39c2` |
+| **Última fase com commit** | **CAT-06F** — commit `f7b39c2` |
+| **Último commit de código** | `f7b39c2` — CAT-06F, `PromptGuard` |
+| **Fase em revisão** | **CAT-06G — fallback ligado e desfecho**: **F-1** fechado, **B-5** decidido. Implementada e validada; **aguardando revisão pré-commit** |
+| **Próxima implementação** | **CAT-06H** — validação e encerramento da CAT-06 |
+| **Suíte da CAT-06G** | **1289 passed · 5603 assertions · 0 failures** · 839,90s (2026-09-13, sobre o código da 06G ainda sem commit, já com os ajustes da revisão pré-commit; +46 testes e +370 assertions sobre o baseline; container `app`, SQLite em memória) |
+| **Baseline publicado** | `main` · `f7b39c2b74a5d91ea802eab4e9b1a07eb97c9246` = `origin/main` |
+| **Suíte no baseline** | **1243 passed · 5233 assertions · 0 failures** · 628,81s (2026-09-12, sobre o código publicado em `f7b39c2`, medida antes do commit; container `app`, SQLite em memória) |
 | **Documentação** | DOC-CONSOLIDATION-01 concluída — três documentos principais, commit `962eb5a` |
 
 > **Nota de reconciliação sobre a CAT-06D.** O roadmap anterior da trilha ainda a
@@ -96,13 +97,13 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 
 | # | Bloqueia | Situação |
 |---|---|---|
-| **F-1** | **Provider externo entrar em operação** — não bloqueia as subfases | Aberto. Fecha na **06G**. **C-2** fechado na **06E** (`FreeTextRedactor`) e **S-1** na **06F** (`PromptGuard`) |
+| **B-3 · B-6** | **Provider externo real entrar em operação** — não bloqueia as subfases | Abertos, sem fase. Os três gates estão fechados: **C-2** na **06E** (`FreeTextRedactor`), **S-1** na **06F** (`PromptGuard`) e **F-1** na **06G** (desfecho e fallback; aguardando revisão pré-commit) |
 | **G-1** | Multi-oferta, backfill de conhecimento em produção (P-1) e revisão de conceitos sem uso (D-4) | Aberto. Não existe superfície de curadoria — **CAT-08** |
 | **F-06** | Produção endurecida do webhook Mercado Pago | Aberto, mitigado por desenho (security debt) |
 | **SEC-DEP-01** | `league/commonmark` 2.9.0 com 4 advisories HIGH | Aberto — atualizar para `>=2.10.0` em fase própria |
 | **GOV-02** | Coleta de eventos que nascem fora do navegador do comprador | Pendência de produto, não implementada |
 
-Nada acima impede a **CAT-06G** de começar.
+Nada acima impede a **CAT-06H** de começar.
 
 ---
 
@@ -141,7 +142,7 @@ Nada acima impede a **CAT-06G** de começar.
 | FIN-SEC-01 — integridade comercial | `[x]` | [§8](#8-checkout-e-pagamentos) |
 | CAT-DOM-01 · CAT-DOM-02 (02A→02I) | `[x]` | [§13](#13-catalog-domain) |
 | CAT-01 → CAT-05 | `[x]` | [§14](#14-catalog-intelligence) |
-| **CAT-06 — IA externa (opcional)** | **`[~]` 06A–06F concluídas (06F aprovada, aguardando commit) · próxima 06G** | [§14](#14-catalog-intelligence) |
+| **CAT-06 — IA externa (opcional)** | **`[~]` 06A–06F concluídas · 06G implementada e validada, aguardando revisão pré-commit · próxima 06H** | [§14](#14-catalog-intelligence) |
 | CAT-07 → CAT-11 | `[ ]` | [§14](#14-catalog-intelligence) |
 | FIN-DOM-01 — domínio financeiro (repasse, ledger) | `[ ]` não iniciada | [§18](#18-próximas-fases) |
 
@@ -502,8 +503,8 @@ Suíte 1048 → 1139 ao longo da fase.
 | 06C | `[x]` | `SuggestionPolicy` + `config/catalog-intelligence.php`; veredito `KnowledgeSufficiency` | `d7a8ba2` · `494018c` |
 | 06D | `[x]` | `Contracts/CatalogAiProvider`, `NullCatalogAiProvider`, `FakeCatalogAiProvider`, `ProviderResponseValidator` (B-4) | `9e105bd` · `be8833d` |
 | 06E | `[x]` | `Support/FreeTextRedactor` — **fecha C-2**. 29 testes: positivo e negativo por faixa, idempotência, falha fechada; controle negativo por mutação | `101748a` |
-| 06F | `[x]` | `Support/PromptGuard`, `DTOs/GuardedPrompt`, `Enums/ProviderInstruction`; `FronteiraDePromptTest` reescrito — **fecha S-1**. 21 testes (11 de estrutura, 10 de fronteira); controle negativo por mutação | aprovada, aguardando commit |
-| 06G | `[ ]` | Fallback ligado + DTO de desfecho — fecha F-1; decide timeout (B-5); a saída ligada passa o texto livre pelo `FreeTextRedactor` e entrega ao adaptador os canais do `GuardedPrompt` | — |
+| 06F | `[x]` | `Support/PromptGuard`, `DTOs/GuardedPrompt`, `Enums/ProviderInstruction`; `FronteiraDePromptTest` reescrito — **fecha S-1**. 21 testes (11 de estrutura, 10 de fronteira); controle negativo por mutação | `f7b39c2` |
+| 06G | `[x]` | Fallback ligado: `suggest(GuardedPrompt)`, `Support/GuardedPromptRedactor`, `Exceptions/CatalogAiProviderException`, desfecho `ListingOutcome` de 8 estados, composição conservadora da resposta externa (nome equivalente não é contribuição), `Null` como binding padrão; `minimum_gaps` = 3 revalidado nos 75 itens reais — **fecha F-1**, **decide B-5** (8 s, 0 novas tentativas). 46 testes novos; 12 controles negativos por mutação | implementada e validada; aguardando revisão pré-commit |
 | 06H | `[ ]` | Validação, reconciliação de nomenclatura (`ListingAssistant` × `GenerateListingSuggestion`), varredura de travas `assertFalse(class_exists`, encerramento | — |
 
 A ordem 06E/06F antes de 06G é deliberada (D-CAT-06B-6): redator e guard existem
@@ -526,8 +527,16 @@ Escopo da **06F** (D-CAT-06F-1…5): instrução, contexto recuperado e dado do
 lojista em três propriedades de `GuardedPrompt`, nunca juntas em texto. A
 instrução é um enum puro fixado pelo guard; `knowledge` e `similar_items` são
 contexto; todo o resto é dado. O guard classifica por origem e não lê conteúdo —
-não há lista de frases. **Ninguém o chama ainda**: compor redator, guard e
-provider é a 06G.
+não há lista de frases. Desde a 06G é chamado pelo assistente.
+
+Escopo da **06G** (D-CAT-06G-1…12): o provider recebe `GuardedPrompt`, e o texto
+livre dos canais `context` e `data` é redigido depois do guard. A falha esperada
+do provider é uma exceção tipada; qualquer outra sobe. O desfecho é exaustivo, com
+8 estados; falha do motor interno tem estado próprio e não consulta o provider. A
+resposta externa válida complementa a interna, sem substituí-la; provider consultado
+sem nada aproveitado — nome equivalente ao atual incluído — tem desfecho próprio. B-5: 8 s no
+adaptador futuro, sem nova tentativa e sem chave de config até existir adaptador.
+**Nenhum provider real, credencial ou chamada de rede.**
 
 ### Dívidas da trilha
 
@@ -545,7 +554,8 @@ G-1, E-1, D-1…D-4 (CAT-05H), B-3, B-5, B-6 (CAT-06A).
 | SEC-03 — autorização com identidade nullable | `[x]` | `null === null` concedia acesso ao chat do pedido; identidade válida exigida antes de comparar propriedade | `c67a450` (FIN-SEC-01B) |
 | Extensões de isolamento | `[x]` | Conteúdo por oferta (02F), autoridade canônica × ownership comercial (02C/02F/02I) | ver §13 |
 | Gate de IA externa C-2 — redação de PII em texto livre | `[x]` | `FreeTextRedactor` na fronteira de saída | CAT-06E · `101748a` |
-| Gate de IA externa S-1 — separação de prompt | `[x]` | `PromptGuard`: instrução, contexto e dado em canais estruturais do `GuardedPrompt` | CAT-06F (aprovada, aguardando commit) |
+| Gate de IA externa S-1 — separação de prompt | `[x]` | `PromptGuard`: instrução, contexto e dado em canais estruturais do `GuardedPrompt` | CAT-06F · `f7b39c2` |
+| Gate de IA externa F-1 — desfecho e fallback | `[x]` | O provider só recebe `GuardedPrompt` redigido; só a falha tipada vira fallback; `TypeError` e defeito interno sobem; log sem mensagem | CAT-06G (aguardando revisão pré-commit) |
 
 Dívidas de segurança abertas: **SEC-DEP-01** (commonmark), **F-06** (assinatura
 do webhook), **LGPD-01** (CPF/CNPJ em claro), **C-1**, **S-2** — ver
@@ -594,7 +604,7 @@ são dívidas distintas.
 | **LGPD-02** | "Logs de acesso ao painel admin retidos por 90 dias" e "`cart_items` anônimos expiram em 7 dias", do roadmap original, **não existem** no código. **Nova — ID atribuído nesta consolidação** | Baixa | Decisão de produto |
 | **C-1** (CAT-05C) | `knownAttributes` protegido por lista de proibição; quem o popular deve mapear campo a campo | Média | CAT-09 |
 | **C-2** (CAT-05C) | Texto livre não é redigido antes de sair para provider | Gate — **`[x]` fechado** pelo `FreeTextRedactor` | **CAT-06E** · `101748a` |
-| **S-1** (CAT-05G) | Teste de prompt injection real, com `PromptGuard` | Gate — **`[x]` fechado** pelo `PromptGuard` | **CAT-06F** (aprovada, aguardando commit) |
+| **S-1** (CAT-05G) | Teste de prompt injection real, com `PromptGuard` | Gate — **`[x]` fechado** pelo `PromptGuard` | **CAT-06F** · `f7b39c2` |
 | **S-2** (CAT-05G) | A sugestão ecoa texto do lojista: renderizar sempre escapado | Média | CAT-09 |
 | SEC-01 | Credencial revogada permanece como string inerte no histórico do Git | Baixa | Só com tarefa coordenada de reescrita de histórico |
 
@@ -624,8 +634,8 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 
 | ID | Dívida | Destino |
 |---|---|---|
-| **F-1** (CAT-05F) | Sem sinal de modo degradado; decidido como DTO de desfecho de 4 estados (D-CAT-06B-1) | **CAT-06G** (gate) |
-| **B-5** (CAT-06A) | Timeout de chamada a provider — a 06D não decidiu | CAT-06G |
+| **F-1** (CAT-05F) | Sem sinal de modo degradado | **`[x]` fechado** na **CAT-06G** — desfecho `ListingOutcome`, 8 estados (D-CAT-06G-3, D-CAT-06G-11) |
+| **B-5** (CAT-06A) | Timeout de chamada a provider | **`[x]` decidido** na **CAT-06G** — 8 s aplicados pelo adaptador, 0 novas tentativas, sem config até haver leitor (D-CAT-06G-5, D-CAT-06G-6) |
 | **B-3** (CAT-06A) | `EmbeddingProvider` órfão: na especificação, nenhuma fase o reivindica; trava de teste o mantém inexistente | Em aberto, sem decisão |
 | **B-6** (CAT-06A) | Custo e rate limit | Em aberto, sem fase |
 | **P-1** (CAT-05B) | Backfill de `catalog_product_knowledge` em produção (em dev foi rodado e revertido na 05H) | Decisão humana após G-1 |
@@ -635,7 +645,7 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 | **D-2** (CAT-05H) | `palavrasChave()` não pondera por score | CAT-07 (alternativa CAT-11) |
 | **D-3** (CAT-05H) | Casamento por frase exata não alcança termo intercalado | CAT-11 — reabre a CAT-04 |
 | **D-4** (CAT-05H) | 8 de 28 conceitos sem evidência direta (inclusive `Crochê`) | CAT-08 |
-| — (CAT-06A/06B) | Nomenclatura `ListingAssistant` × `GenerateListingSuggestion`; nome do DTO de desfecho (`SuggestionOutcome` só candidata) | CAT-06H / 06G |
+| — (CAT-06A/06B) | Nomenclatura `ListingAssistant` × `GenerateListingSuggestion` (o DTO de desfecho foi batizado na 06G: `ListingOutcome`) | CAT-06H |
 | — (CAT-06D §10) | Auditorias devem varrer asserções (`assertFalse(class_exists`), não só arquivos | CAT-06H |
 | — (CAT-05G) | `ListingContext::deProduct()` custa 1 consulta por ancestral sem `with('category.parent')` — observação, não dívida | CAT-09 |
 
@@ -674,12 +684,11 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 
 Ordem recomendada, sem prejuízo de decisão de produto:
 
-1. **CAT-06G — fallback ligado e desfecho** (próxima implementação): F-1 e B-5, com a saída passando pelo `FreeTextRedactor` e pelo `PromptGuard`. A CAT-06F está aprovada, aguardando commit.
-2. CAT-06H — validação e encerramento da CAT-06.
-3. **CAT-08 — interface administrativa**: fecha G-1 e destrava P-1 e D-4. A CAT-05H
+1. **CAT-06H — validação e encerramento da CAT-06** (próxima implementação). A CAT-06G está implementada e validada, aguardando revisão pré-commit.
+2. **CAT-08 — interface administrativa**: fecha G-1 e destrava P-1 e D-4. A CAT-05H
    registrou que ela pode ser mais útil que a CAT-07; a ordem entre 07 e 08 é
    decisão de produto.
-4. CAT-07 → CAT-09 → CAT-10 → CAT-11.
+3. CAT-07 → CAT-09 → CAT-10 → CAT-11.
 
 Fora da Catalog Intelligence, sem ordem definida:
 
@@ -713,7 +722,8 @@ O detalhe de cada fase está no Git. Marcos de suíte (`passed · assertions`):
 | Fim da CAT-06C | 1151 · 4102 |
 | Baseline `6ae5981` (código idêntico em `962eb5a`) | 1198 · 4485 |
 | Fim da CAT-06E (`101748a`) | 1227 · 4629 |
-| **CAT-06F, aprovada, aguardando commit** | **1243 · 5233** |
+| Fim da CAT-06F (`f7b39c2`) | 1243 · 5233 |
+| **CAT-06G, implementada e validada, aguardando revisão pré-commit** | **1289 · 5603** |
 
 Critério permanente: nenhuma fase é concluída com teste vermelho, e o número de
 testes nunca cai sem justificativa escrita.

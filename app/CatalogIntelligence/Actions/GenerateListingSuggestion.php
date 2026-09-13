@@ -2,11 +2,21 @@
 
 namespace App\CatalogIntelligence\Actions;
 
+use App\CatalogIntelligence\Contracts\CatalogAiProvider;
 use App\CatalogIntelligence\DTOs\ListingContext;
+use App\CatalogIntelligence\DTOs\ListingOutcome;
 use App\CatalogIntelligence\DTOs\ListingSuggestion;
+use App\CatalogIntelligence\Enums\KnowledgeSufficiency;
 use App\CatalogIntelligence\Enums\ListingGap;
+use App\CatalogIntelligence\Enums\ListingOutcomeState;
 use App\CatalogIntelligence\Enums\SuggestionSource;
+use App\CatalogIntelligence\Exceptions\CatalogAiProviderException;
 use App\CatalogIntelligence\Queries\FindSimilarProducts;
+use App\CatalogIntelligence\Support\GuardedPromptRedactor;
+use App\CatalogIntelligence\Support\KnowledgeNormalizer;
+use App\CatalogIntelligence\Support\PromptGuard;
+use App\CatalogIntelligence\Support\ProviderResponseValidator;
+use App\CatalogIntelligence\Support\SuggestionPolicy;
 use App\Models\Product;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
@@ -18,14 +28,22 @@ use Throwable;
  * Recebe um `ListingContext`, completa-o com o que o motor da CAT-04 sabe, e
  * devolve um `ListingSuggestion` estruturado.
  *
- * ## Um caminho só, o interno
+ * ## Dois caminhos, e quem decide entre eles (CAT-06G)
  *
- * A §3.2 desenha o assistente decidindo entre conhecimento interno e provider
- * externo. Nesta fase **não há a segunda opção**: a D-CAT-05B-4 situa
- * `CatalogAiProvider`, `Fake` e `Null` na CAT-06, e não existe interface a
- * consultar. O `source` da sugestão é sempre `Internal`, e a decisão de
- * fallback — o "conhecimento suficiente?" do fluxograma da §1 — é a primeira
- * coisa que a CAT-06 vai acrescentar aqui, e não em quem chama.
+ * O caminho interno roda sempre, e primeiro: é barato, determinístico e é a
+ * sugestão que sobra quando nada de fora ajuda. Depois dele a `SuggestionPolicy`
+ * responde o "conhecimento suficiente?" do fluxograma da §1, e **só** o veredito
+ * `ExternalMayHelp` leva ao provider. A decisão mora aqui, e não em quem chama.
+ *
+ * A saída tem uma ordem que não se inverte: o `PromptGuard` separa instrução,
+ * contexto e dado (S-1); o `GuardedPromptRedactor` redige o conteúdo dos dois
+ * canais não confiáveis (C-2); só então o provider recebe o prompt; e a resposta
+ * passa pelo `ProviderResponseValidator` antes de qualquer campo ser aproveitado.
+ * O contexto devolvido a quem chama continua o original — a redação é da
+ * fronteira de saída, não do caminho interno (D-CAT-06B-2).
+ *
+ * A resposta externa **complementa** a interna e nunca a substitui: ver
+ * `complementar()`.
  *
  * ## Sugerir não é salvar (D-CAT-05B-1)
  *
@@ -69,20 +87,25 @@ use Throwable;
  * O model entra aqui e **não** no `ListingContext`: a D-CAT-05B-3 mantém o
  * contexto livre de Eloquent, e é o assistente que faz a ponte.
  *
- * ## Falha da inteligência não bloqueia nada (CAT-05F)
+ * ## Falha da inteligência não bloqueia nada (CAT-05F, CAT-06G)
  *
  * As duas chamadas ao motor da CAT-04 são capturadas aqui dentro. Se o
  * casamento ou a similaridade lançarem, a sugestão degrada — vazia ou sem
- * semelhantes — e **nenhuma exceção sai desta Action**. É a regra 3 das
- * invioláveis implementada no único ponto onde ninguém pode esquecê-la.
+ * semelhantes — e **nenhuma exceção do motor sai desta Action**. É a regra 3
+ * das invioláveis implementada no único ponto onde ninguém pode esquecê-la.
  *
- * **Limitação conhecida, e é dívida (F-1).** Quem recebe a sugestão não
- * consegue distinguir *"a base não conhece este item"* de *"a inteligência
- * falhou"*: os dois devolvem `ListingSuggestion::vazia()`. A §3.3 prevê que a
- * UI informe o modo degradado, e para isso a distinção precisará existir —
- * mas dar um campo novo à sugestão reabriria a forma da §3.4, congelada na
- * CAT-05D. Fica endereçada à **CAT-06**, quando existir um segundo modo de
- * falha real (provider fora do ar) e a distinção passar a valer o campo.
+ * Do provider, captura-se **só** `CatalogAiProviderException`, a falha esperada
+ * da fronteira (D-CAT-06G-7). Qualquer outra exceção vinda de lá é defeito e
+ * sobe: tratar `TypeError` como "provider fora do ar" anunciaria um defeito
+ * permanente como falha transitória. Não há nova tentativa (D-CAT-06G-6).
+ *
+ * ## O desfecho — F-1
+ *
+ * `comContexto()` devolve, ao lado da sugestão e do contexto, um
+ * `ListingOutcome` que diz em que condição a sugestão foi produzida. É por ele —
+ * e não por sugestão vazia, `source` ou `missing_information` — que se distingue
+ * *"a base não conhece este item"* de *"a inteligência falhou"*, sem reabrir a
+ * forma da §3.4. Os estados são exaustivos: ver `ListingOutcomeState`.
  */
 class GenerateListingSuggestion
 {
@@ -95,17 +118,52 @@ class GenerateListingSuggestion
     public function __construct(
         private readonly MatchProductKnowledge $matcher,
         private readonly FindSimilarProducts $semelhantes,
+        private readonly SuggestionPolicy $politica,
+        private readonly CatalogAiProvider $provider,
+        private readonly PromptGuard $guard,
+        private readonly GuardedPromptRedactor $redator,
+        private readonly ProviderResponseValidator $validador,
+        private readonly KnowledgeNormalizer $normalizador,
     ) {}
 
     /**
+     * A sugestão, o contexto que a produziu e o desfecho (D-CAT-06B-1, D-CAT-06G-3).
+     *
+     * A ordem das decisões:
+     *
+     * 1. completa o contexto e compõe a sugestão interna — sempre;
+     * 2. se a etapa de conhecimento falhou, termina em `InternalIntelligenceFailed`
+     *    sem consultar o provider: a lacuna de conhecimento que a política veria
+     *    seria produto da falha, não um fato do item, e consultar fora por causa
+     *    dela seria pagar pela queda da base (D-CAT-06G-4);
+     * 3. a política decide — `Sufficient` e `AwaitsMerchant` terminam aqui;
+     * 4. `ExternalMayHelp` segue para `consultarProvider()`.
+     *
      * @param  Product|null  $produto  O item salvo, quando houver; nulo no cadastro em andamento.
-     * @return array{0: ListingSuggestion, 1: ListingContext} A sugestão e o contexto que a produziu.
+     * @return array{0: ListingSuggestion, 1: ListingContext, 2: ListingOutcome}
      */
     public function comContexto(ListingContext $contexto, ?Product $produto = null): array
     {
-        $completo = $this->completar($contexto, $produto);
+        [$completo, $conhecimentoFalhou] = $this->completar($contexto, $produto);
 
-        return [$this->compor($completo), $completo];
+        $interna = $this->compor($completo);
+
+        if ($conhecimentoFalhou) {
+            return [$interna, $completo, ListingOutcome::de(ListingOutcomeState::InternalIntelligenceFailed)];
+        }
+
+        $veredito = ($this->politica)($completo);
+
+        if ($veredito->justificaConsultaExterna()) {
+            [$sugestao, $desfecho] = $this->consultarProvider($completo, $interna);
+
+            return [$sugestao, $completo, $desfecho];
+        }
+
+        return [$interna, $completo, ListingOutcome::de(match ($veredito) {
+            KnowledgeSufficiency::Sufficient => ListingOutcomeState::InternalKnowledgeSufficient,
+            KnowledgeSufficiency::AwaitsMerchant => ListingOutcomeState::InternalKnowledgeInsufficient,
+        })];
     }
 
     public function __invoke(ListingContext $contexto, ?Product $produto = null): ListingSuggestion
@@ -120,10 +178,17 @@ class GenerateListingSuggestion
      * precisar registrar **a entrada** ao lado da saída: uma sugestão sem o
      * contexto que a produziu não é auditável, e recalcular o contexto depois
      * daria outro resultado se o texto do item tiver mudado no meio.
+     *
+     * Diz também se a etapa de conhecimento falhou (CAT-06G): é o que separa
+     * `InternalIntelligenceFailed` de uma base que simplesmente não conhece o
+     * item. A similaridade não entra nessa conta — é acessória (D-CAT-05F-2).
+     *
+     * @return array{0: ListingContext, 1: bool} O contexto completado, e se o conhecimento falhou.
      */
-    private function completar(ListingContext $contexto, ?Product $produto): ListingContext
+    private function completar(ListingContext $contexto, ?Product $produto): array
     {
         $completo = $contexto;
+        $conhecimentoFalhou = false;
 
         try {
             $completo = $completo->comConhecimento(
@@ -131,10 +196,11 @@ class GenerateListingSuggestion
             );
         } catch (Throwable $falha) {
             $this->registrarDegradacao('conhecimento', $falha);
+            $conhecimentoFalhou = true;
         }
 
         if ($produto === null) {
-            return $completo;
+            return [$completo, $conhecimentoFalhou];
         }
 
         try {
@@ -145,7 +211,7 @@ class GenerateListingSuggestion
             $this->registrarDegradacao('semelhantes', $falha);
         }
 
-        return $completo;
+        return [$completo, $conhecimentoFalhou];
     }
 
     /**
@@ -216,6 +282,162 @@ class GenerateListingSuggestion
         return $falha->getMessage();
     }
 
+    /**
+     * A consulta externa, com a fronteira protegida e a resposta desconfiada.
+     *
+     * Só chega aqui com o veredito `ExternalMayHelp`. Cada saída tem o seu
+     * desfecho, e todas devolvem uma sugestão — a interna, quando nada de fora
+     * pode ser aproveitado.
+     *
+     * Os dois `try` envolvem **só** as chamadas ao provider. O prompt é montado
+     * fora deles: guard, redator e validador nunca lançam por contrato, e um
+     * defeito em qualquer um tem de aparecer como defeito, não como falha do
+     * provider. A tentativa é uma só (D-CAT-06G-6).
+     *
+     * @return array{0: ListingSuggestion, 1: ListingOutcome}
+     */
+    private function consultarProvider(ListingContext $contexto, ListingSuggestion $interna): array
+    {
+        try {
+            $disponivel = $this->provider->isAvailable();
+        } catch (CatalogAiProviderException $falha) {
+            return [$interna, $this->falhaDoProvider('provider_disponibilidade', $falha)];
+        }
+
+        if (! $disponivel) {
+            return [$interna, ListingOutcome::de(ListingOutcomeState::ProviderUnavailable)];
+        }
+
+        $prompt = ($this->redator)(($this->guard)($contexto));
+
+        try {
+            $resposta = $this->provider->suggest($prompt);
+        } catch (CatalogAiProviderException $falha) {
+            return [$interna, $this->falhaDoProvider('provider_sugestao', $falha)];
+        }
+
+        $violacoes = $this->validador->violacoes($resposta);
+
+        if ($violacoes !== []) {
+            return [$interna, ListingOutcome::respostaInvalida($violacoes)];
+        }
+
+        return $this->complementar($contexto, $interna, $resposta);
+    }
+
+    /**
+     * Registra a falha esperada do provider e devolve o desfecho dela.
+     *
+     * Classe do provider, etapa e classe da exceção — e **nada da mensagem**: quem
+     * a escreveu foi o adaptador, e uma falha de transporte pode carregar trecho
+     * do prompt ou da resposta. É a regra do `mensagemSegura()`, mais estrita,
+     * porque aqui não há mensagem que se saiba segura.
+     */
+    private function falhaDoProvider(string $etapa, CatalogAiProviderException $falha): ListingOutcome
+    {
+        Log::warning('catalog-intelligence: assistente degradado', [
+            'etapa' => $etapa,
+            'provider' => $this->provider::class,
+            'excecao' => $falha::class,
+        ]);
+
+        return ListingOutcome::de(ListingOutcomeState::ProviderFailed);
+    }
+
+    /**
+     * A resposta externa válida **complementa** a sugestão interna (D-CAT-06G-8).
+     *
+     * O validador diz se a resposta pode ser usada; esta composição diz o que dela
+     * entra. As regras são as que o caminho interno já seguia:
+     *
+     * - **texto externo só entra onde nada foi escrito nem proposto**: campo que o
+     *   lojista preencheu não recebe proposta (D-CAT-05D-4), e texto que a base já
+     *   compôs fica — texto curado não é trocado por texto de fora;
+     * - o **nome** é decidido em `nomeSugerido()`, e nome equivalente ao atual não
+     *   entra;
+     * - **palavras-chave internas primeiro**, externas depois, sem repetir o que a
+     *   base já trouxe;
+     * - **`missing_information` é recalculado** por `oQueFalta()` sobre o que a
+     *   sugestão final preenche — a lista do provider é descartada, porque pedir ao
+     *   lojista é regra da Feira, e não do fornecedor (D-CAT-05E-6);
+     * - `source` vira `External`, e `confidence` vem da resposta, só quando algo
+     *   dela entrou.
+     *
+     * Proposta para campo que já tinha texto é descartada e **não** é violação: o
+     * validador olha a forma da resposta (D-CAT-06D-2), e a resposta está bem
+     * formada — só não tem onde entrar.
+     *
+     * Se nada entrar, a sugestão devolvida é a interna, intacta, e o desfecho é
+     * `ExternalSuggestionNotUsed` (D-CAT-06G-11): o provider foi consultado e
+     * respondeu bem, o que não se confunde com a base não ter bastado.
+     *
+     * @return array{0: ListingSuggestion, 1: ListingOutcome}
+     */
+    private function complementar(ListingContext $contexto, ListingSuggestion $interna, ListingSuggestion $externa): array
+    {
+        $nome = $this->nomeSugerido($contexto, $externa);
+
+        $resumoExterno = $interna->shortDescription === null && $contexto->existingShortDescription === null
+            ? $externa->shortDescription
+            : null;
+
+        $descricaoExterna = $interna->description === null && $contexto->existingDescription === null
+            ? $externa->description
+            : null;
+
+        $palavrasExternas = $this->palavrasChaveNovas($interna->keywords, $externa->keywords);
+
+        if ($nome === null && $resumoExterno === null && $descricaoExterna === null && $palavrasExternas === []) {
+            return [$interna, ListingOutcome::de(ListingOutcomeState::ExternalSuggestionNotUsed)];
+        }
+
+        $resumo = $interna->shortDescription ?? $resumoExterno;
+        $descricao = $interna->description ?? $descricaoExterna;
+
+        return [
+            new ListingSuggestion(
+                suggestedName: $nome,
+                shortDescription: $resumo,
+                description: $descricao,
+                keywords: [...$interna->keywords, ...$palavrasExternas],
+                missingInformation: $this->oQueFalta($contexto, $this->preenchidas($resumo, $descricao)),
+                source: SuggestionSource::External,
+                confidence: $externa->confidence,
+            ),
+            ListingOutcome::de(ListingOutcomeState::ExternalSuggestionUsed),
+        ];
+    }
+
+    /**
+     * As palavras-chave externas que a base ainda não trouxe.
+     *
+     * A comparação é pela chave do `KnowledgeNormalizer`, a mesma que decide se
+     * dois conceitos são um só: "croche" não entra ao lado de "Crochê" — o mesmo
+     * motivo que deixou `alias` fora das palavras-chave (D-CAT-05E-2).
+     *
+     * @param  array<int, string>  $internas
+     * @param  array<int, string>  $externas
+     * @return array<int, string>
+     */
+    private function palavrasChaveNovas(array $internas, array $externas): array
+    {
+        $vistas = array_map(fn (string $palavra) => $this->normalizador->normalize($palavra), $internas);
+        $novas = [];
+
+        foreach ($externas as $palavra) {
+            $chave = $this->normalizador->normalize($palavra);
+
+            if ($chave === '' || in_array($chave, $vistas, true)) {
+                continue;
+            }
+
+            $vistas[] = $chave;
+            $novas[] = $palavra;
+        }
+
+        return $novas;
+    }
+
     private function compor(ListingContext $contexto): ListingSuggestion
     {
         $conceitos = $contexto->knowledge;
@@ -234,20 +456,31 @@ class GenerateListingSuggestion
         $descricao = $this->descricaoSugerida($contexto, $conceitos);
 
         return new ListingSuggestion(
-            suggestedName: $this->nomeSugerido(),
+            suggestedName: $this->nomeSugerido($contexto),
             shortDescription: $resumo,
             description: $descricao,
             keywords: $this->palavrasChave($conceitos),
-            missingInformation: $this->oQueFalta($contexto, array_keys(array_filter([
-                ListingGap::ShortDescription->value => $resumo,
-                ListingGap::Description->value => $descricao,
-            ], fn ($v) => $v !== null))),
+            missingInformation: $this->oQueFalta($contexto, $this->preenchidas($resumo, $descricao)),
             source: SuggestionSource::Internal,
         );
     }
 
     /**
-     * O caminho interno **não propõe nome**, e devolve nulo sempre.
+     * As lacunas de texto que uma sugestão preenche — para `oQueFalta()` não pedir
+     * o que ela já oferece. Serve a sugestão interna e a complementada.
+     *
+     * @return array<int, string>
+     */
+    private function preenchidas(?string $resumo, ?string $descricao): array
+    {
+        return array_keys(array_filter([
+            ListingGap::ShortDescription->value => $resumo,
+            ListingGap::Description->value => $descricao,
+        ], fn ($v) => $v !== null));
+    }
+
+    /**
+     * O caminho interno **não propõe nome**; nome só vem de fora.
      *
      * Renomear é o único dos campos que exige de fato escrever algo novo: o
      * resumo e a descrição podem ser compostos a partir de conceitos que o
@@ -259,10 +492,27 @@ class GenerateListingSuggestion
      * O campo continua existindo porque a §3.4 o nomeia e porque é exatamente o
      * que a CAT-06 terá condições de preencher. Devolver nulo é a resposta
      * honesta de quem não tem base para preferir um nome a outro.
+     *
+     * **CAT-06G.** Quando uma resposta externa válida propõe nome, é aqui que ele
+     * entra (D-CAT-06G-8). É a única proposta que não esbarra na D-CAT-05D-4: o
+     * nome é obrigatório e está sempre preenchido, então "campo preenchido não
+     * recebe proposta" fecharia para sempre o campo que esta sugestão existe para
+     * oferecer. Aplicar ou não continua sendo escolha do lojista, na CAT-09.
+     *
+     * Só entra nome **diferente** do atual (D-CAT-06G-12) — diferente pela chave do
+     * `KnowledgeNormalizer`, a mesma que desduplica palavras-chave, e não por byte.
+     * "Tapete de Croche" proposto para "Tapete de crochê" é o mesmo nome, e
+     * oferecê-lo seria fingir contribuição.
      */
-    private function nomeSugerido(): ?string
+    private function nomeSugerido(ListingContext $contexto, ?ListingSuggestion $externa = null): ?string
     {
-        return null;
+        if ($externa?->suggestedName === null) {
+            return null;
+        }
+
+        return $this->normalizador->normalize($externa->suggestedName) === $this->normalizador->normalize($contexto->name)
+            ? null
+            : $externa->suggestedName;
     }
 
     /**

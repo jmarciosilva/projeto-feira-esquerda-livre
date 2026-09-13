@@ -38,11 +38,14 @@ return [
     | aí não há nem nome de onde partir.
     |
     | 3 de 5 é o ponto em que o assistente interno passa a ter menos material do
-    | que falta. Não é constante sagrada: é o número que a CAT-06G vai validar
-    | contra os 75 itens reais, do mesmo modo que a CAT-05H validou o resto.
+    | que falta. Não é constante sagrada, e foi revalidado na CAT-06G contra os 75
+    | itens reais (D-CAT-06G-10): com 3, os 30 itens em que a base não consegue
+    | escrever o texto que falta são consultados e nenhum fica de fora, ao custo de
+    | 10 consultas em itens que ela já resolve; com 4 ou 5 esses 30 ficam sem
+    | consulta, e com 1 ou 2 os 75 viram consulta.
     |
-    | Vale como piso de decisão, nunca como autorização de gasto: quem decide
-    | *consultar* é a CAT-06G, e o custo por consulta é a dívida B-6, ainda em
+    | Vale como piso de decisão, nunca como autorização de gasto: quem consulta é
+    | `GenerateListingSuggestion`, e o custo por consulta é a dívida B-6, ainda em
     | aberto.
     */
     'fallback' => [

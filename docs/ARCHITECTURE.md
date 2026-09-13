@@ -1031,55 +1031,139 @@ ListingContext::paraItemNovo() | ::deProduct()
 `Null`, `Fake`, limiar, redator e guard; nenhum fornecedor real, credencial ou
 segredo. O domínio não conhece nome de fornecedor nem de modelo.
 
-Entregue (06C, 06D, 06E, 06F):
+Entregue (06C, 06D, 06E, 06F, 06G):
 
 ```php
 interface CatalogAiProvider          // App\CatalogIntelligence\Contracts
 {
+    /** @throws CatalogAiProviderException */
     public function isAvailable(): bool;
-    public function suggest(ListingContext $context): ListingSuggestion;
+
+    /** @throws CatalogAiProviderException */
+    public function suggest(GuardedPrompt $prompt): ListingSuggestion;   // 06G; na 06D era ListingContext
 }
 ```
 
 | Peça | Comportamento |
 |---|---|
-| `NullCatalogAiProvider` | caminho padrão sem credencial; `isAvailable() === false`; `suggest()` devolve `vazia()` e **nunca lança** — operar sem IA externa é **estado normal** (D-CAT-06B-5) |
-| `FakeCatalogAiProvider` | determinístico; `indisponivel()`, `disponivel()`, `respondendo($dto)`, `queFalha()` (lança de propósito); conta chamadas |
+| `NullCatalogAiProvider` | caminho padrão sem credencial e **binding padrão do contrato** (D-CAT-06G-9); `isAvailable() === false`; `suggest()` devolve `vazia()` e **nunca lança** — operar sem IA externa é **estado normal** (D-CAT-06B-5). Não carrega política nem fallback |
+| `FakeCatalogAiProvider` | determinístico; `indisponivel()`, `disponivel()`, `respondendo($dto)`, `queFalha()` e `queEsgotaOTempo()` (lançam `CatalogAiProviderException` de propósito); `chamadas()` e `promptsRecebidos()`; nunca registrado no container |
 | `ProviderResponseValidator` | valida só o que o tipo não garante — texto em branco, keywords e missing_information malformadas, confiança fora de `[0,1]`, procedência incorreta; devolve lista de `ProviderResponseViolation` e nunca lança |
 | `SuggestionPolicy` | lê `ListingContext::lacunas()` (não reconta); devolve `KnowledgeSufficiency`: `Sufficient` · `ExternalMayHelp` (falta **texto**) · `AwaitsMerchant` (falta **fato** — consultar seria pagar por invenção) |
 | `config/catalog-intelligence.php` | só `fallback.minimum_gaps` (`CATALOG_AI_MINIMUM_GAPS`, padrão 3; padrão de segurança 5 se a chave sumir); **proibido** credencial, fornecedor ou endpoint (há teste) |
-| `FreeTextRedactor` (06E) | `Support/`, `redigir(string): string`, marcador único `[redigido]`. D-CAT-06B-2 sem reabertura: telefone, e-mail, CPF/CNPJ (inclusive o alfanumérico) e CEP **sempre**; medidas, preço, quantidade **nunca**; URL e `@handle` **não por padrão** — dado pessoal dentro de URL é redigido e a URL fica. Sem máscara, CPF/CNPJ só com dígito verificador válido e CEP só depois da palavra "CEP"; fixo sem máscara e fixo sem DDD **não** são reconhecidos (limitação declarada). Preserva o resto byte a byte, é idempotente, não tem dependência, não registra e nunca lança; texto ilegível **falha fechado** (sai só o marcador). **Ninguém o chama ainda**: não há saída ligada — **fecha C-2** |
-| `PromptGuard` (06F) | `Support/`, `__invoke(ListingContext): GuardedPrompt`. Três canais em `DTOs/GuardedPrompt` (`final`, `readonly`, nenhum método além do construtor): `instruction` — `Enums/ProviderInstruction`, enum **puro** fixado pelo guard, que nenhum texto escolhe; `context` — `knowledge` e `similar_items`, por lista de permissão; `data` — todo o resto do `ListingContext`, e toda chave nova. Classifica por origem e **não lê conteúdo**: não redige, não escapa, não altera, não lança, não reconhece frase; payload hostil e conteúdo legítimo parecido com instrução atravessam intactos no canal de dado. Não escreve texto de instrução nem formato de fornecedor. **Ninguém o chama ainda** — **fecha S-1** |
+| `FreeTextRedactor` (06E) | `Support/`, `redigir(string): string`, marcador único `[redigido]`. D-CAT-06B-2 sem reabertura: telefone, e-mail, CPF/CNPJ (inclusive o alfanumérico) e CEP **sempre**; medidas, preço, quantidade **nunca**; URL e `@handle` **não por padrão** — dado pessoal dentro de URL é redigido e a URL fica. Sem máscara, CPF/CNPJ só com dígito verificador válido e CEP só depois da palavra "CEP"; fixo sem máscara e fixo sem DDD **não** são reconhecidos (limitação declarada). Preserva o resto byte a byte, é idempotente, não tem dependência, não registra e nunca lança; texto ilegível **falha fechado** (sai só o marcador). Chamado na saída ligada pelo `GuardedPromptRedactor` (06G) — **fecha C-2** |
+| `PromptGuard` (06F) | `Support/`, `__invoke(ListingContext): GuardedPrompt`. Três canais em `DTOs/GuardedPrompt` (`final`, `readonly`, nenhum método além do construtor): `instruction` — `Enums/ProviderInstruction`, enum **puro** fixado pelo guard, que nenhum texto escolhe; `context` — `knowledge` e `similar_items`, por lista de permissão; `data` — todo o resto do `ListingContext`, e toda chave nova. Classifica por origem e **não lê conteúdo**: não redige, não escapa, não altera, não lança, não reconhece frase; payload hostil e conteúdo legítimo parecido com instrução atravessam intactos no canal de dado. Não escreve texto de instrução nem formato de fornecedor. Chamado por `GenerateListingSuggestion` na saída ligada (06G) — **fecha S-1** |
+| `GuardedPromptRedactor` (06G) | `Support/`, `__invoke(GuardedPrompt): GuardedPrompt`, só depende do `FreeTextRedactor`. Redige toda string de `context` e `data` em qualquer profundidade, e número cuja forma escrita é dado pessoal; `instruction` nunca chega ao redator; chaves estruturais intactas; chaves de `known_attributes` — as únicas vindas de fora (C-1) — redigidas, e na colisão fica a primeira. Não lança, não registra (D-CAT-06G-2) |
+| `CatalogAiProviderException` (06G) | `Exceptions/`, `final`, `extends RuntimeException`, sem hierarquia; `tempoEsgotado()`. A única falha que o assistente trata como falha do provider (D-CAT-06G-7) |
+| `ListingOutcome` · `ListingOutcomeState` (06G) | DTO do desfecho (`state`, `violations`) e enum exaustivo de 8 estados, com `ehFalha()` e `convidaARepetir()`; `violations` só existe na resposta inválida — **fecha F-1** (D-CAT-06G-3) |
 
-Nenhum binding de provider no `CatalogIntelligenceServiceProvider`;
-`EmbeddingProvider` **não existe** (B-3 em aberto, trava de teste guarda só ele).
+O único binding do `CatalogIntelligenceServiceProvider` é `CatalogAiProvider` →
+`NullCatalogAiProvider`; `EmbeddingProvider` **não existe** (B-3 em aberto, trava de
+teste guarda só ele).
 
-A construir, com contratos já decididos:
+**Fluxo ligado (06G)** — fecha **F-1** e decide **B-5**. O orquestrador é
+`GenerateListingSuggestion`; nenhum service novo.
+
+```text
+comContexto(ListingContext, ?Product)
+  → completar()                   motor da CAT-04; falha na etapa de conhecimento → InternalIntelligenceFailed, sem provider
+  → compor()                      sugestão interna, sempre
+  → SuggestionPolicy              Sufficient → InternalKnowledgeSufficient
+                                  AwaitsMerchant → InternalKnowledgeInsufficient
+                                  ExternalMayHelp ↓
+  → provider->isAvailable()       false → ProviderUnavailable
+  → PromptGuard
+  → GuardedPromptRedactor         GuardedPrompt seguro (S-1 + C-2)
+  → provider->suggest(prompt)     CatalogAiProviderException → ProviderFailed
+  → ProviderResponseValidator     violações → ProviderResponseInvalid
+  → complementar()                algo entrou → ExternalSuggestionUsed · nada entrou → ExternalSuggestionNotUsed
+  → [ListingSuggestion, ListingContext (original), ListingOutcome]
+```
+
+| `ListingOutcomeState` | Falha? | Convida a repetir? | Quando |
+|---|---|---|---|
+| `InternalKnowledgeSufficient` | não | não | política `Sufficient` |
+| `InternalKnowledgeInsufficient` | não | não | política `AwaitsMerchant` |
+| `InternalIntelligenceFailed` | sim | sim | a etapa de conhecimento lançou; provider não consultado |
+| `ProviderUnavailable` | não | não | consulta justificada e `isAvailable() === false` |
+| `ProviderFailed` | sim | sim | `CatalogAiProviderException` em `isAvailable()` ou `suggest()`, prazo esgotado incluído |
+| `ProviderResponseInvalid` | sim | não | o validador devolveu violações; elas vão em `violations` |
+| `ExternalSuggestionUsed` | não | não | algum campo da resposta entrou na sugestão |
+| `ExternalSuggestionNotUsed` | não | não | resposta válida, e nada dela entrou — nem nome equivalente ao atual |
+
+Os quatro estados da D-CAT-06B-1 continuam com o mesmo significado: provider
+ausente → `ProviderUnavailable`; base não conhece → `InternalKnowledgeInsufficient`;
+provider falhou → `ProviderFailed`; resposta inválida → `ProviderResponseInvalid`.
+
+- **Fronteira** (D-CAT-06G-1, D-CAT-06G-2): o provider recebe `GuardedPrompt`, e o
+  tipo impede enviar `ListingContext`. A redação é composta **depois** do guard; o
+  contexto devolvido ao chamador segue original.
+- **Exceções** (D-CAT-06G-7): só `CatalogAiProviderException` vira `ProviderFailed`,
+  capturada só em volta das duas chamadas ao provider. `RuntimeException` genérica,
+  `TypeError` e defeito de guard, redator, validador ou desfecho **sobem**. O log
+  da falha tem etapa, classe do provider e classe da exceção — nunca a mensagem.
+  O motor interno mantém a captura da CAT-05F (D-CAT-05F-1).
+- **B-5** (D-CAT-06G-5, D-CAT-06G-6): prazo total de **8 s** para a tentativa
+  externa, aplicado pelo adaptador no transporte; esgotado →
+  `CatalogAiProviderException::tempoEsgotado()` → `ProviderFailed`, sugestão
+  interna preservada. **0 novas tentativas.** Nenhuma chave de config até existir
+  adaptador que a leia.
+- **Resposta válida complementa, não substitui** (D-CAT-06G-8): texto externo só
+  onde o lojista não escreveu e a base não compôs; nome por `nomeSugerido()`, e só
+  se diferente do atual pela chave do `KnowledgeNormalizer` (D-CAT-06G-12);
+  palavras-chave internas primeiro e externas sem duplicata pela mesma chave;
+  `missing_information` recalculado por `oQueFalta()`; `source = External` e
+  `confidence` da resposta só com contribuição. Proposta para campo preenchido é
+  descartada e **não** é violação. Sem contribuição, o desfecho é
+  `ExternalSuggestionNotUsed` (D-CAT-06G-11).
+- `__invoke()` continua devolvendo só `ListingSuggestion`.
+
+A construir:
 
 | Subfase | Peça | Contrato |
 |---|---|---|
-| **06G** | Fallback + DTO de desfecho | Desfecho **fora** da `ListingSuggestion` e fora de `missing_information`, devolvido por `comContexto()` ao lado da sugestão e do contexto. Quatro estados: provider ausente (normal, silêncio) · base não conhece (lacuna) · provider falhou (transitório, pode repetir) · resposta inválida (contrato, não repetir). Nome não decidido. Decide timeout (B-5). A saída ligada aqui passa o texto livre pelo `FreeTextRedactor` antes de ir embora (D-CAT-06B-2) — se sobre uma cópia redigida do contexto ou sobre os canais `context` e `data` do `GuardedPrompt`, fica para a 06G. O adaptador traduz os três canais do `GuardedPrompt` para o mecanismo do fornecedor sem juntá-los numa string antes — **fecha F-1** |
 | **06H** | Encerramento | Reconciliação de nomenclatura e varredura de travas de asserção |
 
 Ordem **06E/06F antes de 06G** (D-CAT-06B-6): resiliência antes do acoplamento.
 
 ### 14.6 Segurança e privacidade do módulo
 
-- **Nunca sai para provider**: nome, e-mail, CPF, CNPJ, endereço, telefone,
-  cookies, `visitor_uuid`, `session_uuid`, IP, dados de pedido e qualquer campo de
-  `ProductOffer`.
-- Campos são filtrados pelo `ContextSanitizer`; **conteúdo** de texto livre é
-  redigido pelo `FreeTextRedactor` (06E), só na saída — o caminho interno recebe o
-  texto como o lojista o escreveu. A D-CAT-06B-2 cobre telefone, e-mail, CPF/CNPJ e
-  CEP: nome de pessoa, endereço sem CEP, credencial e token escritos no texto livre
-  **não** são procurados.
+- **O que pode atravessar a fronteira** (06G): só o que o `GuardedPrompt` carrega,
+  depois do `PromptGuard` e do `GuardedPromptRedactor` — o **conteúdo de catálogo**
+  necessário à sugestão. No canal `data`: tipo do item, **nome do item**, caminho
+  de categoria, resumo e descrição existentes e `known_attributes`. No canal
+  `context`: conceitos aprovados (nome, tipo, descrição curada, termos) e itens
+  semelhantes (nome, conceitos compartilhados, razões). Esse conteúdo **sai** para o
+  provider, redigido.
+- **O que o `FreeTextRedactor` redige nesse conteúdo** (D-CAT-06B-2, CAT-06E, sem
+  ampliação): telefone, e-mail, CPF/CNPJ e CEP, nas formas que ele reconhece — sem
+  máscara, CPF/CNPJ só com dígito verificador válido e CEP só depois da palavra
+  "CEP"; fixo sem máscara e fixo sem DDD **não** são reconhecidos. Medida, preço e
+  quantidade nunca são redigidos; URL e `@handle`, não por padrão. A redação vale
+  para os valores de `context` e `data` e para as chaves de `known_attributes`
+  (D-CAT-06G-2); o caminho interno recebe o texto como o lojista o escreveu.
+- **O que nunca pertence ao contexto**, e por isso não chega ao provider: dados de
+  pedido, cookies, `visitor_uuid`, `session_uuid`, IP e qualquer campo de
+  `ProductOffer` ou de `Expositor`. O `ListingContext` tem campos fixos e nenhum
+  parâmetro que aceite oferta ou expositor (D-CAT-05B-3). Em `known_attributes`,
+  único ponto por onde entra dado de fora, essas categorias caem pela lista de
+  proibição de **chaves** do `ContextSanitizer`, que não protege o valor posto sob
+  uma chave com nome não previsto (dívida C-1).
+- **Limitações conhecidas — não são reconhecidos automaticamente**: nome de pessoa,
+  endereço sem CEP, credencial e token escritos em texto livre, e dado pessoal
+  escrito por extenso ou disfarçado. Se estiverem no nome, na descrição, num
+  atributo ou no nome de um item semelhante, **atravessam** a fronteira.
 - Nenhuma classe do módulo importa cliente HTTP, usa formato de mensagem de
   fornecedor, contém marca de credencial ou nomeia fornecedor — varreduras em
   `FronteiraDePromptTest` e `ContratosDeProviderTest`, com duas camadas
   independentes.
 - Texto do lojista e contexto recuperado nunca viram instrução: o `PromptGuard`
   os entrega em canais próprios do `GuardedPrompt`, e a instrução é um enum que
-  texto nenhum escolhe. A garantia é de estrutura, não de reconhecer frase.
+  texto nenhum escolhe. A garantia é de estrutura, não de reconhecer frase. Desde a
+  06G o provider só recebe `GuardedPrompt`.
+- Falha do provider é registrada com etapa, classe do provider e classe da
+  exceção, **sem a mensagem**, que é do adaptador e pode carregar prompt ou
+  resposta (D-CAT-06G-7).
 - Cachear conhecimento e contexto é legítimo; copiar atributo objetivo de um item
   para outro por efeito de cache, não.
 - Futuro (CAT-10): métricas por chamada externa — provider, modelo, tokens, custo,
@@ -1227,7 +1311,7 @@ Decisões:
 | Segredos | Nunca versionados; `.env.example` só com chaves vazias ou exemplos; `.gitignore` cobre `.env*`, `*.backup`, `*.bak` |
 | Credencial legada (SEC-01) | Revogada na origem; histórico do Git não reescrito (string inerte) — reescrever quebraria clones e não desfaria a exposição |
 | PII em log (CAT-05F) | `QueryException` do módulo de IA registrada só pelo SQLSTATE |
-| IA externa (CAT-06) | Nenhum provider opera antes de C-2 (redação) e S-1 (PromptGuard) fecharem. C-2 fechado na 06E (`FreeTextRedactor`); S-1 fechado na 06F (`PromptGuard`) |
+| IA externa (CAT-06) | Nenhum provider opera antes de C-2 (redação) e S-1 (PromptGuard) fecharem. C-2 fechado na 06E (`FreeTextRedactor`); S-1 fechado na 06F (`PromptGuard`); F-1 fechado na 06G: o provider só recebe `GuardedPrompt` redigido, e só a falha tipada vira fallback. Nenhum provider real acoplado |
 | Download de material AVA | URL assinada temporária + matrícula ativa |
 
 ### 19.2 Dívidas de segurança abertas
@@ -1598,9 +1682,9 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 | **D-CAT-05F-1** | O assistente captura exceção do motor e devolve `vazia()` | Garantia na única porta | VIGENTE |
 | **D-CAT-05F-2** | Captura separada por etapa — degradação parcial | Não perder o principal pelo acessório | VIGENTE |
 | **D-CAT-05F-3** | `QueryException` no log só pelo SQLSTATE | Bindings carregam texto do lojista | VIGENTE |
-| **D-CAT-05F-4** | Sem sinal de modo degradado por ora (dívida F-1) | Não reabrir a forma da sugestão | **SUPERADA** por D-CAT-06B-1 (DTO de desfecho, a implementar na 06G) |
+| **D-CAT-05F-4** | Sem sinal de modo degradado por ora (dívida F-1) | Não reabrir a forma da sugestão | **SUPERADA** por D-CAT-06B-1 (DTO de desfecho, implementado na 06G) |
 | **D-CAT-05F-5** | C-2 vira **gate** da CAT-06, não item da CAT-10 | Na CAT-10 o texto já teria saído por quatro fases | VIGENTE |
-| **D-CAT-05F-6** | Timeout fora de escopo, destino CAT-06 | Não há chamada que penda; PDO global afetaria o checkout | VIGENTE — precisado por B-5 (06G) |
+| **D-CAT-05F-6** | Timeout fora de escopo, destino CAT-06 | Não há chamada que penda; PDO global afetaria o checkout | HISTÓRICA — B-5 decidida na 06G (D-CAT-06G-5) |
 | **D-CAT-05F-7** | A CAT-05F escreve o teste da regra 3; a CAT-10 herda a verificação | Um dono por teste | VIGENTE |
 | **D-CAT-05G-1** | Teto do assistente é exatamente 6 consultas | Teto folgado aceita regressão | VIGENTE |
 | **D-CAT-05G-2** | Prompt injection é gate da CAT-06 (S-1) | Sem prompt, o teste passaria pelo motivo errado | HISTÓRICA (cumprida na 06F) |
@@ -1613,8 +1697,8 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 | **D-CAT-05H-3** | Achados D-1…D-4 viram dívida, não correção | Validação não altera comportamento | VIGENTE |
 | **D-CAT-05H-4** | Script de validação descartável e não versionado | Subfase sem código | HISTÓRICA |
 | CAT-06A `(sem ID)` | Subdivisão A→H; gates atribuídos (C-2→06E, S-1→06F, F-1→06G); F-1 não é binário (≥ 4 estados); validação de resposta mapeada para 06D; `EmbeddingProvider` registrado como órfão sem decisão | Gate fechado no meio de outra entrega não tem onde ser revisado | VIGENTE — decisões de produto formalizadas na 06B |
-| **D-CAT-06B-1** | Desfecho da sugestão é DTO próprio, devolvido por `comContexto()`; 4 estados, um deles não é falha; `ListingSuggestion` não é reaberta; desfecho fora de `missing_information` | Operação normal sem IA não pode parecer avaria | VIGENTE (a implementar na 06G) |
-| **D-CAT-06B-2** | Redação de PII em `Support/FreeTextRedactor`, só na fronteira de saída; telefone/e-mail/CPF/CNPJ/CEP sempre; medidas/preço/quantidade nunca; URL e `@handle` não por padrão; teste positivo e negativo por faixa | Sanitizer serve o caminho interno, que não sai da aplicação | VIGENTE (implementada na 06E) |
+| **D-CAT-06B-1** | Desfecho da sugestão é DTO próprio, devolvido por `comContexto()`; 4 estados, um deles não é falha; `ListingSuggestion` não é reaberta; desfecho fora de `missing_information` | Operação normal sem IA não pode parecer avaria | VIGENTE — implementada na 06G, com os 4 estados preservados dentro de 8 (D-CAT-06G-3, D-CAT-06G-11) |
+| **D-CAT-06B-2** | Redação de PII em `Support/FreeTextRedactor`, só na fronteira de saída; telefone/e-mail/CPF/CNPJ/CEP sempre; medidas/preço/quantidade nunca; URL e `@handle` não por padrão; teste positivo e negativo por faixa | Sanitizer serve o caminho interno, que não sai da aplicação | VIGENTE (implementada na 06E; ligada na 06G) |
 | **D-CAT-06B-3** | `SuggestionPolicy` lê `lacunas()`, limiar em config, não conhece provider | Testável sem dublê | VIGENTE (implementada na 06C) |
 | **D-CAT-06B-4** | Validação de resposta nasce junto dos contratos, na 06D | Produz o quarto estado do desfecho | VIGENTE (implementada na 06D) |
 | **D-CAT-06B-5** | Operar sem IA externa é estado normal; `Null` é o caminho padrão de produção | — | VIGENTE |
@@ -1622,14 +1706,14 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 | **D-CAT-06C-1** | `SuggestionPolicy::__invoke()` recebe o `ListingContext` inteiro | Fonte única estrutural | VIGENTE |
 | **D-CAT-06C-2** | Veredito é o enum `KnowledgeSufficiency` de três casos | Falta de texto e falta de fato pedem ações opostas | VIGENTE |
 | **D-CAT-06C-3** | Limiar lido no ponto de uso via `config()` | Octane; config não decorativo | VIGENTE |
-| **D-CAT-06C-4** | `minimum_gaps` = 3, revalidado na 06G contra dados reais | Ponto em que falta mais do que existe | VIGENTE |
+| **D-CAT-06C-4** | `minimum_gaps` = 3, revalidado na 06G contra dados reais | Ponto em que falta mais do que existe | VIGENTE — revalidado na 06G sobre os 75 itens reais (D-CAT-06G-10) |
 | **D-CAT-06C-5** | Trava da `SuggestionPolicy` substituída pela garantia que representava; `PromptGuard` segue travado | Gatilho cumpriu a função | VIGENTE — a trava do `PromptGuard` foi substituída na 06F (D-CAT-06F-5) |
 | **D-CAT-06C-6** | Padrão de segurança do limiar ausente é 5 | Config sumido nunca liga fallback | VIGENTE |
 | **D-CAT-06D-1** | `NullCatalogAiProvider::suggest()` devolve `vazia()` e nunca lança | Erro de chamador não vira exceção em produção | VIGENTE |
 | **D-CAT-06D-2** | Validação da B-4 cobre só o que o tipo não garante | Revalidar tipo é cerimônia | VIGENTE |
 | **D-CAT-06D-3** | O validador devolve lista de violações e nunca lança | O desfecho precisa registrar o motivo | VIGENTE |
 | **D-CAT-06D-4** | Comprimento de texto não é validado no validador | O limite é da coluna; segunda fonte | VIGENTE |
-| **D-CAT-06D-5** | `FakeCatalogAiProvider::queFalha()` lança de propósito | Simular falha é a função dele | VIGENTE |
+| **D-CAT-06D-5** | `FakeCatalogAiProvider::queFalha()` lança de propósito | Simular falha é a função dele | VIGENTE — desde a 06G lança `CatalogAiProviderException` (D-CAT-06G-7) |
 | **D-CAT-06D-6** | O `Fake` conta chamadas | Provar que não houve consulta | VIGENTE |
 | **D-CAT-06D-7** | A trava da CAT-05D passa a guardar só o `EmbeddingProvider` | B-3 é o único sem decisão | VIGENTE |
 | **D-CAT-06D-8** | `EmbeddingProvider` não é criado | Interface sem consumidor | VIGENTE |
@@ -1638,6 +1722,18 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 | **D-CAT-06F-3** | Classificação por origem: `knowledge` e `similar_items` são contexto recuperado, por lista de permissão; todo o resto do `ListingContext`, e toda chave nova, é dado do lojista | É a forma que o `ListingContext` já tem (campos próprios × cópias); o padrão fica no lado não confiável, nunca no de instrução | VIGENTE |
 | **D-CAT-06F-4** | O guard não lê conteúdo: não redige, não escapa, não altera, não descarta, não lança e não registra; vazio e nulo atravessam como estão | Proteção por lista de frases destrói conteúdo legítimo e envelhece na primeira frase não prevista; PII é a C-2, e compor as duas peças é a 06G | VIGENTE |
 | **D-CAT-06F-5** | `FronteiraDePromptTest` reescrito: as 3 precondições da CAT-05G trocadas pelo que vigiavam (guard sem provider nem função de texto; varredura permanente de formato de fornecedor, rede e credencial); o teste do texto hostil sobrevive e vira a base dos testes de injeção | Precondição vencida vira garantia, não é apagada (mesma regra da D-CAT-06C-5) | VIGENTE |
+| **D-CAT-06G-1** | `CatalogAiProvider::suggest()` recebe `GuardedPrompt`, e não `ListingContext`; os dois métodos declaram `@throws CatalogAiProviderException`. **Evolução da 06D, não correção**: a assinatura transcrita da §3.3 bastava enquanto redator e guard existiam isolados | Compor as peças mostrou que `ListingContext` não é fronteira segura de transporte — texto cru, sem canais, e nada no tipo obrigava a proteger antes de enviar | VIGENTE |
+| **D-CAT-06G-2** | Composição externa `PromptGuard` → `GuardedPromptRedactor` → provider. Redige toda string de `context` e `data`, e número cuja forma escrita é dado pessoal; `instruction` nunca; chaves estruturais intactas; chaves de `known_attributes` — as únicas vindas de fora (C-1) — redigidas, e na colisão fica a primeira | `ListingContext` não gera cópia redigida sem mudar o DTO; redigir depois da classificação não junta canais nem altera responsabilidade de guard ou redator | VIGENTE |
+| **D-CAT-06G-3** | Desfecho em `DTOs/ListingOutcome` + `Enums/ListingOutcomeState`, **exaustivo**, 7 estados; os 4 da D-CAT-06B-1 preservados em significado; `violations` só na resposta inválida | Com o fluxo composto, 4 estados não cobriam sucesso interno, falha do motor nem uso externo; `null`, `source` e `missing_information` não são estado | VIGENTE — ampliada para 8 estados por D-CAT-06G-11 |
+| **D-CAT-06G-4** | Falha do motor interno ≠ falha do provider: estado próprio, e o provider não é consultado quando a etapa de conhecimento falhou; falha só da similaridade segue acessória | A lacuna de conhecimento seria produto da falha; ampliar `ProviderFailed` apagaria de que lado está o defeito | VIGENTE |
+| **D-CAT-06G-5** | B-5: prazo total de 8 s para a tentativa externa, aplicado pelo adaptador no transporte; esgotado → `CatalogAiProviderException::tempoEsgotado()` → `ProviderFailed`; sem chave de config até existir adaptador | Tela síncrona com "timeout curto" (spec §7); config sem leitor seria decorativo (D-CAT-06C-3) | VIGENTE |
+| **D-CAT-06G-6** | 0 novas tentativas, no adaptador e no assistente; retry futuro exige decisão nova | Previsibilidade, latência, custo e chamada duplicada | VIGENTE |
+| **D-CAT-06G-7** | A falha esperada da fronteira é `Exceptions/CatalogAiProviderException` (`final`, sem hierarquia); só ela é capturada, só em volta de `isAvailable()` e `suggest()`; log com etapa, classe do provider e da exceção, sem mensagem | `Throwable` mascararia `TypeError` e defeito interno como falha transitória; a mensagem do adaptador pode carregar prompt | VIGENTE |
+| **D-CAT-06G-8** | Resposta válida complementa: texto externo só onde o lojista não escreveu e a base não compôs; nome por `nomeSugerido()`; keywords internas primeiro e externas sem duplicata (`KnowledgeNormalizer`); `missing_information` recalculado; `source` e `confidence` externos só com contribuição; proposta para campo preenchido é descartada e não é violação; sem contribuição → `InternalKnowledgeInsufficient` | Preservar D-CAT-05D-4 e D-CAT-05E-6; o validador olha forma (D-CAT-06D-2); o desfecho descreve contribuição, não chamada | **VIGENTE PARCIALMENTE** — a composição conservadora permanece vigente; a cláusula "sem contribuição → `InternalKnowledgeInsufficient`" foi **SUPERADA** por D-CAT-06G-11; a regra do nome foi **precisada** por D-CAT-06G-12 |
+| **D-CAT-06G-9** | `CatalogAiProvider` resolve para `NullCatalogAiProvider` no container; `Fake` nunca registrado; o `Null` não carrega política nem fallback | D-CAT-06B-5: sem credencial, ausência de provider é o estado normal | VIGENTE |
+| **D-CAT-06G-10** | `minimum_gaps` = 3 **mantido** após revalidação só de leitura sobre os 75 itens reais do MySQL de desenvolvimento (transação desfeita, 0 SQL fora de SELECT, contagens iguais, script descartável removido). Lacunas: 2 em 35 itens, 3 em 40. Com 3: 40 consultas, cobrindo os 30 itens cuja lacuna de texto a base não preenche, 10 sem essa lacuna, 0 itens perdidos. Com 1–2: 75 consultas (45 sem lacuna aberta). Com 4–5: 0 consultas (30 perdidos) | Único limiar sem item perdido e com menor desperdício. `attributes` e `short_description` abertos em 75/75 (CAT-02, B-4) fazem o limiar operar hoje como "falta categoria ou conhecimento" | VIGENTE |
+| **D-CAT-06G-11** | Oitavo estado `ExternalSuggestionNotUsed` — não é falha, não convida a repetir, sem violações: o provider foi consultado, respondeu validamente e nada da resposta foi aproveitado. `InternalKnowledgeInsufficient` volta a significar só `AwaitsMerchant`. O desfecho exaustivo passa de 7 para 8 estados | A revisão pré-commit mostrou que "o provider não contribuiu" e "o conhecimento interno foi insuficiente" são eventos distintos. Refinamento que só a composição real expôs, e não correção da CAT-06B | VIGENTE |
+| **D-CAT-06G-12** | Nome externo equivalente ao atual pela chave do `KnowledgeNormalizer` não entra e não conta como contribuição, decidido em `nomeSugerido()`; outra contribuição real na mesma resposta ainda resulta em `ExternalSuggestionUsed` | Devolver o nome que o item já tem, ou a mesma grafia sem acento, seria fingir contribuição; a chave é a mesma que desduplica palavras-chave | VIGENTE |
 
 ### 23.9 Documentação
 
@@ -1664,7 +1760,7 @@ arquitetura.
 | **F-06** | Integridade do pagamento depende de a verdade vir da API do gateway, não do webhook |
 | **SEC-DEP-01** | Dependência de Markdown com advisories HIGH, usada em runtime pelo painel |
 | **LGPD-01 · LGPD-02** | Princípios de proteção declarados e nunca implementados |
-| **F-1 · B-5** | Nenhum provider externo pode ser acoplado antes da 06G. **C-2** fechado na 06E e **S-1** na 06F: redator e guard existem e têm teste, e a saída ligada na 06G é obrigada a passar pelos dois — o adaptador recebe os três canais do `GuardedPrompt` e não os junta antes do formato do fornecedor |
+| **Adaptador real (pós-F-1 · B-5)** | F-1 fechado e B-5 decidido na 06G; nenhum provider real acoplado. Quem acoplar recebe `GuardedPrompt` já redigido, não junta os três canais antes do formato do fornecedor, aplica o prazo de 8 s no transporte, não tenta de novo e converte só a falha esperada em `CatalogAiProviderException`. Continua dependendo de B-3 e B-6 |
 | **B-3 · B-6** | Embeddings e custo/rate limit sem decisão; qualquer provider real precisa delas |
 | **D-3 (CAT-05H)** | Casamento por frase exata limita o alcance; mudar reabre a CAT-04 e troca falso negativo por falso positivo |
 | **GOV-02** | Consentimento avaliado na requisição de origem não cobre eventos assíncronos |

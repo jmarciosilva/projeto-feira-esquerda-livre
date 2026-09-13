@@ -3,7 +3,7 @@
 namespace App\CatalogIntelligence\Providers;
 
 use App\CatalogIntelligence\Contracts\CatalogAiProvider;
-use App\CatalogIntelligence\DTOs\ListingContext;
+use App\CatalogIntelligence\DTOs\GuardedPrompt;
 use App\CatalogIntelligence\DTOs\ListingSuggestion;
 
 /**
@@ -22,6 +22,9 @@ use App\CatalogIntelligence\DTOs\ListingSuggestion;
  * catálogo que está começando, e ausência de **fornecedor** é o estado normal
  * de uma aplicação que não contratou nenhum. Tratar qualquer um dos dois como
  * erro obrigaria cada superfície a envolver a chamada em `try`.
+ *
+ * Nem a `CatalogAiProviderException` que o contrato permite desde a CAT-06G: não
+ * haver fornecedor não é uma falha dele.
  *
  * ## O que `suggest()` faz se for chamado mesmo assim
  *
@@ -42,8 +45,15 @@ use App\CatalogIntelligence\DTOs\ListingSuggestion;
  * A vazia carrega `source: Internal`, e isso é verdade: **nada externo
  * contribuiu**. A consequência é que passar esta resposta pelo
  * `ProviderResponseValidator` acusaria procedência incorreta — o que está
- * certo, e não é um caso que a 06G vá produzir, porque ela checa
- * `isAvailable()` antes.
+ * certo, e não é um caso que o assistente produza, porque
+ * `GenerateListingSuggestion` pergunta `isAvailable()` antes.
+ *
+ * ## É o binding padrão, e não é o fallback
+ *
+ * O `CatalogIntelligenceServiceProvider` resolve o contrato para esta classe
+ * (D-CAT-06G-9). Isso diz *"não há provider"*, e só: quem decide o que fazer sem
+ * ele — devolver a sugestão interna com o desfecho `ProviderUnavailable` — é o
+ * assistente. Nenhuma política, conhecimento ou regra de catálogo mora aqui.
  */
 final class NullCatalogAiProvider implements CatalogAiProvider
 {
@@ -52,7 +62,7 @@ final class NullCatalogAiProvider implements CatalogAiProvider
         return false;
     }
 
-    public function suggest(ListingContext $context): ListingSuggestion
+    public function suggest(GuardedPrompt $prompt): ListingSuggestion
     {
         return ListingSuggestion::vazia();
     }
