@@ -360,6 +360,82 @@ class ContratosDeProviderTest extends TestCase
     }
 
     /**
+     * O caminho externo não conhece oferta, expositor, o cadastro, request nem
+     * Customer Intelligence (H-06).
+     *
+     * **Quais arquivos.** Os que existem para a consulta externa ou cujos valores
+     * atravessam a fronteira: o contrato, as duas implementações e a exceção; o
+     * assistente, que liga tudo, e a política, que decide se consulta; o contexto,
+     * o guard, o prompt protegido e a instrução; os dois redatores da saída; a
+     * sugestão, a procedência, o validador e os motivos de recusa; o desfecho.
+     *
+     * **Quais não, de propósito (H-14).** A varredura olha as dependências diretas
+     * de cada arquivo, não o fechamento transitivo. O resto do módulo tem
+     * dependências conscientes que não entram aqui: a vigência da similaridade em
+     * `FindSimilarProducts` (D-CAT-05B-2) e a lista de campos da oferta que o
+     * `ContextSanitizer` lê de `SaveProductWithOffer` (D-CAT-05C-7) — o contexto usa
+     * o sanitizer justamente para que nenhum campo de oferta chegue ao prompt.
+     *
+     * **Como.** Sobre o **código**, sem comentários: os docblocks citam
+     * `SaveProductWithOffer` e `ProductOffer` justamente para dizer que não os usam.
+     * Strings continuam na varredura, porque classe e tabela também se alcançam por
+     * nome. As marcas cobrem as formas reais de chegar a cada dependência neste
+     * projeto: model e tabela; o namespace das Actions de cadastro; namespace e
+     * facade de Customer Intelligence; a request pelo tipo, pela facade, pelo alias
+     * global, pelo helper e pelas classes HTTP da aplicação.
+     */
+    public function test_o_caminho_externo_nao_depende_de_oferta_expositor_cadastro_nem_request(): void
+    {
+        $arquivos = [
+            ...$this->arquivosDaFronteira(),
+            app_path('CatalogIntelligence/Actions/GenerateListingSuggestion.php'),
+            app_path('CatalogIntelligence/Support/SuggestionPolicy.php'),
+            app_path('CatalogIntelligence/DTOs/ListingContext.php'),
+            app_path('CatalogIntelligence/Support/PromptGuard.php'),
+            app_path('CatalogIntelligence/DTOs/GuardedPrompt.php'),
+            app_path('CatalogIntelligence/Enums/ProviderInstruction.php'),
+            app_path('CatalogIntelligence/Support/GuardedPromptRedactor.php'),
+            app_path('CatalogIntelligence/Support/FreeTextRedactor.php'),
+            app_path('CatalogIntelligence/DTOs/ListingSuggestion.php'),
+            app_path('CatalogIntelligence/Enums/SuggestionSource.php'),
+            app_path('CatalogIntelligence/Support/ProviderResponseValidator.php'),
+            app_path('CatalogIntelligence/Enums/ProviderResponseViolation.php'),
+            app_path('CatalogIntelligence/DTOs/ListingOutcome.php'),
+            app_path('CatalogIntelligence/Enums/ListingOutcomeState.php'),
+        ];
+
+        $marcas = [
+            // oferta e expositor: models (e o que carrega o nome deles) e tabelas
+            'ProductOffer', 'Expositor', 'product_offers', 'expositores',
+            // o cadastro
+            'SaveProductWithOffer', 'App\\Actions\\Catalog\\',
+            // Customer Intelligence: namespace e facade
+            'CustomerIntelligence',
+            // request e HTTP da aplicação: tipo, facade, alias global, helper, controllers e form requests
+            'Illuminate\\Http\\', 'Illuminate\\Foundation\\Http\\', 'Illuminate\\Support\\Facades\\Request',
+            'Request::', 'request(', 'App\\Http\\',
+        ];
+
+        foreach ($arquivos as $arquivo) {
+            $this->assertFileExists($arquivo, 'um arquivo do caminho externo mudou de lugar: a lista precisa acompanhar');
+
+            $codigo = collect(token_get_all(file_get_contents($arquivo)))
+                ->reject(fn ($token) => is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true))
+                ->map(fn ($token) => is_array($token) ? $token[1] : $token)
+                ->implode('');
+
+            foreach ($marcas as $marca) {
+                $this->assertStringNotContainsString(
+                    $marca,
+                    $codigo,
+                    basename($arquivo)." passou a conhecer \"{$marca}\": o caminho até o provider sugere sobre a identidade ".
+                    'do item e não lê oferta, expositor, request nem cadastro.',
+                );
+            }
+        }
+    }
+
+    /**
      * O binding padrão do contrato é o `Null`, e o `Fake` nunca é registrado.
      *
      * O que substituiu `test_o_service_provider_nao_registra_binding_de_provider`.
