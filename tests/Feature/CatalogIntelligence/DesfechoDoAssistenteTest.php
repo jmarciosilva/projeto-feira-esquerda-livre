@@ -33,8 +33,10 @@ use App\Models\ContentCategory;
 use App\Models\Expositor;
 use App\Models\Product;
 use Error;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use RuntimeException;
@@ -786,6 +788,52 @@ class DesfechoDoAssistenteTest extends TestCase
     }
 
     // ─── Fluxo manual ─────────────────────────────────────────────────────────
+
+    /**
+     * Sugerir não é salvar, também quando a contribuição é externa (D-CAT-05B-1).
+     *
+     * A janela observada é só a execução do assistente: dela não sai comando de
+     * escrita, em tabela nenhuma — leitura não é persistência —, e nem o item, nem a
+     * oferta, nem o conhecimento, nem o pivot mudam.
+     */
+    public function test_uso_externo_nao_grava_nada(): void
+    {
+        $this->conceito();
+        $produto = Product::factory()->create([
+            'name' => 'Tapete de crochê',
+            'short_description' => null,
+            'description' => 'Descrição da lojista.',
+            'category_id' => null,
+        ]);
+        $this->comProvider(FakeCatalogAiProvider::respondendo(
+            $this->resposta(nome: 'Tapete redondo de crochê', palavras: ['barbante'], confianca: 0.8)
+        ));
+
+        $antesProduto = $produto->fresh()->toArray();
+        $antesOfertas = DB::table('product_offers')->get()->toArray();
+        $antesConceitos = DB::table('catalog_knowledge_entries')->get()->toArray();
+        $antesPivot = DB::table('catalog_product_knowledge')->count();
+        $contexto = ListingContext::deProduct($produto);
+
+        $escritas = [];
+        $observando = false;
+        DB::listen(function (QueryExecuted $consulta) use (&$escritas, &$observando): void {
+            if ($observando && preg_match('/^\s*(insert|update|delete|replace|truncate)\b/i', $consulta->sql) === 1) {
+                $escritas[] = $consulta->sql;
+            }
+        });
+
+        $observando = true;
+        [, , $desfecho] = $this->gerar($contexto, $produto);
+        $observando = false;
+
+        $this->assertSame(ListingOutcomeState::ExternalSuggestionUsed, $desfecho->state, 'o cenário exige contribuição externa');
+        $this->assertSame([], $escritas, 'o assistente não emite comando de escrita ao sugerir');
+        $this->assertSame($antesProduto, $produto->fresh()->toArray());
+        $this->assertEquals($antesOfertas, DB::table('product_offers')->get()->toArray());
+        $this->assertEquals($antesConceitos, DB::table('catalog_knowledge_entries')->get()->toArray());
+        $this->assertSame($antesPivot, DB::table('catalog_product_knowledge')->count());
+    }
 
     /**
      * **Provider quebrado não é catálogo quebrado.** Em cada modo de falha prevista,
