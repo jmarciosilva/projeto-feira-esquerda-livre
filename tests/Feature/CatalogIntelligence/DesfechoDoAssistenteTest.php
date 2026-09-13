@@ -423,6 +423,28 @@ class DesfechoDoAssistenteTest extends TestCase
         $this->assertSame(['short_description'], $sugestao->camposPropostos());
     }
 
+    /** Contribuição só de descrição: o resumo é da lojista, e só a descrição externa entra. */
+    public function test_contribuicao_so_de_descricao_e_uso_externo(): void
+    {
+        $this->comProvider(FakeCatalogAiProvider::respondendo(
+            $this->resposta(resumo: 'Resumo externo que tentaria substituir.', descricao: 'Descrição externa.', confianca: 0.7)
+        ));
+
+        [$sugestao, , $desfecho] = $this->gerar(
+            ListingContext::paraItemNovo(ItemType::Produto, 'Tapete de crochê', shortDescription: 'Resumo da lojista.')
+        );
+
+        $this->assertSame(ListingOutcomeState::ExternalSuggestionUsed, $desfecho->state);
+        $this->assertSame(['description'], $sugestao->camposPropostos());
+        $this->assertSame('Descrição externa.', $sugestao->description);
+        $this->assertNull($sugestao->shortDescription, 'o resumo da lojista não recebe proposta');
+        $this->assertSame([], $sugestao->keywords);
+        $this->assertSame(SuggestionSource::External, $sugestao->source);
+        $this->assertSame(0.7, $sugestao->confidence);
+        $this->assertNotContains(ListingGap::Description->pedido(), $sugestao->missingInformation);
+        $this->assertNotContains(ListingGap::ShortDescription->pedido(), $sugestao->missingInformation);
+    }
+
     public function test_texto_composto_pela_base_nao_e_trocado_pelo_externo(): void
     {
         $this->conceito();
@@ -801,7 +823,11 @@ class DesfechoDoAssistenteTest extends TestCase
             'external_suggestion_not_used' => [false, false],
         ];
 
-        $this->assertSame(array_keys($esperado), array_map(fn (ListingOutcomeState $s) => $s->value, ListingOutcomeState::cases()));
+        $this->assertEqualsCanonicalizing(
+            array_keys($esperado),
+            array_map(fn (ListingOutcomeState $s) => $s->value, ListingOutcomeState::cases()),
+            'todo caso tem classificação e nenhuma classificação sobra — sem depender da ordem de declaração',
+        );
 
         foreach (ListingOutcomeState::cases() as $estado) {
             $this->assertSame($esperado[$estado->value], [$estado->ehFalha(), $estado->convidaARepetir()], $estado->value);
