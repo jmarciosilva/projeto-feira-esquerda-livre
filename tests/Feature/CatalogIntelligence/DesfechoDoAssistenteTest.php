@@ -375,13 +375,14 @@ class DesfechoDoAssistenteTest extends TestCase
     {
         $contexto = $this->itemQueFaltaTexto();
         $referencia = $this->referenciaInterna($contexto);
-        $this->comProvider(FakeCatalogAiProvider::respondendo(
+        $fake = $this->comProvider(FakeCatalogAiProvider::respondendo(
             $this->resposta(resumo: '   ', descricao: 'Descrição externa bem escrita.', palavras: ['palavra externa'])
         ));
 
         [$sugestao, , $desfecho] = $this->gerar($contexto);
 
         $this->assertSame(ListingOutcomeState::ProviderResponseInvalid, $desfecho->state);
+        $this->assertSame(1, $fake->chamadas(), 'resposta inválida não gera nova tentativa (D-CAT-06G-6)');
         $this->assertSame([ProviderResponseViolation::TextoEmBranco], $desfecho->violations);
         $this->assertSame($referencia, $sugestao->toArray(), 'nenhum campo de uma resposta inválida é aproveitado');
         $this->assertTrue($desfecho->state->ehFalha());
