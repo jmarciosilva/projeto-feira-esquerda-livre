@@ -74,14 +74,14 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 
 | | |
 |---|---|
-| **Fase atual** | **CAT-09 — Implantação do Assistente no Catálogo**, planejada e antecipada antes da CAT-07 e da CAT-08 (decisão de produto, 2026-09-13); nenhum código escrito. A **CAT-06 — IA externa (opcional)** está concluída: 06A–06G e 06H-A → 06H-F publicadas nos dois ciclos; a 06H-G (técnica `dc217cf`) e a 06H-H (validação final, sem código) são registradas no mesmo commit documental que encerra a fase |
-| **Última fase concluída** | **CAT-06** — IA externa opcional: contrato, redator, guard, fallback e desfecho, validados na 06H-H. Nenhum provider real, credencial ou chamada de rede; `NullCatalogAiProvider` é o binding padrão |
-| **Última fase com commit** | **CAT-06H-G** — commit técnico `dc217cf` |
-| **Próxima implementação** | **CAT-09 — Implantação do Assistente no Catálogo** — botão de sugestão no cadastro e na edição do lojista, pré-visualização e aplicação explícita, sem persistência na geração (plano em [§14](#14-catalog-intelligence)); o código começa depois da revisão e do commit desta reconciliação documental |
-| **Último commit técnico publicado** | `dc217cf` (`dc217cf8092820b1bbf92a52b38ad96cb3b1892b`) — `docs: reconcilia comentários técnicos da CAT-06H-G` |
-| **Último commit documental publicado** | `874ec9d` (`874ec9d60ea8c2e9345386eee51bb74f9558b9d2`) — `docs: reconcilia publicação técnica da CAT-06H-F` |
-| **Última suíte completa** | **1294 passed · 5874 assertions · 0 failures** · 1073,41s (2026-09-13, na 06H-H, sobre o código publicado em `dc217cf`; container `app`, SQLite em memória). A anterior era 1289 · 5603, sobre `5a667b4`; os 5 testes a mais são os da 06H-A (1), 06H-B (2), 06H-D (1) e 06H-E (1) |
-| **Validação final da CAT-06 (06H-H)** | Sobre o código publicado em `dc217cf`, sem alteração de código: suíte completa **1294 passed · 5874 assertions · 0 failures**; Catalog Intelligence **324 passed · 2820 assertions · 0 failures**; matriz de garantias, varreduras e estado remoto em [§14](#cat-06h--validação-hardening-e-encerramento-da-cat-06-x) |
+| **Fase atual** | Nenhuma fase em andamento. A **CAT-09 — Implantação do Assistente no Catálogo** está concluída e publicada (commit técnico `1efe1b6`), com a homologação visual em navegador pendente. A próxima fase depende de decisão de produto ([§18](#18-próximas-fases)) |
+| **Última fase concluída** | **CAT-09** — assistente no cadastro e na edição do lojista: pré-visualização, aplicação explícita e geração sem persistência. `NullCatalogAiProvider` continua o binding padrão; ainda não existe provider externo real |
+| **Última fase com commit** | **CAT-09** — commit técnico `1efe1b6` |
+| **Próxima implementação** | A definir por decisão de produto: [§18](#18-próximas-fases) recomenda a CAT-08, e a ordem entre CAT-07 e CAT-08 é decisão de produto. Nenhuma das duas foi iniciada |
+| **Último commit técnico publicado** | `1efe1b6` (`1efe1b642224f145d7b729dda2e4af45dbddb06d`) — `feat: integra Catalog Intelligence ao cadastro de produtos` |
+| **Último commit documental publicado** | `0d2f6f7` (`0d2f6f7c130bd8084badd0c88d15ade52845995a`) — `docs: conclui a CAT-06 e planeja a CAT-09` |
+| **Última suíte completa** | **1327 passed · 6053 assertions · 0 failures** (2026-09-14, na CAT-09, sobre o conteúdo commitado em `1efe1b6`). A anterior era 1294 · 5874, sobre `dc217cf`; os 33 testes a mais são os da CAT-09 |
+| **Validação da CAT-09** | CAT-09 **33 passed · 176 assertions · 0 failures**; Catalog Intelligence **357 passed · 2999 assertions · 0 failures**; homologação visual em navegador **pendente**. Detalhe em [§14](#cat-09--implantação-do-assistente-no-catálogo-x) |
 | **Documentação** | DOC-CONSOLIDATION-01 concluída — três documentos principais, commit `962eb5a` |
 
 > **Nota de reconciliação sobre a CAT-06D.** O roadmap anterior da trilha ainda a
@@ -102,8 +102,8 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 | **SEC-DEP-01** | `league/commonmark` 2.9.0 com 4 advisories HIGH | Aberto — atualizar para `>=2.10.0` em fase própria |
 | **GOV-02** | Coleta de eventos que nascem fora do navegador do comprador | Pendência de produto, não implementada |
 
-Nenhum bloqueador funcional acima afeta a **CAT-09**. B-3 e B-6 continuam bloqueando só
-um provider real, que a CAT-09 não integra: ela usa `GenerateListingSuggestion` com o
+A **CAT-09** foi concluída sem provider real. B-3 e B-6 continuam bloqueando só um
+provider real: o assistente no cadastro usa `GenerateListingSuggestion` com o
 `NullCatalogAiProvider` como binding padrão.
 
 ---
@@ -144,7 +144,7 @@ um provider real, que a CAT-09 não integra: ela usa `GenerateListingSuggestion`
 | CAT-DOM-01 · CAT-DOM-02 (02A→02I) | `[x]` | [§13](#13-catalog-domain) |
 | CAT-01 → CAT-05 | `[x]` | [§14](#14-catalog-intelligence) |
 | CAT-06 — IA externa (opcional) | `[x]` concluída — 06A → 06H, validação final na 06H-H | [§14](#14-catalog-intelligence) |
-| **CAT-09 — Implantação do Assistente no Catálogo** | **`[ ]` próxima — antecipada antes da CAT-07 e da CAT-08** | [§14](#14-catalog-intelligence) |
+| CAT-09 — Implantação do Assistente no Catálogo | `[x]` concluída — `1efe1b6`; homologação visual em navegador pendente | [§14](#14-catalog-intelligence) |
 | CAT-07 · CAT-08 · CAT-10 · CAT-11 | `[ ]` | [§14](#14-catalog-intelligence) |
 | FIN-DOM-01 — domínio financeiro (repasse, ledger) | `[ ]` não iniciada | [§18](#18-próximas-fases) |
 
@@ -477,7 +477,7 @@ salvo sem aprovação humana**; **falha da inteligência não bloqueia o cadastr
 | CAT-06 | `[x]` | IA externa opcional — contrato, redator, guard, fallback. Nenhum texto sai da aplicação ao fim dela | ver abaixo |
 | CAT-07 | `[ ]` | Feedback humano e memória (sugerido → aplicado → final → desfecho) | — |
 | CAT-08 | `[ ]` | Interface administrativa da inteligência — **fecha G-1** | — |
-| **CAT-09** | **`[ ]` próxima** | **Implantação do Assistente no Catálogo** — integração no cadastro e na edição do lojista (pré-visualização, aplicação explícita). Antecipada antes da CAT-07 e da CAT-08 | ver abaixo |
+| CAT-09 | `[x]` | Implantação do Assistente no Catálogo — integração no cadastro e na edição do lojista (pré-visualização, aplicação explícita). Antecipada antes da CAT-07 e da CAT-08 | `1efe1b6` |
 | CAT-10 | `[ ]` | Observabilidade, custos e segurança com provider acoplado | — |
 | CAT-11 | `[ ]` | Hardening, testes e revisão final | — |
 
@@ -984,9 +984,10 @@ implementação/auditoria técnica
 
 **O agente de código nunca realiza push.**
 
-### CAT-09 — Implantação do Assistente no Catálogo `[ ]`
+### CAT-09 — Implantação do Assistente no Catálogo `[x]`
 
-Próxima implementação, antecipada antes da CAT-07 e da CAT-08 por decisão de produto
+Concluída e publicada no commit técnico `1efe1b6`; entrega, validação e pendências ao fim
+desta seção. Foi antecipada antes da CAT-07 e da CAT-08 por decisão de produto
 (2026-09-13): colocar o Catálogo Inteligente utilizável no cadastro real. A numeração
 planejada foi mantida — a CAT-09 já era a integração no cadastro do lojista — para não
 reescrever referências de código, dívidas e decisões (D-CAT-05B-1: aplicação é CAT-09).
@@ -1004,7 +1005,7 @@ resultado antes de qualquer gravação e decide explicitamente, campo a campo, s
 - Contexto montado com `ListingContext::paraItemNovo()` a partir do que está **na tela**,
   inclusive o que ainda não foi salvo; na edição, o `Product` entra como segundo argumento,
   para a similaridade. O caminho de categoria reaproveita a subida que o `ListingContext`
-  já faz (hoje privada), exposta sem reescrita.
+  já faz (privada até então, pública desde a CAT-09), exposta sem reescrita.
 - Pré-visualização de nome sugerido, resumo, descrição, palavras-chave e informações
   faltantes, sempre escapados (S-2).
 - Desfecho: os 8 estados de `ListingOutcomeState` com mensagem própria; `ehFalha()` separa
@@ -1061,6 +1062,65 @@ do commit técnico. Roteiro de homologação: item novo; item existente com e se
 item sem conhecimento associado; motor interno indisponível. Em todos, conferir que nada é
 gravado sem salvar e que o texto aplicado é o exibido.
 
+**Entrega — commit técnico `1efe1b6` (`1efe1b642224f145d7b729dda2e4af45dbddb06d`), publicado**
+
+- `ProdutoForm::gerarSugestao()` chama `GenerateListingSuggestion::comContexto()` com o
+  `ListingContext` montado a partir dos valores atuais da tela, inclusive os não salvos; na
+  edição, o `Product` entra como segundo argumento. O caminho de categoria usa
+  `ListingContext::caminhoDaCategoria()`, que passou de privado a público.
+- Pré-visualização de nome, resumo, descrição, palavras-chave e informações faltantes; a
+  view renderiza a sugestão só com `{{ }}`, e a S-2 fica resolvida.
+- `aplicarSugestao()` copia nome, resumo ou descrição para a tela, por ação explícita do
+  lojista; nada é gravado ao gerar nem ao aplicar. Gravar continua sendo o `save()`, pela
+  `SaveProductWithOffer`, que segue como fronteira de persistência.
+- Sobrescrita: resumo e descrição só recebem a sugestão quando vazios; o nome só é trocado
+  pelo clique explícito, com o nome atual visível.
+- O estado da sugestão é `#[Locked]`; `guardOwnership()` roda antes de gerar e antes de
+  aplicar.
+- Autoridade canônica (`updateCanonical`): verificada ao gerar e reconferida no servidor em
+  `aplicarSugestao()`, não a cada `render()`; a recusa da `SaveProductWithOffer` com
+  `SemAutoridadeCanonica` continua intacta.
+- Os 8 `ListingOutcomeState` têm mensagem própria. Com o mesmo contexto e um desfecho que
+  não `convidaARepetir()`, gerar de novo não chama o assistente.
+- `wire:target="save"` separa o estado de salvamento do estado de geração.
+- `knownAttributes` fica vazio: a C-1 não foi exercida nem resolvida, e segue para a CAT-11.
+- `NullCatalogAiProvider` continua o binding padrão. Ainda não existe provider externo real,
+  cliente HTTP ou credencial.
+
+**Travas reconciliadas**
+
+- `ResilienciaDoAssistenteTest::test_o_caminho_de_cadastro_nao_referencia_a_inteligencia`
+  deixou de listar o `ProdutoForm`, continua proibindo `CatalogIntelligence` em
+  `SaveProductWithOffer` e no `ProdutoController` da API e passou a proibir, no corpo de
+  `ProdutoForm::save()`, `CatalogIntelligence`, `GenerateListingSuggestion`, `ListingContext`
+  e `sugest`.
+- A versão pela tela de `test_cadastro_conclui_com_o_assistente_quebrado` é
+  `AssistenteNoCadastroTest::test_falha_do_motor_mostra_aviso_e_nao_impede_salvar_manualmente`.
+
+**Testes:** `AssistenteNoCadastroTest`, 33 testes — 25 simples e os 8 casos de
+`test_cada_desfecho_tem_mensagem_aviso_so_na_falha_e_convite_so_no_transitorio`, pelo
+provider `desfechos` —, cobrindo os previstos acima, inclusive sugestão não adulterável
+pelo cliente, autoridade revogada entre gerar e aplicar, `Http::assertNothingSent()` com o
+binding `Null`, texto hostil escapado e custo em consultas.
+
+**Validação** (executada antes do commit técnico, sobre o conteúdo que ele contém)
+
+- CAT-09: **33 passed · 176 assertions · 0 failures**.
+- Catalog Intelligence: **357 passed · 2999 assertions · 0 failures** (antes: 324 · 2820).
+- Suíte completa: **1327 passed · 6053 assertions · 0 failures** (antes: 1294 · 5874); os
+  33 testes a mais são os da CAT-09.
+- `git diff --check` limpo; Pint aprovado nos arquivos alterados; ROADMAP, README e
+  ARCHITECTURE intocados no commit técnico.
+- **Homologação visual em navegador: pendente.** O roteiro acima ainda não foi percorrido
+  em navegador.
+
+**Fora da CAT-09, por decisão do operador na revisão**
+
+- `session('error')` da `SemAutoridadeCanonica` não exibida ao lojista — débito separado,
+  preexistente, em [§17](#17-dívidas-técnicas).
+- Custo de consultas em hierarquias profundas de categoria — observação técnica separada,
+  em [§17](#17-dívidas-técnicas).
+
 ### Dívidas da trilha
 
 Tabela única em [§17](#17-dívidas-técnicas) — C-1, C-2, F-1, S-1, S-2, P-1, B-4,
@@ -1081,8 +1141,8 @@ G-1, E-1, D-1…D-4 (CAT-05H), B-3, B-5, B-6 (CAT-06A), H-11 e H-12 (CAT-06H).
 | Gate de IA externa F-1 — desfecho e fallback | `[x]` | O provider só recebe `GuardedPrompt` redigido; só a falha tipada vira fallback; `TypeError` e defeito interno sobem; log sem mensagem | CAT-06G · `5a667b4` |
 
 Dívidas de segurança abertas: **SEC-DEP-01** (commonmark), **F-06** (assinatura
-do webhook), **LGPD-01** (CPF/CNPJ em claro), **C-1**, **S-2** — ver
-[§17](#17-dívidas-técnicas).
+do webhook), **LGPD-01** (CPF/CNPJ em claro), **C-1** — ver
+[§17](#17-dívidas-técnicas). A **S-2** foi resolvida na CAT-09 (`1efe1b6`).
 
 ---
 
@@ -1125,10 +1185,10 @@ são dívidas distintas.
 | **F-06** (FIN-SEC) | Webhook Mercado Pago sem verificação de assinatura; mitigado porque o corpo não é fonte de verdade (`getPayment()` autenticado) | Média | Hardening próprio ou troca de gateway |
 | **LGPD-01** | CPF/CNPJ gravado **sem criptografia** em `lojista_solicitacoes`. O princípio "CPF/CNPJ armazenado sempre encriptado" do roadmap original nunca foi implementado. **Nova — ID atribuído nesta consolidação** | Média | Decisão de produto + migration |
 | **LGPD-02** | "Logs de acesso ao painel admin retidos por 90 dias" e "`cart_items` anônimos expiram em 7 dias", do roadmap original, **não existem** no código. **Nova — ID atribuído nesta consolidação** | Baixa | Decisão de produto |
-| **C-1** (CAT-05C) | `knownAttributes` protegido por lista de proibição; quem o popular deve mapear campo a campo | Média | CAT-09 |
+| **C-1** (CAT-05C) | `knownAttributes` protegido por lista de proibição; quem o popular deve mapear campo a campo | Média | **CAT-11** — hardening/revisão final. Não resolvida: a CAT-09 só preservou a restrição, com `knownAttributes` vazio |
 | **C-2** (CAT-05C) | Texto livre não é redigido antes de sair para provider | Gate — **`[x]` fechado** pelo `FreeTextRedactor` | **CAT-06E** · `101748a` |
 | **S-1** (CAT-05G) | Teste de prompt injection real, com `PromptGuard` | Gate — **`[x]` fechado** pelo `PromptGuard` | **CAT-06F** · `f7b39c2` |
-| **S-2** (CAT-05G) | A sugestão ecoa texto do lojista: renderizar sempre escapado | Média | CAT-09 |
+| **S-2** (CAT-05G) | A sugestão ecoa texto do lojista: renderizar sempre escapado | **`[x]` resolvida** — a tela do lojista renderiza a sugestão só com saída escapada, com testes de conteúdo hostil (`test_texto_hostil_do_lojista_volta_escapado`, `test_texto_hostil_vindo_de_fora_volta_escapado`) | **CAT-09** · `1efe1b6` |
 | SEC-01 | Credencial revogada permanece como string inerte no histórico do Git | Baixa | Só com tarefa coordenada de reescrita de histórico |
 
 ### Catálogo e multi-oferta
@@ -1146,6 +1206,7 @@ são dívidas distintas.
 | R-4 (CAT-DOM-02D) | Arquivos órfãos em disco; `ImageService` apaga por caminho sem contar referências | Baixa | Operação de limpeza explícita |
 | — (Fase 3) | Drag-and-drop de ordenação, carrinho de visitante 7 dias, limite de 50 itens | Baixa | Backlog |
 | #6 (CAT-01) | `product_faqs` vazio — sem corpus de FAQ | Baixa | — |
+| — (CAT-09) | `ProdutoForm::save()` registra a recusa por `SemAutoridadeCanonica` em `session('error')`, mas a mensagem não é exibida ao lojista. Preexistente, identificado na revisão da CAT-09 | A classificar | Débito separado, fora da CAT-09 (decisão do operador) |
 
 Resolvidas e registradas para não serem reabertas: D-1 (CAT-DOM-01, espelho
 comercial — 02C/02H), D-2 (CAT-DOM-01, conteúdo autoral no mestre — 02C a 02F),
@@ -1164,7 +1225,7 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 | **P-1** (CAT-05B) | Backfill de `catalog_product_knowledge` em produção (em dev foi rodado e revertido na 05H) | Decisão humana após G-1 |
 | **B-4** (CAT-05A) | Corpus de seeder: `short_description` vazia em 75/75, "demonstração" em 34/75 | Depende de catálogo real |
 | **E-1** (CAT-05E) | `KnowledgeTermType::Keyword` sem uso | Decidir quando houver registro |
-| **D-1** (CAT-05H) | Caminho da descrição sem cobertura real (75/75 já têm descrição) | CAT-09 |
+| **D-1** (CAT-05H) | Caminho da descrição sem cobertura real (75/75 já têm descrição) | **CAT-11** — hardening/revisão final. Sem evidência de resolução na CAT-09 |
 | **D-2** (CAT-05H) | `palavrasChave()` não pondera por score | CAT-07 (alternativa CAT-11) |
 | **D-3** (CAT-05H) | Casamento por frase exata não alcança termo intercalado | CAT-11 — reabre a CAT-04 |
 | **D-4** (CAT-05H) | 8 de 28 conceitos sem evidência direta (inclusive `Crochê`) | CAT-08 |
@@ -1172,7 +1233,7 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 | — (CAT-06D §10) | Auditorias devem varrer asserções (`assertFalse(class_exists`), não só arquivos | **`[x]` feito** na **CAT-06H-H** — em `tests/`, a única trava de inexistência é a do `EmbeddingProvider`, deliberada (B-3) |
 | **H-11** (CAT-06H) | Onde mora o texto da instrução (`ProviderInstruction`) quando existir adaptador real: no domínio ou no adaptador | Dívida / decisão futura — reabre com o primeiro adaptador real de `CatalogAiProvider` |
 | **H-12** (CAT-06H) | Captura ampla de `Throwable` no motor interno de `GenerateListingSuggestion::completar()`: defeito de programação pode virar `InternalIntelligenceFailed` que convida a repetir, e a mensagem de exceção que não seja `QueryException` vai para o log; sem teste de `TypeError`/`Error` no motor, de propósito | Dívida histórica e risco latente de observabilidade/privacidade — em aberto, sem fase; exige decisão explícita futura |
-| — (CAT-05G) | `ListingContext::deProduct()` custa 1 consulta por ancestral sem `with('category.parent')` — observação, não dívida | CAT-09 |
+| — (CAT-05G · CAT-09) | Custo de consultas em hierarquias profundas de categoria: a subida do `ListingContext` custa 1 consulta por ancestral não carregado — em `deProduct()` sem `with('category.parent')` e, no `ProdutoForm` da CAT-09, a cada nível acima dos dois que o `with('parent')` cobre. Observação, não dívida | Observação técnica separada, sem fase — não otimizada na CAT-09 (decisão do operador) |
 
 ### Financeiro, pedidos e AVA
 
@@ -1207,13 +1268,15 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 
 ## 18. Próximas fases
 
+A **CAT-09** foi concluída e publicada em `1efe1b6`; a homologação visual dela em navegador
+segue pendente ([§14](#cat-09--implantação-do-assistente-no-catálogo-x)).
+
 Ordem recomendada, sem prejuízo de decisão de produto:
 
-1. **CAT-09 — Implantação do Assistente no Catálogo** — próxima, antecipada antes da CAT-07 e da CAT-08 para colocar o Catálogo Inteligente utilizável no cadastro real; plano em [§14](#14-catalog-intelligence). A CAT-06 foi concluída com a validação final da 06H-H.
-2. **CAT-08 — interface administrativa**: fecha G-1 e destrava P-1 e D-4. A CAT-05H
+1. **CAT-08 — interface administrativa**: fecha G-1 e destrava P-1 e D-4. A CAT-05H
    registrou que ela pode ser mais útil que a CAT-07; a ordem entre 07 e 08 é
    decisão de produto.
-3. CAT-07 → CAT-10 → CAT-11.
+2. CAT-07 → CAT-10 → CAT-11.
 
 Fora da Catalog Intelligence, sem ordem definida:
 
@@ -1249,7 +1312,8 @@ O detalhe de cada fase está no Git. Marcos de suíte (`passed · assertions`):
 | Fim da CAT-06E (`101748a`) | 1227 · 4629 |
 | Fim da CAT-06F (`f7b39c2`) | 1243 · 5233 |
 | Fim da CAT-06G (`5a667b4`) | 1289 · 5603 |
-| **Fim da CAT-06 (`dc217cf`)** | **1294 · 5874** |
+| Fim da CAT-06 (`dc217cf`) | 1294 · 5874 |
+| **Fim da CAT-09 (`1efe1b6`)** | **1327 · 6053** |
 
 Critério permanente: nenhuma fase é concluída com teste vermelho, e o número de
 testes nunca cai sem justificativa escrita.

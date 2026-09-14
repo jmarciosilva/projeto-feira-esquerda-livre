@@ -1017,8 +1017,10 @@ ListingContext::paraItemNovo() | ::deProduct()
   separado — degradação parcial —, registradas em `Log::warning` com etapa e
   classe. `QueryException` entra no log **só pelo SQLSTATE**, sem SQL nem bindings
   (§5.3 da especificação original: nenhum conteúdo sensível em log).
-- **Fronteira do cadastro**: `SaveProductWithOffer`, `ProdutoForm` e
-  `ProdutoController` não referenciam o módulo (há teste).
+- **Fronteira do cadastro**: `SaveProductWithOffer` e `ProdutoController` não
+  referenciam o módulo. O `ProdutoForm` passou a conhecê-lo na CAT-09, para gerar
+  e aplicar a sugestão, mas `ProdutoForm::save()` não o referencia; a sugestão só
+  chega à persistência pelos campos da tela (há teste).
 - **Custo**: teto exato de **6 consultas** para o assistente inteiro; montar o
   contexto de um `Product` custa 1 consulta por ancestral de categoria não
   carregado (zero com `with('category.parent')`).
@@ -1330,7 +1332,8 @@ Estado e destino em [`ROADMAP.md`](../ROADMAP.md) §17.
 - **F-06** — webhook sem verificação de assinatura; risco residual limitado a ruído
   na fila de conflitos.
 - **LGPD-01** — CPF/CNPJ de `lojista_solicitacoes` sem criptografia.
-- **C-1**, **S-2** — Catalog Intelligence (**C-2** fechado na CAT-06E; **S-1** na CAT-06F).
+- **C-1** — Catalog Intelligence (**C-2** fechado na CAT-06E; **S-1** na CAT-06F;
+  **S-2** resolvida na CAT-09).
 
 ---
 
