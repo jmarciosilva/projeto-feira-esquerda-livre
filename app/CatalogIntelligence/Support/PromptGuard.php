@@ -9,9 +9,9 @@ use App\CatalogIntelligence\Enums\ProviderInstruction;
 /**
  * A fronteira de autoridade — gate **S-1**.
  *
- * CAT-06F. Recebe o `ListingContext` que o contrato `CatalogAiProvider` entrega a
- * `suggest()` e devolve um `GuardedPrompt`, em que instrução, contexto recuperado
- * e dado do lojista ocupam canais separados (D-CAT-06F-1).
+ * CAT-06F. Recebe o `ListingContext` que `GenerateListingSuggestion` completou e
+ * devolve um `GuardedPrompt`, em que instrução, contexto recuperado e dado do
+ * lojista ocupam canais separados (D-CAT-06F-1).
  *
  * ## O que ela é, e o que não é
  *
@@ -43,14 +43,17 @@ use App\CatalogIntelligence\Enums\ProviderInstruction;
  * ## O que ela não faz, de propósito (D-CAT-06F-4)
  *
  * - **Não redige.** PII é a C-2, do `FreeTextRedactor`. As duas peças não se
- *   conhecem; a ordem entre elas é da CAT-06G.
+ *   conhecem: `GenerateListingSuggestion` aplica primeiro este guard e, sobre o
+ *   `GuardedPrompt` que ele devolve, o `GuardedPromptRedactor`.
  * - **Não escapa, não apara e não descarta.** O valor sai byte a byte como
  *   entrou, vazio e nulo inclusive.
  * - **Não lança e não registra.** Não há `ListingContext` inválido para
  *   recusar — ele já nasce pelo sanitizer —, e registrar seria gravar o texto que
  *   ela existe para manter no seu lugar.
- * - **Não é chamada por ninguém** nesta fase. Nada sai da aplicação ao fim da
- *   CAT-06; ligar a saída é a CAT-06G.
+ * - **Não fala com provider.** Quem a chama é `GenerateListingSuggestion`, e só
+ *   quando vai consultar um provider disponível; o `GuardedPrompt` devolvido
+ *   ainda passa pelo `GuardedPromptRedactor` antes de chegar a
+ *   `CatalogAiProvider::suggest()`.
  */
 class PromptGuard
 {

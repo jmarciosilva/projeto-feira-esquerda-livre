@@ -16,10 +16,9 @@ namespace App\CatalogIntelligence\Support;
  * interno, cujo texto não sai da aplicação — redigir ali degradaria a sugestão
  * interna sem proteger fronteira nenhuma.
  *
- * Nesta subfase a classe existe, tem teste, e **ninguém a chama**. Não há saída
- * ligada para chamá-la: ligar a saída é a CAT-06G, e é lá que o texto livre
- * passa por aqui antes de ir embora. Chamar agora seria antecipar o acoplamento
- * que a D-CAT-06B-6 pôs depois do redator e do guard.
+ * Quem a chama é o `GuardedPromptRedactor`, sobre o conteúdo dos dois canais não
+ * confiáveis do `GuardedPrompt`: depois do `PromptGuard`, que já separou os
+ * canais, e antes de o prompt chegar a `CatalogAiProvider::suggest()`.
  *
  * ## Recebe texto, devolve texto
  *

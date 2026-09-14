@@ -33,8 +33,8 @@ namespace App\CatalogIntelligence\Enums;
  * ## O que este enum **não** decide
  *
  * Não decide consultar. Decide se **valeria a pena** consultar. Quem consulta é
- * a CAT-06G, depois que o redator (06E) e o guard (06F) existirem — ordem
- * travada em D-CAT-06B-6.
+ * `GenerateListingSuggestion`, e só diante de `ExternalMayHelp`: antes de chegar
+ * ao provider, o contexto passa pelo `PromptGuard` e pelo `GuardedPromptRedactor`.
  */
 enum KnowledgeSufficiency: string
 {
@@ -49,7 +49,8 @@ enum KnowledgeSufficiency: string
     /**
      * Falta material, e o que falta é **texto** — consulta externa ajudaria.
      *
-     * É o único veredito que autoriza a CAT-06G a considerar o fallback.
+     * É o único veredito que leva `GenerateListingSuggestion` a considerar o
+     * provider externo.
      */
     case ExternalMayHelp = 'external_may_help';
 
@@ -63,7 +64,7 @@ enum KnowledgeSufficiency: string
     case AwaitsMerchant = 'awaits_merchant';
 
     /**
-     * A CAT-06G deve considerar consultar algo externo?
+     * O veredito justifica considerar uma consulta externa?
      *
      * Existe para que o chamador não precise repetir a comparação e, no dia em
      * que houver um quarto caso, não haja um `=== ExternalMayHelp` solto em

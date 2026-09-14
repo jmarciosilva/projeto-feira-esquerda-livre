@@ -11,8 +11,9 @@ use Illuminate\Support\Collection;
 /**
  * O mínimo necessário para entender **o que um item é**.
  *
- * É o insumo do assistente de conteúdo: tudo o que a CAT-05D vai ler para
- * escrever nome, resumo e descrição sai daqui, e nada além disto chega lá.
+ * É o insumo do assistente de conteúdo: tudo o que `GenerateListingSuggestion`
+ * lê para escrever nome, resumo e descrição sai daqui, e nada além disto chega
+ * lá.
  *
  * ## Só identidade de catálogo (D-CAT-05B-3)
  *
@@ -49,8 +50,8 @@ use Illuminate\Support\Collection;
  * ## Imutável, e completado por cópia
  *
  * O conhecimento e os semelhantes não chegam pelo construtor porque não são
- * conhecidos no momento em que o contexto nasce: quem os busca é o
- * `ListingAssistant`, na CAT-05D, e ele o faz *a partir* deste contexto.
+ * conhecidos no momento em que o contexto nasce: quem os busca é
+ * `GenerateListingSuggestion`, e ele o faz *a partir* deste contexto.
  * `comConhecimento()` e `comSemelhantes()` devolvem uma cópia nova em vez de
  * mutar — um contexto que muda depois de montado deixaria de ser reproduzível,
  * e reproduzir a entrada é o que permitirá auditar uma sugestão depois.

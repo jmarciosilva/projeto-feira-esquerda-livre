@@ -29,7 +29,8 @@ use App\CatalogIntelligence\Enums\SuggestionSource;
  *
  * ## Sobre `confidence`
  *
- * Fica **nula**, e é uma decisão, não um esquecimento.
+ * A sugestão composta pela aplicação a deixa **nula**, e é uma decisão, não um
+ * esquecimento.
  *
  * A CAT-03 tomou a mesma para a coluna `confidence` de `KnowledgeEntry`:
  * *"atribuir 0,7 a uma origem hoje seria inventar precisão que ninguém
@@ -38,8 +39,12 @@ use App\CatalogIntelligence\Enums\SuggestionSource;
  * para ser lido como porcentagem. Converter uma ordem em um decimal e mostrá-lo
  * a um lojista é falsa ciência com casa decimal.
  *
- * O campo existe porque a §3.4 o nomeia e porque a CAT-06 pode ter uma medida
- * de verdade vinda do provider. Até lá, nulo.
+ * O único valor que pode aparecer é o de uma resposta externa: quando
+ * `GenerateListingSuggestion` aproveita alguma contribuição dela, a sugestão
+ * final carrega o `confidence` que o provider devolveu — nulo inclusive, e só
+ * dentro de `[0, 1]`, porque o `ProviderResponseValidator` recusa a resposta
+ * fora dessa faixa. Resposta externa recusada ou não aproveitada não empresta o
+ * número à sugestão interna.
  *
  * ## Este texto passou pelo lojista, e a CAT-09 precisa saber (dívida S-2)
  *

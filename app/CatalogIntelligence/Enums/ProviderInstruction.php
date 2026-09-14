@@ -21,10 +21,12 @@ namespace App\CatalogIntelligence\Enums;
  *
  * ## Identifica a instrução; não a escreve
  *
- * O texto da instrução é o prompt, e o prompt não existe nesta fase: nada sai da
- * aplicação ao fim da CAT-06. Quem traduz o caso para o formato de um fornecedor
- * é o adaptador que a CAT-06G vier a ligar — e se o texto das regras mora no
- * domínio ou no adaptador é decisão dela.
+ * O texto da instrução é o prompt, e nenhuma classe do módulo o escreve: o
+ * `GuardedPrompt` carrega só o caso, e quem o traduz para o formato de um
+ * fornecedor é o adaptador que implementar `CatalogAiProvider`. O módulo não tem
+ * adaptador real — o binding padrão é o `NullCatalogAiProvider` —, e se o texto
+ * das regras vai morar no domínio ou no adaptador é decisão para quando o
+ * primeiro existir.
  */
 enum ProviderInstruction
 {

@@ -34,9 +34,11 @@ use App\CatalogIntelligence\Enums\ProviderInstruction;
  *
  * ## Quem traduz para o fornecedor
  *
- * Ninguém, nesta fase. O formato de mensagem de cada fornecedor é do adaptador
- * que a CAT-06G ligar, e ele mapeia os três canais para o mecanismo que o
+ * O adaptador que implementar `CatalogAiProvider` para um fornecedor. É ele que
+ * recebe este objeto em `suggest()` — já com o conteúdo redigido pelo
+ * `GuardedPromptRedactor` — e mapeia os três canais para o mecanismo que o
  * fornecedor tiver. O que ele não pode é juntá-los numa string só antes disso.
+ * O binding padrão, `NullCatalogAiProvider`, não traduz nada.
  *
  * ## Imutável
  *

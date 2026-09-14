@@ -11,12 +11,12 @@ use App\CatalogIntelligence\Enums\ListingGap;
  *
  * CAT-06C. É a primeira peça da CAT-06 e **não conhece provider algum** — nem
  * por interface, nem por config, nem por nome. Ela decide *se valeria
- * consultar*; *consultar* é a CAT-06G, depois que o redator (06E) e o guard
- * (06F) existirem.
+ * consultar*; *consultar* é de `GenerateListingSuggestion`, que só segue para o
+ * provider quando o veredito é `ExternalMayHelp`.
  *
  * Essa ignorância é o que a torna testável sem um único dublê: não há o que
- * injetar, não há resposta a simular, e o teste da política nunca vai depender
- * de um `Fake` que ainda não existe.
+ * injetar, não há resposta a simular, e o teste da política não depende do
+ * `FakeCatalogAiProvider`.
  *
  * ## Lê `lacunas()`; não reconta
  *
