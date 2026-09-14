@@ -20,7 +20,7 @@ use Tests\TestCase;
  *
  * ## O que este arquivo substitui
  *
- * `ListingAssistantTest::test_nenhuma_interface_de_provider_externo_existe`
+ * A antiga trava do teste do assistente contra interface de provider externo
  * prendia quatro nomes. Três chegaram nesta subfase, por decisão, e as
  * linguetas correspondentes viraram as garantias positivas daqui: em vez de
  * *"o contrato não existe"*, agora se afirma *"o contrato existe, e nem ele nem

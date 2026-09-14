@@ -39,7 +39,7 @@ use Tests\TestCase;
  * associações) segue adiada para a CAT-05H por decisão humana, e os cenários
  * são montados por factory e pelas Actions, como a CAT-05C fez.
  */
-class ListingAssistantTest extends TestCase
+class GenerateListingSuggestionTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -114,7 +114,8 @@ class ListingAssistantTest extends TestCase
 
     // ── Fonte e ausência de provider (D-CAT-05B-4) ────────────────────────────
 
-    public function test_a_fonte_e_sempre_interna_nesta_fase(): void
+    /** Com o binding padrão — o `Null` —, nada externo contribui e a sugestão é interna. */
+    public function test_sem_provider_configurado_a_fonte_e_interna(): void
     {
         $this->conceito('Crochê');
 
