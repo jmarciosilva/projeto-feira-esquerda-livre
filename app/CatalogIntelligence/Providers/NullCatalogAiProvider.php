@@ -51,7 +51,8 @@ use App\CatalogIntelligence\DTOs\ListingSuggestion;
  * ## É o binding padrão, e não é o fallback
  *
  * O `CatalogIntelligenceServiceProvider` resolve o contrato para esta classe
- * (D-CAT-06G-9). Isso diz *"não há provider"*, e só: quem decide o que fazer sem
+ * (D-CAT-06G-9) — desde a CAT-10A, pelo seletor da aplicação, sempre que não há
+ * provider real ligado e bem configurado. Isso diz *"não há provider"*, e só: quem decide o que fazer sem
  * ele — devolver a sugestão interna com o desfecho `ProviderUnavailable` — é o
  * assistente. Nenhuma política, conhecimento ou regra de catálogo mora aqui.
  */

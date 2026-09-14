@@ -12,6 +12,7 @@ use App\CatalogIntelligence\Providers\FakeCatalogAiProvider;
 use App\CatalogIntelligence\Providers\NullCatalogAiProvider;
 use App\CatalogIntelligence\Support\PromptGuard;
 use App\Enums\ItemType;
+use App\Services\CatalogAi\OpenAiCatalogAiProvider;
 use Tests\TestCase;
 
 /**
@@ -442,14 +443,28 @@ class ContratosDeProviderTest extends TestCase
      * A CAT-06D não ligava nem o `Null`, porque o acoplamento era da 06G. A 06G o
      * ligou (D-CAT-06G-9): sem credencial, o contrato resolve para "não há
      * provider", que é o estado normal de produção (D-CAT-06B-5).
+     *
+     * ## Revisto na CAT-10A, por decisão (H-13)
+     *
+     * A H-13 mandava que um provider real quebrasse este teste e exigisse revisão
+     * arquitetural explícita. A revisão foi feita e aprovada: o binding passou a
+     * resolver pelo `CatalogAiProviderSelector`, fora do módulo. A trava continua
+     * prendendo o essencial — um binding só, sem `singleton`, sem `Fake` — e passa a
+     * prender também o caminho: sem configuração o contrato é o `Null`; com
+     * configuração válida, é o adaptador real, e nunca o dublê.
      */
     public function test_o_binding_padrao_do_contrato_e_o_null(): void
     {
-        $this->assertInstanceOf(NullCatalogAiProvider::class, app(CatalogAiProvider::class));
+        $this->assertInstanceOf(NullCatalogAiProvider::class, app(CatalogAiProvider::class), 'sem configuração, não há provider');
 
         $conteudo = file_get_contents(app_path('CatalogIntelligence/CatalogIntelligenceServiceProvider.php'));
 
         $this->assertSame(1, substr_count($conteudo, '->bind('), 'o módulo tem um binding só: o do contrato do provider');
+        $this->assertStringContainsString(
+            'CatalogAiProviderSelector::class)->resolve()',
+            $conteudo,
+            'o contrato resolve pelo seletor da aplicação (CAT-10A, H-13 revista)',
+        );
 
         foreach (['FakeCatalogAiProvider', '->singleton('] as $marca) {
             $this->assertStringNotContainsString(
@@ -458,5 +473,18 @@ class ContratosDeProviderTest extends TestCase
                 "o ServiceProvider passou a conhecer \"{$marca}\" — o dublê de teste nunca é o provider de produção.",
             );
         }
+
+        config()->set('services.catalog_ai', [
+            'enabled' => true,
+            'provider' => 'openai',
+            'model' => 'modelo-de-teste',
+            'api_key' => 'chave-de-teste-que-nao-vale-nada',
+            'timeout' => 8,
+        ]);
+
+        $real = app(CatalogAiProvider::class);
+
+        $this->assertInstanceOf(OpenAiCatalogAiProvider::class, $real, 'com configuração válida, o contrato resolve para o adaptador real');
+        $this->assertNotInstanceOf(FakeCatalogAiProvider::class, $real);
     }
 }

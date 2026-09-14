@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    /*
+    | Catalog Intelligence — provider externo (CAT-10A). Desligado por padrão.
+    |
+    | Lido por App\Services\CatalogAi\CatalogAiProviderSelector: valor ausente ou
+    | inválido resolve o contrato para o NullCatalogAiProvider. O prazo nunca passa
+    | de 8 segundos. A chave nunca é versionada.
+    */
+    'catalog_ai' => [
+        'enabled' => env('CATALOG_AI_ENABLED', false),
+        'provider' => env('CATALOG_AI_PROVIDER'),
+        'model' => env('CATALOG_AI_MODEL'),
+        'api_key' => env('CATALOG_AI_API_KEY'),
+        'timeout' => env('CATALOG_AI_TIMEOUT', 8),
+    ],
+
 ];

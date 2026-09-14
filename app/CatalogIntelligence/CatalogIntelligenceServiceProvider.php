@@ -4,7 +4,7 @@ namespace App\CatalogIntelligence;
 
 use App\CatalogIntelligence\Console\AssociateProductsCommand;
 use App\CatalogIntelligence\Contracts\CatalogAiProvider;
-use App\CatalogIntelligence\Providers\NullCatalogAiProvider;
+use App\Services\CatalogAi\CatalogAiProviderSelector;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -20,10 +20,16 @@ use Illuminate\Support\ServiceProvider;
  * deixou de ser verdade, e a linha foi reescrita em vez de mantida por inércia.
  *
  * A CAT-06G trouxe a terceira, e o único binding do módulo: o contrato
- * `CatalogAiProvider` resolve para `NullCatalogAiProvider` (D-CAT-06G-9). Sem
+ * `CatalogAiProvider`, que resolvia para `NullCatalogAiProvider` (D-CAT-06G-9). Sem
  * credencial, operar sem IA externa é o estado normal (D-CAT-06B-5), e o
- * assistente precisa de um provider a quem perguntar `isAvailable()`. Um provider
- * real, quando existir, troca esta linha — e o `Fake` nunca é registrado aqui.
+ * assistente precisa de um provider a quem perguntar `isAvailable()`.
+ *
+ * A CAT-10A trocou esta linha, como ela previa: o contrato passa a resolver pelo
+ * `CatalogAiProviderSelector`, fora do módulo, que devolve o `Null` quando o recurso
+ * está desligado ou mal configurado e o adaptador real quando está pronto. O nome
+ * do fornecedor mora lá, e não aqui. Continua sendo um binding só, resolvido a cada
+ * pedido — sem `singleton`, para que valha o config do momento —, e o `Fake` nunca
+ * é registrado aqui.
  *
  * Continua sem middleware. As Actions, o normalizador, a `SuggestionPolicy`, o
  * guard, os redatores e o validador são resolvidos por injeção de construtor, sem
@@ -52,7 +58,7 @@ class CatalogIntelligenceServiceProvider extends ServiceProvider
             'catalog-intelligence'
         );
 
-        $this->app->bind(CatalogAiProvider::class, NullCatalogAiProvider::class);
+        $this->app->bind(CatalogAiProvider::class, fn ($app) => $app->make(CatalogAiProviderSelector::class)->resolve());
     }
 
     public function boot(): void

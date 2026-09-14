@@ -40,8 +40,8 @@ final class CatalogAiProviderException extends RuntimeException
      * O prazo da tentativa externa se esgotou — B-5.
      *
      * A política (D-CAT-06G-5, D-CAT-06G-6) é **8 segundos no total**, aplicados
-     * pelo adaptador no transporte, e **nenhuma** nova tentativa. O valor não tem
-     * chave de config enquanto não existir adaptador que a leia.
+     * pelo adaptador no transporte, e **nenhuma** nova tentativa. Desde a CAT-10A o
+     * valor vem de config, lido fora do módulo, e nunca passa de 8 segundos.
      */
     public static function tempoEsgotado(): self
     {

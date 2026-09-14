@@ -28,7 +28,7 @@ use App\CatalogIntelligence\Exceptions\CatalogAiProviderException;
  * ## O domínio não sabe quem está do outro lado
  *
  * Nenhum nome de fornecedor, de modelo ou de endpoint aparece neste arquivo,
- * nas implementações, ou em qualquer lugar do módulo. Não é estilo: é o que
+ * nas implementações do módulo, ou em qualquer outro lugar dele. Não é estilo: é o que
  * permite trocar o que está atrás do contrato sem tocar em uma linha de
  * domínio, e é verificado por teste que varre o módulo inteiro.
  *
@@ -38,6 +38,10 @@ use App\CatalogIntelligence\Exceptions\CatalogAiProviderException;
  * não houver credencial (D-CAT-06B-5), registrado como padrão na CAT-06G — e
  * `FakeCatalogAiProvider`, para teste. **Nenhuma implementação real é escrita
  * nesta trilha**, e ao fim da CAT-06 nenhum texto sai da aplicação.
+ *
+ * A CAT-10A escreveu a primeira implementação real **fora do módulo**, em
+ * `app/Services/CatalogAi`, onde moram o fornecedor, o transporte e a credencial.
+ * As duas implementações daqui continuam sem rede.
  *
  * ## `isAvailable()` é pergunta, não promessa
  *
