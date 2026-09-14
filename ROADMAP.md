@@ -74,14 +74,14 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 
 | | |
 |---|---|
-| **Fase atual** | **CAT-06 — IA externa (opcional)**, em andamento. Subfases 06A–06G concluídas e publicadas; **CAT-06H em andamento** — 06H-A publicada nos ciclos técnico (`ca51910`) e documental (`d59a500`); 06H-B publicada nos ciclos técnico (`9838b0d`) e documental (`82a82ce`); 06H-C publicada nos ciclos técnico (`f9d72df`) e documental (`fa43af1`); 06H-D tecnicamente concluída e publicada (`b4662d9`), reconciliação documental em andamento; 06H-E → 06H-H pendentes |
+| **Fase atual** | **CAT-06 — IA externa (opcional)**, em andamento. Subfases 06A–06G concluídas e publicadas; **CAT-06H em andamento** — 06H-A publicada nos ciclos técnico (`ca51910`) e documental (`d59a500`); 06H-B publicada nos ciclos técnico (`9838b0d`) e documental (`82a82ce`); 06H-C publicada nos ciclos técnico (`f9d72df`) e documental (`fa43af1`); 06H-D publicada nos ciclos técnico (`b4662d9`) e documental (`046c12c`); 06H-E tecnicamente concluída e publicada (`54e4963`), reconciliação documental em andamento; 06H-F → 06H-H pendentes |
 | **Última fase concluída** | **CAT-06G** — fallback ligado e desfecho: **F-1** fechado, **B-5** decidido. Publicada em `5a667b4` |
-| **Última fase com commit** | **CAT-06H-D** — commit técnico `b4662d9` |
-| **Próxima implementação** | Planejada: **CAT-06H-E** — isolamento do caminho externo (H-06 · H-13 · H-14), somente após a publicação e a verificação remota da reconciliação documental da CAT-06H-D |
-| **Último commit técnico publicado** | `b4662d9` (`b4662d952cd4898b5f2344a798dd072a2207e12b`) — `test: garante ausência de persistência na CAT-06H-D` |
-| **Último commit documental publicado** | `fa43af1` (`fa43af157bed51c78e9a43cf375962e1b53ef59d`) — `docs: reconcilia publicação técnica da CAT-06H-C` |
+| **Última fase com commit** | **CAT-06H-E** — commit técnico `54e4963` |
+| **Próxima implementação** | Planejada: **CAT-06H-F** — reconciliação de nomenclatura (H-08 · H-10), somente após a publicação e a verificação remota da reconciliação documental da CAT-06H-E |
+| **Último commit técnico publicado** | `54e4963` (`54e4963de032c2e79cb6ffc4d8978e75ac4ef7c8`) — `test: endurece isolamento externo da CAT-06H-E` |
+| **Último commit documental publicado** | `046c12c` (`046c12c0d028adebaa613c1aeea836b8b2eb0a25`) — `docs: reconcilia publicação técnica da CAT-06H-D` |
 | **Última suíte completa** | **1289 passed · 5603 assertions · 0 failures** · 839,90s (2026-09-13, sobre o código publicado em `5a667b4`, medida antes do commit; container `app`, SQLite em memória). Desde então nenhum arquivo de produção mudou |
-| **Validação da CAT-06H-D** | Sobre o conteúdo exato commitado em `b4662d9` (`fa43af1` + H-05): `DesfechoDoAssistenteTest` **34 passed · 182 assertions · 0 failures**; Catalog Intelligence **323 passed · 2568 assertions · 0 failures**. Resultados auxiliares sobre o working tree exploratório não são baseline. Suíte completa não executada nesta subfase — evidência e motivo em [§14](#cat-06h--validação-hardening-e-encerramento-da-cat-06-) |
+| **Validação da CAT-06H-E** | Sobre o conteúdo exato commitado em `54e4963` (`046c12c` + H-06): `ContratosDeProviderTest` **19 passed · 422 assertions · 0 failures**; Catalog Intelligence **324 passed · 2820 assertions · 0 failures**. Resultados auxiliares sobre o working tree exploratório não são baseline. Suíte completa não executada nesta subfase — evidência e motivo em [§14](#cat-06h--validação-hardening-e-encerramento-da-cat-06-) |
 | **Documentação** | DOC-CONSOLIDATION-01 concluída — três documentos principais, commit `962eb5a` |
 
 > **Nota de reconciliação sobre a CAT-06D.** O roadmap anterior da trilha ainda a
@@ -102,9 +102,9 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 | **SEC-DEP-01** | `league/commonmark` 2.9.0 com 4 advisories HIGH | Aberto — atualizar para `>=2.10.0` em fase própria |
 | **GOV-02** | Coleta de eventos que nascem fora do navegador do comprador | Pendência de produto, não implementada |
 
-Nenhum bloqueador funcional acima afeta a **CAT-06H-E**. Ela é a próxima implementação
+Nenhum bloqueador funcional acima afeta a **CAT-06H-F**. Ela é a próxima implementação
 planejada, mas só pode ser iniciada após a publicação e a verificação remota da
-reconciliação documental da CAT-06H-D.
+reconciliação documental da CAT-06H-E.
 
 ---
 
@@ -143,7 +143,7 @@ reconciliação documental da CAT-06H-D.
 | FIN-SEC-01 — integridade comercial | `[x]` | [§8](#8-checkout-e-pagamentos) |
 | CAT-DOM-01 · CAT-DOM-02 (02A→02I) | `[x]` | [§13](#13-catalog-domain) |
 | CAT-01 → CAT-05 | `[x]` | [§14](#14-catalog-intelligence) |
-| **CAT-06 — IA externa (opcional)** | **`[~]` 06A–06G concluídas e publicadas · 06H em andamento (06H-A, 06H-B e 06H-C publicadas; 06H-D tecnicamente publicada em `b4662d9`) · próxima 06H-E, após a publicação e verificação remota da reconciliação documental da 06H-D** | [§14](#14-catalog-intelligence) |
+| **CAT-06 — IA externa (opcional)** | **`[~]` 06A–06G concluídas e publicadas · 06H em andamento (06H-A, 06H-B, 06H-C e 06H-D publicadas; 06H-E tecnicamente publicada em `54e4963`) · próxima 06H-F, após a publicação e verificação remota da reconciliação documental da 06H-E** | [§14](#14-catalog-intelligence) |
 | CAT-07 → CAT-11 | `[ ]` | [§14](#14-catalog-intelligence) |
 | FIN-DOM-01 — domínio financeiro (repasse, ledger) | `[ ]` não iniciada | [§18](#18-próximas-fases) |
 
@@ -506,7 +506,7 @@ Suíte 1048 → 1139 ao longo da fase.
 | 06E | `[x]` | `Support/FreeTextRedactor` — **fecha C-2**. 29 testes: positivo e negativo por faixa, idempotência, falha fechada; controle negativo por mutação | `101748a` |
 | 06F | `[x]` | `Support/PromptGuard`, `DTOs/GuardedPrompt`, `Enums/ProviderInstruction`; `FronteiraDePromptTest` reescrito — **fecha S-1**. 21 testes (11 de estrutura, 10 de fronteira); controle negativo por mutação | `f7b39c2` |
 | 06G | `[x]` | Fallback ligado: `suggest(GuardedPrompt)`, `Support/GuardedPromptRedactor`, `Exceptions/CatalogAiProviderException`, desfecho `ListingOutcome` de 8 estados, composição conservadora da resposta externa (nome equivalente não é contribuição), `Null` como binding padrão; `minimum_gaps` = 3 revalidado nos 75 itens reais — **fecha F-1**, **decide B-5** (8 s, 0 novas tentativas). 46 testes novos; 12 controles negativos por mutação | `5a667b4` |
-| 06H | `[~]` | Validação, hardening e encerramento da CAT-06 — em andamento, subdividida em 06H-A → 06H-H; 06H-A, 06H-B e 06H-C publicadas, 06H-D tecnicamente publicada ([ver abaixo](#cat-06h--validação-hardening-e-encerramento-da-cat-06-)) | `ca51910` (06H-A) · `9838b0d` (06H-B) · `f9d72df` (06H-C) · `b4662d9` (06H-D) |
+| 06H | `[~]` | Validação, hardening e encerramento da CAT-06 — em andamento, subdividida em 06H-A → 06H-H; 06H-A, 06H-B, 06H-C e 06H-D publicadas, 06H-E tecnicamente publicada ([ver abaixo](#cat-06h--validação-hardening-e-encerramento-da-cat-06-)) | `ca51910` (06H-A) · `9838b0d` (06H-B) · `f9d72df` (06H-C) · `b4662d9` (06H-D) · `54e4963` (06H-E) |
 
 A ordem 06E/06F antes de 06G é deliberada (D-CAT-06B-6): redator e guard existem
 antes de a saída ser ligada. **Nenhum fornecedor real é integrado, nenhuma
@@ -545,18 +545,18 @@ adaptador futuro, sem nova tentativa e sem chave de config até existir adaptado
 Em andamento. Uma **auditoria exploratória** levantou os achados **H-01 a H-14**.
 Esses identificadores são da auditoria, **não são nomes de fase**: os achados foram
 agrupados nas subfases **06H-A → 06H-H** abaixo, para permitir rastreabilidade e
-publicação incremental. A 06H-A, a 06H-B e a 06H-C foram publicadas nos ciclos técnico
-e documental; a 06H-D tem entrega técnica publicada, com a reconciliação documental em
-andamento; as demais seguem pendentes, e nenhum resultado local da auditoria vale como
-baseline oficial antes de ser publicado pela subfase correspondente.
+publicação incremental. A 06H-A, a 06H-B, a 06H-C e a 06H-D foram publicadas nos ciclos
+técnico e documental; a 06H-E tem entrega técnica publicada, com a reconciliação
+documental em andamento; as demais seguem pendentes, e nenhum resultado local da
+auditoria vale como baseline oficial antes de ser publicado pela subfase correspondente.
 
 | Subfase | Estado | Origem | Objetivo | Commit |
 |---|---|---|---|---|
 | 06H-A — Matriz de desfechos e composição conservadora | `[x]` | H-01 · H-07 | Cobertura dos 8 estados de `ListingOutcomeState`, inclusive contribuição externa só por descrição; composição conservadora; exaustividade independente da ordem de declaração do enum | `ca51910` |
 | 06H-B — Fronteira de exceções do provider | `[x]` | H-02 · H-03 | Só `CatalogAiProviderException` é falha operacional esperada do provider; `RuntimeException`, `TypeError`, `Error` e demais defeitos não tipados não são mascarados como fallback normal, nem em `isAvailable()` nem em `suggest()` | `9838b0d` |
 | 06H-C — Zero retry | `[x]` | H-04 | Uma única chamada ao provider nos caminhos atualmente exercitáveis — resposta inválida, falha e resposta válida sem contribuição. Preserva a decisão B-5 de 0 retry também para o timeout do adaptador futuro (8 s, 0 novas tentativas), **sem implementar nem testar timeout real**: nada de `sleep`, rede, cliente HTTP ou configuração de timeout nesta fase | `f9d72df` |
-| 06H-D — Ausência de persistência | `[~]` | H-05 | `GenerateListingSuggestion` segue como mecanismo de sugestão sem escrita: o caminho externo, mesmo com sugestão válida aproveitada, não persiste alteração em produto, oferta ou entidade relacionada | `b4662d9` |
-| 06H-E — Isolamento do caminho externo | `[ ]` | H-06 · H-13 · H-14 | A fronteira externa não passa a depender de `ProductOffer`, `Expositor`, cadastro, request nem Customer Intelligence. As dependências de oferta de `FindSimilarProducts` e `ContextSanitizer` pertencem a caminhos internos já decididos (D-CAT-05B-2, D-CAT-05C-7) e não violam a fronteira externa | — |
+| 06H-D — Ausência de persistência | `[x]` | H-05 | `GenerateListingSuggestion` segue como mecanismo de sugestão sem escrita: o caminho externo, mesmo com sugestão válida aproveitada, não persiste alteração em produto, oferta ou entidade relacionada | `b4662d9` |
+| 06H-E — Isolamento do caminho externo | `[~]` | H-06 · H-13 · H-14 | Trava sobre as dependências diretas dos 18 componentes do caminho externo: nenhum deles contém, no próprio código, nenhuma das 13 marcas ligadas a `ProductOffer`, `Expositor`, cadastro, Customer Intelligence e request/HTTP da aplicação — sem fechamento transitivo. Binding `Null` preservado (H-13). As dependências de oferta de `FindSimilarProducts` e `ContextSanitizer` pertencem a caminhos internos já decididos (D-CAT-05B-2, D-CAT-05C-7), ficam fora da trava e não violam a fronteira externa (H-14) | `54e4963` |
 | 06H-F — Reconciliação de nomenclatura | `[ ]` | H-08 · H-10 | `GenerateListingSuggestion` adotado formalmente como nome técnico canônico; sem criar `ListingAssistant`, alias, facade ou wrapper para reproduzir nomenclatura histórica; testes e referências técnicas legadas reconciliados | — |
 | 06H-G — Reconciliação documental e dívidas | `[ ]` | H-09 · H-11 · H-12 | Reconciliar documentação e registrar, sem correção oportunista durante o hardening: docblocks obsoletos (H-09); onde residirá o texto de `ProviderInstruction` quando existir adaptador real (H-11); o comportamento histórico do `Throwable` do motor interno em `GenerateListingSuggestion::completar()` (H-12) | — |
 | 06H-H — Auditoria final e encerramento da CAT-06 | `[ ]` | — | Validação consolidada depois das subfases publicadas: 8 estados, fronteira `GuardedPrompt`, C-2, S-1, F-1, fronteira de exceções, zero retry, ausência de persistência, isolamento externo, binding `Null`, nomenclatura reconciliada, dívidas registradas, testes dirigidos, Catalog Intelligence, suíte completa, `git diff --check`, estado remoto e ausência de regressões | — |
@@ -677,12 +677,11 @@ cumprida.
   dirigido e o Catalog Intelligence passaram; a última suíte completa oficial continua a
   de §2.
 
-**06H-D — entrega técnica publicada em `b4662d9`** (`test: garante ausência de
-persistência na CAT-06H-D`, parent `fa43af1`). O `[~]` registra que a entrega técnica da
-06H-D foi concluída, publicada e verificada no remoto, enquanto a reconciliação
-documental da subfase permanece em andamento. A 06H-D só passa a `[x]` e pode ser
-considerada CLOSED/FROZEN depois da publicação e verificação remota do commit documental
-correspondente.
+**06H-D — publicada nos dois ciclos:** entrega técnica em `b4662d9` (`test: garante
+ausência de persistência na CAT-06H-D`, parent `fa43af1`) e reconciliação documental em
+`046c12c` (`docs: reconcilia publicação técnica da CAT-06H-D`), ambos verificados no
+remoto. A condição registrada para o `[x]` — publicação e verificação remota do commit
+documental — foi cumprida; a 06H-D está PUBLISHED / CLOSED / FROZEN.
 
 - Só teste: `tests/Feature/CatalogIntelligence/DesfechoDoAssistenteTest.php` (48 linhas
   acrescentadas, nenhuma removida). Nenhum arquivo de produção mudou — o assistente já
@@ -722,6 +721,82 @@ correspondente.
   teste mudou, nenhuma produção, nenhum rename nem arquivo novo versionado, e o conteúdo
   exato do commit passou no arquivo e no Catalog Intelligence inteiro, com dois controles
   negativos válidos; a última suíte completa oficial continua a de §2 (1289 · 5603 · 0).
+
+**06H-E — entrega técnica publicada em `54e4963`** (`test: endurece isolamento externo
+da CAT-06H-E`, parent `046c12c`). O `[~]` registra que a entrega técnica da 06H-E foi
+concluída, publicada e verificada no remoto, enquanto a reconciliação documental da
+subfase permanece em andamento. A 06H-E só passa a `[x]` e pode ser considerada
+CLOSED/FROZEN depois da publicação e verificação remota do commit documental
+correspondente; a 06H-F só pode ser iniciada depois dessa mesma publicação e verificação
+remota.
+
+- Só teste: `tests/Feature/CatalogIntelligence/ContratosDeProviderTest.php` (76 linhas
+  acrescentadas, nenhuma removida). Nenhum arquivo de produção mudou — nem bindings,
+  provider real, HTTP, credenciais ou comportamento de runtime —, e a subfase acrescenta
+  evidência contra regressão. Nenhuma mutação dos controles negativos entrou no commit, e
+  as alterações exploratórias de H-08/H-10 (rename do teste e docblock) ficaram fora dele.
+- **H-06** — "isolamento do caminho externo", nesta subfase, é uma **trava sobre as
+  dependências diretas dos componentes protegidos**: não é fechamento transitivo nem
+  garantia sobre o módulo inteiro. `test_o_caminho_externo_nao_depende_de_oferta_expositor_cadastro_nem_request`
+  verifica **18 componentes** que participam da decisão, preparação, transporte,
+  validação e desfecho da consulta externa — `CatalogAiProvider`,
+  `NullCatalogAiProvider`, `FakeCatalogAiProvider` e `CatalogAiProviderException`;
+  `GenerateListingSuggestion` e `SuggestionPolicy`; `ListingContext`, `PromptGuard`,
+  `GuardedPrompt` e `ProviderInstruction`; `GuardedPromptRedactor` e `FreeTextRedactor`;
+  `ListingSuggestion`, `SuggestionSource`, `ProviderResponseValidator` e
+  `ProviderResponseViolation`; `ListingOutcome` e `ListingOutcomeState` — contra **13
+  marcas** de dependência proibida: oferta e expositor por model e tabela
+  (`ProductOffer`, `Expositor`, `product_offers`, `expositores`); cadastro
+  (`SaveProductWithOffer`, `App\Actions\Catalog\`); Customer Intelligence, namespace e
+  facade (`CustomerIntelligence`); request e HTTP da aplicação (`Illuminate\Http\`,
+  `Illuminate\Foundation\Http\`, `Illuminate\Support\Facades\Request`, `Request::`,
+  `request(`, `App\Http\`).
+- **Como a trava lê o código:** cada arquivo passa por `token_get_all`, e os tokens
+  `T_COMMENT` e `T_DOC_COMMENT` são descartados antes da busca — docblocks que citam
+  `ProductOffer` ou `SaveProductWithOffer` para dizer que não os usam não viram violação.
+  Strings continuam sob inspeção, porque classe e tabela também se alcançam por nome. A
+  garantia publicada é que nenhum dos 18 componentes contém, no próprio código, alguma
+  das 13 marcas; dependências alcançadas indiretamente, por meio de outras classes, não
+  são objeto desta trava.
+- **H-13 — auditada e preservada, sem código novo nesta subfase.**
+  `test_o_binding_padrao_do_contrato_e_o_null` continua exigindo que `CatalogAiProvider`
+  resolva para `NullCatalogAiProvider`, que o `CatalogIntelligenceServiceProvider` tenha
+  exatamente um `->bind(` — hoje o único binding do módulo — e que não conheça
+  `FakeCatalogAiProvider` nem `->singleton(`. A fragilidade é deliberada e não foi
+  flexibilizada: um provider real, um segundo binding ou uma mudança estrutural precisa
+  quebrar o teste e exigir revisão arquitetural explícita.
+- **H-14 — auditada e preservada.** `FindSimilarProducts` e `ContextSanitizer` ficaram
+  deliberadamente fora da lista da H-06: são dependências internas historicamente
+  autorizadas e não representam a fronteira externa. A vigência da similaridade em
+  `FindSimilarProducts` decorre da D-CAT-05B-2; o `ContextSanitizer` lê as estruturas
+  comerciais — a lista de campos da oferta de `SaveProductWithOffer` (D-CAT-05C-7) —
+  justamente para removê-las do contexto antes do prompt. Essas dependências não foram
+  removidas nem alteradas.
+- Controle negativo **N-H06a**: `use App\Models\ProductOffer;` inserido temporariamente
+  em `PromptGuard.php`. Com H-06: **1 failed / 18 passed**. Não era lacuna: a lista
+  fechada de importações do `PromptGuard` em `FronteiraDePromptTest` já protegia esse
+  arquivo.
+- Controle negativo **N-H06b**: `use Illuminate\Support\Facades\Request;` inserido
+  temporariamente em `GuardedPromptRedactor.php`. Com a H-06 reforçada: **1 failed / 18
+  passed**. A versão exploratória original da H-06 não detectava essa mutação, o que
+  motivou o reforço das marcas de request; o baseline já tinha a proteção específica da
+  06G, a lista fechada de importações do `GuardedPromptRedactor` em
+  `GuardedPromptRedactorTest`.
+- Controle negativo **N-H06c**: `use App\Models\ProductOffer;` inserido temporariamente
+  em `ProviderResponseValidator.php`. Com a H-06 reforçada: **1 failed / 18 passed**. Com
+  a versão exploratória original: **19 passed**. Sem H-06, no Catalog Intelligence de
+  `046c12c`: **323 passed** — nenhuma trava anterior detectava a dependência. É a lacuna
+  real do baseline e a principal evidência de que a H-06 ampliou a proteção, em vez de só
+  duplicar travas existentes. As três mutações foram revertidas antes do commit.
+- Validação formal, sobre o conteúdo exato commitado em `54e4963` (`046c12c` + H-06):
+  `ContratosDeProviderTest` **19 passed · 422 assertions · 0 failures** (7,89s); Catalog
+  Intelligence **324 passed · 2820 assertions · 0 failures** (115,77s); `git diff
+  --cached --check` limpo. Resultados auxiliares sobre o working tree exploratório, que
+  ainda contém H-08/H-10, não são baseline. A suíte completa não foi executada nesta
+  subfase: alteração só de teste, nenhuma produção, nenhum rename nem arquivo novo
+  versionado no commit, teste dirigido e domínio verdes, três controles negativos
+  executados e conteúdo exato staged validado; a última suíte completa oficial continua a
+  de §2 (1289 · 5603 · 0).
 
 **H-09 tem duas naturezas de alteração, e elas vão em ciclos diferentes da 06H-G:**
 
@@ -893,7 +968,7 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 
 Ordem recomendada, sem prejuízo de decisão de produto:
 
-1. **CAT-06H — validação, hardening e encerramento da CAT-06**, em andamento: a 06H-A foi publicada nos ciclos técnico (`ca51910`) e documental (`d59a500`); a 06H-B, nos ciclos técnico (`9838b0d`) e documental (`82a82ce`); a 06H-C, nos ciclos técnico (`f9d72df`) e documental (`fa43af1`); a 06H-D foi tecnicamente publicada em `b4662d9`, com a reconciliação documental em andamento; a próxima implementação planejada é a **CAT-06H-E — isolamento do caminho externo** (H-06 · H-13 · H-14), que só pode ser iniciada após a publicação e a verificação remota da reconciliação documental da CAT-06H-D. A CAT-06G foi publicada em `5a667b4`.
+1. **CAT-06H — validação, hardening e encerramento da CAT-06**, em andamento: a 06H-A foi publicada nos ciclos técnico (`ca51910`) e documental (`d59a500`); a 06H-B, nos ciclos técnico (`9838b0d`) e documental (`82a82ce`); a 06H-C, nos ciclos técnico (`f9d72df`) e documental (`fa43af1`); a 06H-D, nos ciclos técnico (`b4662d9`) e documental (`046c12c`); a 06H-E foi tecnicamente publicada em `54e4963`, com a reconciliação documental em andamento; a próxima implementação planejada é a **CAT-06H-F — reconciliação de nomenclatura** (H-08 · H-10), que só pode ser iniciada após a publicação e a verificação remota da reconciliação documental da CAT-06H-E. A CAT-06G foi publicada em `5a667b4`.
 2. **CAT-08 — interface administrativa**: fecha G-1 e destrava P-1 e D-4. A CAT-05H
    registrou que ela pode ser mais útil que a CAT-07; a ordem entre 07 e 08 é
    decisão de produto.
