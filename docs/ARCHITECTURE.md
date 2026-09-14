@@ -1102,7 +1102,10 @@ provider falhou → `ProviderFailed`; resposta inválida → `ProviderResponseIn
   capturada só em volta das duas chamadas ao provider. `RuntimeException` genérica,
   `TypeError` e defeito de guard, redator, validador ou desfecho **sobem**. O log
   da falha tem etapa, classe do provider e classe da exceção — nunca a mensagem.
-  O motor interno mantém a captura da CAT-05F (D-CAT-05F-1).
+  O motor interno mantém a captura da CAT-05F (D-CAT-05F-1), que é ampla: qualquer
+  `Throwable` do casamento vira `InternalIntelligenceFailed`, e o da similaridade,
+  degradação acessória. A assimetria com a fronteira do provider é dívida registrada
+  na 06H — **H-12 (CAT-06H)**, §24 —, e não arquitetura reafirmada.
 - **B-5** (D-CAT-06G-5, D-CAT-06G-6): prazo total de **8 s** para a tentativa
   externa, aplicado pelo adaptador no transporte; esgotado →
   `CatalogAiProviderException::tempoEsgotado()` → `ProviderFailed`, sugestão
@@ -1118,11 +1121,8 @@ provider falhou → `ProviderFailed`; resposta inválida → `ProviderResponseIn
   `ExternalSuggestionNotUsed` (D-CAT-06G-11).
 - `__invoke()` continua devolvendo só `ListingSuggestion`.
 
-A construir:
-
-| Subfase | Peça | Contrato |
-|---|---|---|
-| **06H** | Encerramento | Reconciliação de nomenclatura e varredura de travas de asserção |
+A 06H validou e encerrou a fase sem alterar contrato: reconciliou a nomenclatura,
+varreu as travas de asserção e registrou H-11 e H-12 (§24).
 
 Ordem **06E/06F antes de 06G** (D-CAT-06B-6): resiliência antes do acoplamento.
 
@@ -1164,6 +1164,13 @@ Ordem **06E/06F antes de 06G** (D-CAT-06B-6): resiliência antes do acoplamento.
 - Falha do provider é registrada com etapa, classe do provider e classe da
   exceção, **sem a mensagem**, que é do adaptador e pode carregar prompt ou
   resposta (D-CAT-06G-7).
+- Falha do motor interno é registrada com etapa e classe da exceção, e a mensagem
+  passa por `mensagemSegura()`: de `QueryException` fica só o SQLSTATE, sem SQL nem
+  bindings; das demais exceções, o `getMessage()`. A stack não é registrada. Nenhum
+  ponto de lançamento alcançado hoje pelo assistente põe texto do lojista na
+  mensagem, mas uma exceção futura que o fizesse o levaria ao log — risco latente de
+  observabilidade/privacidade, não vulnerabilidade comprovada (**H-12 (CAT-06H)**,
+  §24).
 - Cachear conhecimento e contexto é legítimo; copiar atributo objetivo de um item
   para outro por efeito de cache, não.
 - Futuro (CAT-10): métricas por chamada externa — provider, modelo, tokens, custo,
@@ -1679,7 +1686,7 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 | **D-CAT-05E-5** | `ListingGap` é enum | `match` falha quando surgir a sexta lacuna | VIGENTE |
 | **D-CAT-05E-6** | Lacuna que a sugestão preenche não vira pedido | Ruído desacredita pedidos | VIGENTE |
 | **D-CAT-05E-7** | `lacunas()` intocado; muda quem consome | Pertence à CAT-05C | VIGENTE |
-| **D-CAT-05F-1** | O assistente captura exceção do motor e devolve `vazia()` | Garantia na única porta | VIGENTE |
+| **D-CAT-05F-1** | O assistente captura exceção do motor e devolve `vazia()` | Garantia na única porta | VIGENTE — a captura ampla de `Throwable` e a assimetria com a fronteira do provider estão registradas como dívida **H-12 (CAT-06H)** (§24) |
 | **D-CAT-05F-2** | Captura separada por etapa — degradação parcial | Não perder o principal pelo acessório | VIGENTE |
 | **D-CAT-05F-3** | `QueryException` no log só pelo SQLSTATE | Bindings carregam texto do lojista | VIGENTE |
 | **D-CAT-05F-4** | Sem sinal de modo degradado por ora (dívida F-1) | Não reabrir a forma da sugestão | **SUPERADA** por D-CAT-06B-1 (DTO de desfecho, implementado na 06G) |
@@ -1718,7 +1725,7 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 | **D-CAT-06D-7** | A trava da CAT-05D passa a guardar só o `EmbeddingProvider` | B-3 é o único sem decisão | VIGENTE |
 | **D-CAT-06D-8** | `EmbeddingProvider` não é criado | Interface sem consumidor | VIGENTE |
 | **D-CAT-06F-1** | Instrução, contexto recuperado e dado do lojista em **três propriedades** de `GuardedPrompt` (`final`, `readonly`), sem método que os junte em texto | A §5.2 pede separação estrutural; delimitador em string pode ser fechado pelo próprio conteúdo | VIGENTE |
-| **D-CAT-06F-2** | O canal de instrução é o enum **puro** `ProviderInstruction`, fixado pelo guard, sem parâmetro de entrada e sem texto nesta fase | `string` ou enum com valor de apoio deixariam texto de fora escolher a instrução; o texto da instrução é o prompt, que é da 06G | VIGENTE |
+| **D-CAT-06F-2** | O canal de instrução é o enum **puro** `ProviderInstruction`, fixado pelo guard, sem parâmetro de entrada e sem texto nesta fase | `string` ou enum com valor de apoio deixariam texto de fora escolher a instrução; o texto da instrução é o prompt, que é da 06G | VIGENTE — a 06G não escreveu texto de instrução; onde ele mora quando houver adaptador real é a dívida **H-11 (CAT-06H)** (§24) |
 | **D-CAT-06F-3** | Classificação por origem: `knowledge` e `similar_items` são contexto recuperado, por lista de permissão; todo o resto do `ListingContext`, e toda chave nova, é dado do lojista | É a forma que o `ListingContext` já tem (campos próprios × cópias); o padrão fica no lado não confiável, nunca no de instrução | VIGENTE |
 | **D-CAT-06F-4** | O guard não lê conteúdo: não redige, não escapa, não altera, não descarta, não lança e não registra; vazio e nulo atravessam como estão | Proteção por lista de frases destrói conteúdo legítimo e envelhece na primeira frase não prevista; PII é a C-2, e compor as duas peças é a 06G | VIGENTE |
 | **D-CAT-06F-5** | `FronteiraDePromptTest` reescrito: as 3 precondições da CAT-05G trocadas pelo que vigiavam (guard sem provider nem função de texto; varredura permanente de formato de fornecedor, rede e credencial); o teste do texto hostil sobrevive e vira a base dos testes de injeção | Precondição vencida vira garantia, não é apagada (mesma regra da D-CAT-06C-5) | VIGENTE |
@@ -1762,6 +1769,8 @@ arquitetura.
 | **LGPD-01 · LGPD-02** | Princípios de proteção declarados e nunca implementados |
 | **Adaptador real (pós-F-1 · B-5)** | F-1 fechado e B-5 decidido na 06G; nenhum provider real acoplado. Quem acoplar recebe `GuardedPrompt` já redigido, não junta os três canais antes do formato do fornecedor, aplica o prazo de 8 s no transporte, não tenta de novo e converte só a falha esperada em `CatalogAiProviderException`. Continua dependendo de B-3 e B-6 |
 | **B-3 · B-6** | Embeddings e custo/rate limit sem decisão; qualquer provider real precisa delas |
+| **H-11 (CAT-06H)** — onde mora o texto da instrução | `ProviderInstruction` é enum estrutural que só identifica a instrução: o `PromptGuard` fixa `SuggestListing`, o `GuardedPrompt` a transporta e o `GuardedPromptRedactor` a preserva; nenhuma classe escreve o prompt, e não há adaptador real, transporte HTTP nem serialização para fornecedor. Definir agora se o texto final da instrução mora no domínio ou no adaptador seria arquitetura especulativa. Com o primeiro adaptador real de `CatalogAiProvider`, decide-se onde reside o texto específico do fornecedor, quem traduz `ProviderInstruction`, se existe formatter ou prompt builder e o que fica no domínio e o que fica no adaptador |
+| **H-12 (CAT-06H)** — captura ampla de `Throwable` no motor interno | `GenerateListingSuggestion::completar()` converte qualquer `Throwable` do motor — inclusive `TypeError` e `Error` — em degradação (D-CAT-05F-1), enquanto a fronteira do provider deixa defeito genérico subir (D-CAT-06G-7). Um defeito permanente de programação pode aparecer como `InternalIntelligenceFailed`, que convida a repetir, e a mensagem de exceção que não seja `QueryException` vai para o log. Não há teste de `TypeError`/`Error` no motor, de propósito: o comportamento é mantido como dívida, não como contrato desejado. Uma decisão futura explícita define se `Error`/`TypeError` propagam, quais exceções do motor são operacionais, quando `InternalIntelligenceFailed` convida a repetir, a política de log e de minimização de mensagens de exceção e os testes que protegem o contrato decidido |
 | **D-3 (CAT-05H)** | Casamento por frase exata limita o alcance; mudar reabre a CAT-04 e troca falso negativo por falso positivo |
 | **GOV-02** | Consentimento avaliado na requisição de origem não cobre eventos assíncronos |
 | **R-4** / `ImageService` sem contagem de referências | Toda exclusão de arquivo precisa checar referências manualmente; compartilhar caminho é proibido |
