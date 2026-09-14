@@ -14,6 +14,7 @@ use App\CatalogIntelligence\Queries\FindSimilarProducts;
 use App\CatalogIntelligence\Support\ProductTextNormalizer;
 use App\CatalogIntelligence\Support\SimilarityScorer;
 use App\Enums\ItemType;
+use App\Livewire\Lojista\Produtos\ProdutoForm;
 use App\Models\Expositor;
 use App\Models\Product;
 use Illuminate\Database\QueryException;
@@ -21,6 +22,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use PDOException;
+use ReflectionMethod;
 use RuntimeException;
 use Tests\TestCase;
 use Throwable;
@@ -33,10 +35,12 @@ use Throwable;
  * manual continua funcionando integralmente. **Essa propriedade terá teste
  * explícito.**"*
  *
- * Este é o teste explícito. Hoje ele prova a garantia **do lado do assistente**
- * — que ele captura a própria falha e nunca escreve —, porque o acoplamento com
- * o formulário só chega na CAT-09. É de propósito: chegar lá sem a rede pronta
- * seria construir o acoplamento e só então descobrir se ele é seguro.
+ * Este é o teste explícito. Ele prova a garantia **do lado do assistente** —
+ * que ele captura a própria falha e nunca escreve —, e foi escrito antes do
+ * acoplamento com o formulário de propósito: chegar lá sem a rede pronta seria
+ * construir o acoplamento e só então descobrir se ele é seguro. A versão pela
+ * tela, com o `ProdutoForm` real, chegou na CAT-09 e mora em
+ * `AssistenteNoCadastroTest`.
  */
 class ResilienciaDoAssistenteTest extends TestCase
 {
@@ -289,15 +293,23 @@ class ResilienciaDoAssistenteTest extends TestCase
     }
 
     /**
-     * A fronteira estrutural que sustenta tudo acima: o caminho de cadastro
-     * **não conhece** o módulo de inteligência. Se um dia conhecer, que seja
-     * por decisão, e este teste é o que obriga a decisão a ser consciente.
+     * A fronteira estrutural que sustenta tudo acima: **quem grava** não conhece
+     * o módulo de inteligência. Se um dia conhecer, que seja por decisão, e este
+     * teste é o que obriga a decisão a ser consciente.
+     *
+     * ## O que a CAT-09 mudou, por decisão
+     *
+     * Até ela, o `ProdutoForm` estava na lista. A CAT-09 o tirou: a tela é onde o
+     * lojista pede e aplica a sugestão, e precisa chamar o assistente. A trava
+     * continua inteira para o salvamento — `SaveProductWithOffer` e o controller
+     * da API seguem sem saber que a inteligência existe — e passa a valer, dentro
+     * do formulário, para o `save()`: gerar e aplicar moram em métodos próprios, e
+     * a sugestão só chega à persistência pelos campos da tela.
      */
     public function test_o_caminho_de_cadastro_nao_referencia_a_inteligencia(): void
     {
         $arquivos = [
             app_path('Actions/Catalog/SaveProductWithOffer.php'),
-            app_path('Livewire/Lojista/Produtos/ProdutoForm.php'),
             app_path('Http/Controllers/Api/V1/Lojista/ProdutoController.php'),
         ];
 
@@ -305,7 +317,22 @@ class ResilienciaDoAssistenteTest extends TestCase
             $this->assertStringNotContainsString(
                 'CatalogIntelligence',
                 file_get_contents($arquivo),
-                basename($arquivo).' passou a depender da inteligência — se foi de propósito (CAT-09), revise este teste junto',
+                basename($arquivo).' passou a depender da inteligência — o salvamento não conhece o assistente; se foi de propósito, revise este teste junto',
+            );
+        }
+
+        $save = new ReflectionMethod(ProdutoForm::class, 'save');
+        $corpo = implode('', array_slice(
+            file($save->getFileName()),
+            $save->getStartLine() - 1,
+            $save->getEndLine() - $save->getStartLine() + 1,
+        ));
+
+        foreach (['CatalogIntelligence', 'GenerateListingSuggestion', 'ListingContext', 'sugest'] as $referencia) {
+            $this->assertStringNotContainsStringIgnoringCase(
+                $referencia,
+                $corpo,
+                "ProdutoForm::save() passou a referenciar «{$referencia}» — gravar continua sendo o fluxo normal (CAT-09)",
             );
         }
     }

@@ -275,9 +275,14 @@ final class ListingContext
      * hierárquica por `parent_id` e nada no banco impede um ciclo, então uma
      * subida ingênua travaria a requisição em vez de devolver contexto.
      *
+     * Pública desde a CAT-09: o formulário do lojista monta o contexto com a
+     * categoria **da tela**, ainda não salva, e reaproveita esta subida em vez de
+     * escrever a segunda. Cada ancestral não carregado custa uma consulta aqui
+     * dentro; o que vem junto é decisão de quem chama (observação da CAT-05G).
+     *
      * @return array<int, string>
      */
-    private static function caminhoDaCategoria(?ContentCategory $categoria): array
+    public static function caminhoDaCategoria(?ContentCategory $categoria): array
     {
         $caminho = [];
         $vistos = [];

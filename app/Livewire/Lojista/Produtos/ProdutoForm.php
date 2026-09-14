@@ -3,6 +3,9 @@
 namespace App\Livewire\Lojista\Produtos;
 
 use App\Actions\Catalog\SaveProductWithOffer;
+use App\CatalogIntelligence\Actions\GenerateListingSuggestion;
+use App\CatalogIntelligence\DTOs\ListingContext;
+use App\CatalogIntelligence\Enums\ListingOutcomeState;
 use App\Enums\ItemType;
 use App\Enums\Modality;
 use App\Enums\PriceType;
@@ -18,12 +21,26 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
 class ProdutoForm extends Component
 {
     use ValidatesFileUploads, WithFileUploads;
+
+    /**
+     * Campo da tela → chave de `ListingSuggestion::toArray()`.
+     *
+     * Só os três textos de identidade se aplicam (CAT-09). Palavras-chave e
+     * informações faltantes são exibidas e não têm onde entrar: o domínio não tem
+     * campo de palavra-chave.
+     */
+    private const CAMPOS_APLICAVEIS = [
+        'name' => 'suggested_name',
+        'short_description' => 'short_description',
+        'description' => 'description',
+    ];
 
     public ?Product $product = null;
 
@@ -88,6 +105,47 @@ class ProdutoForm extends Component
     public $upload3 = null;
 
     public $upload4 = null;
+
+    /**
+     * A última sugestão do assistente, na forma de `ListingSuggestion::toArray()`.
+     *
+     * CAT-09. É pré-visualização e nada mais: gerar não grava, e aplicar só copia
+     * um campo daqui para a propriedade da tela — quem grava continua sendo o
+     * `save()`, pela `SaveProductWithOffer`. `#[Locked]` porque o texto aplicado
+     * tem de ser o que o servidor gerou, e não o que o navegador devolveu.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[Locked]
+    public ?array $sugestao = null;
+
+    /** O `ListingOutcomeState` da última sugestão: é por ele, e não pela sugestão, que a tela fala do desfecho. */
+    #[Locked]
+    public ?string $desfecho = null;
+
+    /**
+     * Assinatura do contexto que produziu a última sugestão.
+     *
+     * É o que permite honrar `convidaARepetir()`: com os mesmos dados na tela e um
+     * desfecho que não convida, pedir de novo traria a mesma resposta.
+     */
+    #[Locked]
+    public ?string $assinaturaDaSugestao = null;
+
+    /**
+     * Se quem gerou a sugestão pode aplicá-la — nome, resumo e descrição.
+     *
+     * Perguntado ao gerar e reconferido a cada aplicação, e **não** a cada
+     * renderização: com a sugestão na tela, todo round-trip do formulário — o nome
+     * é `wire:model.live` — pagaria de novo as consultas de `updateCanonical`. Se a
+     * delegação cair entre gerar e aplicar, a aplicação reconfere, recusa e o
+     * valor se corrige; o salvamento continua protegido pela `SaveProductWithOffer`.
+     */
+    #[Locked]
+    public bool $sugestaoAplicavel = false;
+
+    /** Aviso da última ação sobre a sugestão; vale só para a renderização desta requisição. */
+    private ?string $avisoDaSugestao = null;
 
     public function mount(?Product $product = null): void
     {
@@ -403,6 +461,152 @@ class ProdutoForm extends Component
         });
     }
 
+    /**
+     * Pede ao assistente uma sugestão para o que está na tela (CAT-09).
+     *
+     * A ordem é a de `save()` e `removeImage()`: propriedade primeiro — este
+     * método é um endpoint próprio, e ninguém monta contexto sobre item de outra
+     * loja. Depois, o mínimo para haver do que partir: tipo válido e nome.
+     *
+     * **Não grava nada**, e não trata falha: o assistente captura a do motor e a
+     * do provider e as devolve como desfecho (CAT-05F, CAT-06G). Uma exceção que
+     * atravesse é defeito, e tem de aparecer como tal.
+     */
+    public function gerarSugestao(GenerateListingSuggestion $assistente): void
+    {
+        $this->guardOwnership();
+
+        $this->validate([
+            'item_type' => 'required|in:produto,servico,cuidado',
+            'name' => 'required|string|max:255',
+        ]);
+
+        $contexto = $this->contextoDaTela();
+        $assinatura = hash('sha256', serialize([$this->product?->id, $contexto->toArray()]));
+
+        if ($assinatura === $this->assinaturaDaSugestao
+            && $this->desfecho !== null
+            && ! ListingOutcomeState::from($this->desfecho)->convidaARepetir()) {
+            $this->avisoDaSugestao = 'A sugestão abaixo já corresponde ao que está preenchido. Altere o tipo, o nome, as descrições ou a categoria para pedir outra.';
+
+            return;
+        }
+
+        [$sugestao, , $desfecho] = $assistente->comContexto($contexto, $this->product);
+
+        $this->sugestao = $sugestao->toArray();
+        $this->desfecho = $desfecho->state->value;
+        $this->assinaturaDaSugestao = $assinatura;
+        $this->sugestaoAplicavel = $this->podeAplicarSugestao();
+    }
+
+    /**
+     * Copia **um** campo da sugestão para a tela — nunca para o banco.
+     *
+     * Três recusas, todas sem efeito:
+     *
+     * - campo fora de nome, resumo e descrição, ou sem proposta;
+     * - edição sem autoridade canônica: a tela nem oferece o botão, e o servidor
+     *   confere de novo porque o botão não é a proteção;
+     * - resumo ou descrição que já têm texto. O assistente só propõe onde havia
+     *   vazio, e se o lojista escreveu depois de gerar, o texto dele fica. O nome
+     *   é a exceção: está sempre preenchido, e só é trocado por este clique, com
+     *   o nome atual visível ao lado da proposta.
+     */
+    public function aplicarSugestao(string $campo): void
+    {
+        $this->guardOwnership();
+
+        $proposta = isset(self::CAMPOS_APLICAVEIS[$campo])
+            ? ($this->sugestao[self::CAMPOS_APLICAVEIS[$campo]] ?? null)
+            : null;
+
+        if (! is_string($proposta)) {
+            return;
+        }
+
+        // Reconfere a cada clique: a delegação pode ter caído depois de a
+        // sugestão aparecer, e a tela passa a mostrar a recusa.
+        $this->sugestaoAplicavel = $this->podeAplicarSugestao();
+
+        if (! $this->sugestaoAplicavel) {
+            return;
+        }
+
+        if ($campo !== 'name' && trim($this->{$campo}) !== '') {
+            $this->avisoDaSugestao = 'Este campo já tem texto seu, e a sugestão não o substitui. Para usá-la, apague o texto atual e aplique de novo.';
+
+            return;
+        }
+
+        $this->{$campo} = $proposta;
+
+        // O mesmo efeito de digitar o nome: em item novo, o slug o acompanha.
+        if ($campo === 'name') {
+            $this->updatedName();
+        }
+    }
+
+    /**
+     * O contexto do assistente, montado com o que está **na tela** — salvo ou não.
+     *
+     * Campo a campo, nunca o array de propriedades (dívida C-1); `knownAttributes`
+     * fica vazio porque o formulário não tem atributo estruturado. A categoria é
+     * a selecionada agora, e a subida é a do próprio `ListingContext`. O pai vem
+     * no `with('parent')`, que cobre os dois níveis que o catálogo usa; cada nível
+     * acima disso custa uma consulta, até o teto de dez da subida (observação da
+     * CAT-05G).
+     */
+    private function contextoDaTela(): ListingContext
+    {
+        $categoria = $this->category_id !== null
+            ? ContentCategory::query()->with('parent')->find($this->category_id)
+            : null;
+
+        return ListingContext::paraItemNovo(
+            itemType: ItemType::from($this->item_type),
+            name: $this->name,
+            categoryPath: ListingContext::caminhoDaCategoria($categoria),
+            shortDescription: $this->short_description,
+            description: $this->description,
+        );
+    }
+
+    /**
+     * Aplicar nome, resumo ou descrição é mexer na identidade do item.
+     *
+     * Item novo nasce com delegação para quem o cadastra, e não há o que conferir.
+     * Na edição, a pergunta é a mesma que a `SaveProductWithOffer` faz ao salvar —
+     * `updateCanonical` —, feita antes, para a tela não oferecer um caminho que
+     * terminaria em `SemAutoridadeCanonica`. A recusa no salvamento continua lá.
+     */
+    private function podeAplicarSugestao(): bool
+    {
+        return $this->product === null
+            || auth()->user()?->can('updateCanonical', $this->product) === true;
+    }
+
+    /**
+     * O que a tela diz de cada desfecho — os oito, sem `default`.
+     *
+     * Nenhuma mensagem nomeia fornecedor, e `ProviderUnavailable` não é erro: sem
+     * provider configurado, operar só com a inteligência da Feira é o estado
+     * normal (D-CAT-06B-5).
+     */
+    private function mensagemDoDesfecho(ListingOutcomeState $estado): string
+    {
+        return match ($estado) {
+            ListingOutcomeState::InternalKnowledgeSufficient => 'Sugestão preparada com o conhecimento da Feira.',
+            ListingOutcomeState::InternalKnowledgeInsufficient => 'A Feira ainda não conhece este item o bastante para escrever por você. Veja abaixo o que vale informar.',
+            ListingOutcomeState::InternalIntelligenceFailed => 'Não foi possível consultar o conhecimento da Feira agora. Você pode tentar de novo, ou preencher e salvar normalmente.',
+            ListingOutcomeState::ProviderUnavailable => 'Sugestão preparada apenas com a inteligência interna da Feira.',
+            ListingOutcomeState::ProviderFailed => 'O assistente complementar não respondeu agora. A sugestão abaixo usa só o conhecimento da Feira, e você pode tentar de novo.',
+            ListingOutcomeState::ProviderResponseInvalid => 'A resposta do assistente complementar foi descartada por não seguir as regras da Feira. A sugestão abaixo usa só o conhecimento interno.',
+            ListingOutcomeState::ExternalSuggestionUsed => 'Sugestão preparada com o conhecimento da Feira e complementada por um assistente externo.',
+            ListingOutcomeState::ExternalSuggestionNotUsed => 'Sugestão preparada com o conhecimento da Feira; a consulta complementar não trouxe nada novo.',
+        };
+    }
+
     public function render(): View
     {
         $categories = ContentCategory::where('is_active', true)
@@ -422,7 +626,16 @@ class ProdutoForm extends Component
             default => $this->product ? 'Editar Produto' : 'Novo Produto',
         };
 
-        return view('livewire.lojista.produtos.produto-form', compact('categories', 'itemTypes', 'priceTypes', 'modalities'))
-            ->layout('lojista.layouts.app', ['title' => $title]);
+        $estado = $this->desfecho !== null ? ListingOutcomeState::from($this->desfecho) : null;
+
+        return view('livewire.lojista.produtos.produto-form', [
+            ...compact('categories', 'itemTypes', 'priceTypes', 'modalities'),
+            // O assistente (CAT-09). A autoridade não é perguntada aqui: ver
+            // `$sugestaoAplicavel`.
+            'mensagemDoDesfecho' => $estado !== null ? $this->mensagemDoDesfecho($estado) : null,
+            'desfechoEhFalha' => $estado?->ehFalha() ?? false,
+            'desfechoConvidaARepetir' => $estado?->convidaARepetir() ?? false,
+            'avisoDaSugestao' => $this->avisoDaSugestao,
+        ])->layout('lojista.layouts.app', ['title' => $title]);
     }
 }

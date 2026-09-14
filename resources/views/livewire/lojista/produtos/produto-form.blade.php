@@ -183,6 +183,104 @@
                     </div>
                 </div>
 
+                {{-- Assistente de cadastro (CAT-09): sugere e mostra; quem grava é o salvar --}}
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Assistente de cadastro</h2>
+                            <p class="text-sm text-gray-500 mt-0.5">Sugere nome, resumo e descrição a partir do que você preencheu acima. Nada é gravado até você salvar.</p>
+                        </div>
+                        <button type="button" wire:click="gerarSugestao" wire:loading.attr="disabled" wire:target="gerarSugestao"
+                                class="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+                                style="background:#FFFBEB; color:#C47A00; border:2px solid #E8A000; min-height:44px;">
+                            <span wire:loading.remove wire:target="gerarSugestao">
+                                @if($desfechoConvidaARepetir) Tentar novamente
+                                @elseif($sugestao) Gerar nova sugestão
+                                @else Gerar sugestão inteligente
+                                @endif
+                            </span>
+                            <span wire:loading wire:target="gerarSugestao">Gerando sugestão...</span>
+                        </button>
+                    </div>
+
+                    @if($mensagemDoDesfecho)
+                    <div role="{{ $desfechoEhFalha ? 'alert' : 'status' }}"
+                         class="p-4 rounded-xl border text-sm font-medium {{ $desfechoEhFalha ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-700' }}">
+                        {{ $mensagemDoDesfecho }}
+                    </div>
+                    @endif
+
+                    @if($avisoDaSugestao)
+                    <p class="p-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700">{{ $avisoDaSugestao }}</p>
+                    @endif
+
+                    @if($sugestao)
+                        @unless($sugestaoAplicavel)
+                        <p class="p-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700">
+                            Você pode consultar a sugestão, mas não tem autoridade para alterar nome, resumo e descrição deste item.
+                            Preço, estoque e as demais condições da sua oferta continuam sob seu controle.
+                        </p>
+                        @endunless
+
+                        @php
+                            $propostas = [
+                                'name' => ['rotulo' => 'Nome sugerido', 'chave' => 'suggested_name', 'acao' => 'Usar este nome'],
+                                'short_description' => ['rotulo' => 'Resumo sugerido', 'chave' => 'short_description', 'acao' => 'Usar este resumo'],
+                                'description' => ['rotulo' => 'Descrição sugerida', 'chave' => 'description', 'acao' => 'Usar esta descrição'],
+                            ];
+                        @endphp
+
+                        @foreach($propostas as $campo => $proposta)
+                        @continue($sugestao[$proposta['chave']] === null)
+                        <div class="p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-2">
+                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">{{ $proposta['rotulo'] }}</span>
+                            @if($campo === 'name')
+                            <p class="text-sm text-gray-500">Nome atual: <span class="font-medium text-gray-700">{{ $name }}</span></p>
+                            @endif
+                            <p class="text-base text-gray-900 whitespace-pre-line">{{ $sugestao[$proposta['chave']] }}</p>
+                            @if($sugestaoAplicavel)
+                                @if($this->{$campo} === $sugestao[$proposta['chave']])
+                                <p class="text-sm font-medium" style="color:#C47A00;">✓ Aplicado na tela — será gravado quando você salvar.</p>
+                                @else
+                                <button type="button" wire:click="aplicarSugestao('{{ $campo }}')"
+                                        class="px-4 py-2 rounded-xl text-sm font-bold"
+                                        style="background:#E8A000; color:#fff; min-height:40px;">
+                                    {{ $proposta['acao'] }}
+                                </button>
+                                @endif
+                            @endif
+                        </div>
+                        @endforeach
+
+                        @if(count($sugestao['keywords']))
+                        <div class="space-y-2">
+                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Palavras-chave</span>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach($sugestao['keywords'] as $palavra)
+                                <span class="px-3 py-1 rounded-full bg-gray-100 text-sm text-gray-700">{{ $palavra }}</span>
+                                @endforeach
+                            </div>
+                            <p class="text-xs text-gray-400">Só para referência: palavras-chave não são gravadas no item.</p>
+                        </div>
+                        @endif
+
+                        @if(count($sugestao['missing_information']))
+                        <div class="space-y-2">
+                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">O que ainda vale informar</span>
+                            <ul class="list-disc pl-5 space-y-1 text-sm text-gray-700">
+                                @foreach($sugestao['missing_information'] as $pedido)
+                                <li>{{ $pedido }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        @endif
+
+                        @if($sugestao['suggested_name'] === null && $sugestao['short_description'] === null && $sugestao['description'] === null && ! count($sugestao['keywords']))
+                        <p class="text-sm text-gray-500">Não há texto a sugerir para este item agora.</p>
+                        @endif
+                    @endif
+                </div>
+
                 {{-- Fotos --}}
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                     <h2 class="text-lg font-bold text-gray-900 mb-1">
@@ -359,7 +457,7 @@
                 <button type="submit"
                         class="w-full py-4 rounded-xl text-white text-lg font-bold transition-colors"
                         style="background-color: #E8A000; min-height: 60px;">
-                    <span wire:loading.remove>
+                    <span wire:loading.remove wire:target="save">
                         @if($product)
                             Salvar Alterações
                         @elseif($item_type === 'servico')
@@ -370,7 +468,7 @@
                             Cadastrar Produto
                         @endif
                     </span>
-                    <span wire:loading>Salvando...</span>
+                    <span wire:loading wire:target="save">Salvando...</span>
                 </button>
 
                 @if($offer?->expositor)
