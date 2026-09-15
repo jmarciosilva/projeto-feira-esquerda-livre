@@ -74,14 +74,14 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 
 | | |
 |---|---|
-| **Fase atual** | Nenhuma fase em andamento. A **CAT-09 — Implantação do Assistente no Catálogo** está concluída e publicada (commit técnico `1efe1b6`), com a homologação visual em navegador pendente. A próxima fase depende de decisão de produto ([§18](#18-próximas-fases)) |
-| **Última fase concluída** | **CAT-09** — assistente no cadastro e na edição do lojista: pré-visualização, aplicação explícita e geração sem persistência. `NullCatalogAiProvider` continua o binding padrão; ainda não existe provider externo real |
-| **Última fase com commit** | **CAT-09** — commit técnico `1efe1b6` |
-| **Próxima implementação** | A definir por decisão de produto: [§18](#18-próximas-fases) recomenda a CAT-08, e a ordem entre CAT-07 e CAT-08 é decisão de produto. Nenhuma das duas foi iniciada |
-| **Último commit técnico publicado** | `1efe1b6` (`1efe1b642224f145d7b729dda2e4af45dbddb06d`) — `feat: integra Catalog Intelligence ao cadastro de produtos` |
-| **Último commit documental publicado** | `0d2f6f7` (`0d2f6f7c130bd8084badd0c88d15ade52845995a`) — `docs: conclui a CAT-06 e planeja a CAT-09` |
-| **Última suíte completa** | **1327 passed · 6053 assertions · 0 failures** (2026-09-14, na CAT-09, sobre o conteúdo commitado em `1efe1b6`). A anterior era 1294 · 5874, sobre `dc217cf`; os 33 testes a mais são os da CAT-09 |
-| **Validação da CAT-09** | CAT-09 **33 passed · 176 assertions · 0 failures**; Catalog Intelligence **357 passed · 2999 assertions · 0 failures**; homologação visual em navegador **pendente**. Detalhe em [§14](#cat-09--implantação-do-assistente-no-catálogo-x) |
+| **Fase atual** | Nenhuma fase em andamento. A **CAT-10A — Primeiro provider real** está concluída e publicada (commit técnico `10fe2bf`). A **homologação real** com o provider ligado está pendente e **não é fase nova**. A homologação visual da **CAT-09** em navegador também segue pendente |
+| **Última fase concluída** | **CAT-10A** — primeiro provider real, **OpenAI**, atrás de `CatalogAiProvider`: adaptador fora do módulo, em `app/Services/CatalogAi`, selecionado pelo `CatalogAiProviderSelector`, com o `NullCatalogAiProvider` como fallback; recurso desligado por padrão |
+| **Última fase com commit** | **CAT-10A** — commit técnico `10fe2bf` |
+| **Próxima implementação** | **Homologação real** do assistente com o provider ligado, em ambiente controlado — não é fase. Depois, **CAT-10B** — observabilidade, custo e segurança ampliados, não iniciada ([§18](#18-próximas-fases)) |
+| **Último commit técnico publicado** | `10fe2bf` (`10fe2bfbb88132215d90644703b7c1e86c7f3a82`) — `feat: integra primeiro provider real ao Catalog Intelligence` |
+| **Último commit documental publicado** | `a3f5a2d` (`a3f5a2df38ef192dce81ff5d7fa90851c8cf36b2`) — `docs: conclui a CAT-09` |
+| **Última suíte completa** | **1411 passed · 8617 assertions · 0 failures** (2026-09-14, na CAT-10A), executada **antes do ajuste textual final da regra 1** da instrução do adaptador; depois do ajuste rodaram os testes dirigidos e o Catalog Intelligence completos. A anterior era 1327 · 6053, sobre `1efe1b6` |
+| **Validação da CAT-10A** | Suíte completa **1411 · 8617 · 0** sobre a implementação **antes** do ajuste textual final da regra 1; **depois** do ajuste, dirigidos **85 passed · 2579 assertions** e Catalog Intelligence **442 passed · 5581 assertions**, sem repetir a suíte completa (dispensa explícita na revisão); homologação real **pendente**. Detalhe em [§14](#cat-10a--primeiro-provider-real-x) |
 | **Documentação** | DOC-CONSOLIDATION-01 concluída — três documentos principais, commit `962eb5a` |
 
 > **Nota de reconciliação sobre a CAT-06D.** O roadmap anterior da trilha ainda a
@@ -96,15 +96,17 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 
 | # | Bloqueia | Situação |
 |---|---|---|
-| **B-3 · B-6** | **Provider externo real entrar em operação** — não bloqueia as subfases | Abertos, sem fase. Os três gates estão fechados: **C-2** na **06E** (`FreeTextRedactor`), **S-1** na **06F** (`PromptGuard`) e **F-1** na **06G** (desfecho e fallback, `5a667b4`) |
+| **B-6** | **Ativação ampla de provider externo em produção** — **não bloqueia** a homologação controlada do provider da CAT-10A (decisão do operador, 2026-09-14) | Aberto — **CAT-10B**, onde entram custo, rate limit, observabilidade e a revisão ampliada. Os três gates estão fechados: **C-2** na **06E** (`FreeTextRedactor`), **S-1** na **06F** (`PromptGuard`) e **F-1** na **06G** (desfecho e fallback, `5a667b4`) |
+| **B-3** | Só o `EmbeddingProvider` — **não bloqueia** a CAT-10A nem a homologação: o provider de sugestão não usa embeddings | Aberto, sem decisão |
 | **G-1** | Multi-oferta, backfill de conhecimento em produção (P-1) e revisão de conceitos sem uso (D-4) | Aberto. Não existe superfície de curadoria — **CAT-08** |
 | **F-06** | Produção endurecida do webhook Mercado Pago | Aberto, mitigado por desenho (security debt) |
 | **SEC-DEP-01** | `league/commonmark` 2.9.0 com 4 advisories HIGH | Aberto — atualizar para `>=2.10.0` em fase própria |
 | **GOV-02** | Coleta de eventos que nascem fora do navegador do comprador | Pendência de produto, não implementada |
 
-A **CAT-09** foi concluída sem provider real. B-3 e B-6 continuam bloqueando só um
-provider real: o assistente no cadastro usa `GenerateListingSuggestion` com o
-`NullCatalogAiProvider` como binding padrão.
+A **CAT-09** foi concluída sem provider real. Na **CAT-10A** (`10fe2bf`), o provider real
+entrou só por configuração de ambiente, desligado por padrão, para homologação controlada;
+sem ele, o `CatalogAiProviderSelector` resolve o contrato para o `NullCatalogAiProvider`. A
+B-6 continua impedindo a ativação ampla em produção até a CAT-10B.
 
 ---
 
@@ -145,7 +147,8 @@ provider real: o assistente no cadastro usa `GenerateListingSuggestion` com o
 | CAT-01 → CAT-05 | `[x]` | [§14](#14-catalog-intelligence) |
 | CAT-06 — IA externa (opcional) | `[x]` concluída — 06A → 06H, validação final na 06H-H | [§14](#14-catalog-intelligence) |
 | CAT-09 — Implantação do Assistente no Catálogo | `[x]` concluída — `1efe1b6`; homologação visual em navegador pendente | [§14](#14-catalog-intelligence) |
-| CAT-07 · CAT-08 · CAT-10 · CAT-11 | `[ ]` | [§14](#14-catalog-intelligence) |
+| CAT-10A — Primeiro provider real (OpenAI) | `[x]` concluída — `10fe2bf`; homologação real pendente | [§14](#14-catalog-intelligence) |
+| CAT-07 · CAT-08 · CAT-10B · CAT-11 | `[ ]` | [§14](#14-catalog-intelligence) |
 | FIN-DOM-01 — domínio financeiro (repasse, ledger) | `[ ]` não iniciada | [§18](#18-próximas-fases) |
 
 ---
@@ -478,7 +481,8 @@ salvo sem aprovação humana**; **falha da inteligência não bloqueia o cadastr
 | CAT-07 | `[ ]` | Feedback humano e memória (sugerido → aplicado → final → desfecho) | — |
 | CAT-08 | `[ ]` | Interface administrativa da inteligência — **fecha G-1** | — |
 | CAT-09 | `[x]` | Implantação do Assistente no Catálogo — integração no cadastro e na edição do lojista (pré-visualização, aplicação explícita). Antecipada antes da CAT-07 e da CAT-08 | `1efe1b6` |
-| CAT-10 | `[ ]` | Observabilidade, custos e segurança com provider acoplado | — |
+| CAT-10A | `[x]` | Primeiro provider real — um único adaptador externo, OpenAI, atrás de `CatalogAiProvider`, com o `Null` como fallback, para homologação real. Antecipada antes da CAT-07 e da CAT-08 | `10fe2bf` |
+| CAT-10B | `[ ]` | Observabilidade, custos e segurança ampliados com provider acoplado | — |
 | CAT-11 | `[ ]` | Hardening, testes e revisão final | — |
 
 ### CAT-05 — Assistente de conteúdo `[x]`
@@ -763,7 +767,8 @@ documental — foi cumprida; a 06H-E está PUBLISHED / CLOSED / FROZEN.
   exatamente um `->bind(` — hoje o único binding do módulo — e que não conheça
   `FakeCatalogAiProvider` nem `->singleton(`. A fragilidade é deliberada e não foi
   flexibilizada: um provider real, um segundo binding ou uma mudança estrutural precisa
-  quebrar o teste e exigir revisão arquitetural explícita.
+  quebrar o teste e exigir revisão arquitetural explícita. **Revista na CAT-10A**
+  (`10fe2bf`), como a trava previa — ver [§14](#cat-10a--primeiro-provider-real-x) e §17.
 - **H-14 — auditada e preservada.** `FindSimilarProducts` e `ContextSanitizer` ficaram
   deliberadamente fora da lista da H-06: são dependências internas historicamente
   autorizadas e não representam a fronteira externa. A vigência da similaridade em
@@ -1121,10 +1126,124 @@ binding `Null`, texto hostil escapado e custo em consultas.
 - Custo de consultas em hierarquias profundas de categoria — observação técnica separada,
   em [§17](#17-dívidas-técnicas).
 
+### CAT-10A — Primeiro provider real `[x]`
+
+Concluída e publicada em `10fe2bf`. Aberta em 2026-09-14 por decisão de produto, à frente
+da CAT-07 e da CAT-08 e sem renumerar fases. A CAT-10 planejada — observabilidade, custos e
+segurança com provider acoplado — foi dividida: a **CAT-10A** conectou o primeiro provider
+real, e a **CAT-10B** permanece futura, para observabilidade, custo e segurança ampliados.
+
+**Objetivo.** Conectar um único provider externo ao Catalog Intelligence para permitir a
+homologação real da geração de sugestões no cadastro de produtos.
+
+- **Primeiro provider real: OpenAI.**
+- O restante da aplicação continua dependendo só de `CatalogAiProvider`, e o
+  `NullCatalogAiProvider` continua o fallback.
+- A tela e a experiência da CAT-09 não mudaram.
+- Fora do escopo: CAT-07, CAT-08, CAT-10B e CAT-11; qualquer mudança em `Product`,
+  `ProductOffer`, autoridade canônica ou multi-oferta; telemetria avançada.
+
+**Decisões aprovadas pelo operador (2026-09-14)** — registradas na ARCHITECTURE como
+D-CAT-10A-1 a D-CAT-10A-7
+
+- O adaptador fica em `app/Services/CatalogAi/`, fora do módulo; o domínio continua sem
+  nome de fornecedor, transporte ou credencial.
+- H-13 revista: o contrato resolve pelo `CatalogAiProviderSelector`, que devolve o `Null`
+  quando o recurso está desligado, o provider não é suportado, falta chave ou modelo, ou o
+  prazo é inválido — sem capturar exceção nenhuma.
+- H-11 resolvida no adaptador: o texto de `ProviderInstruction` vem de `match` exaustivo, e
+  o domínio continua carregando só o enum.
+- B-3 não bloqueia a CAT-10A: trata só do `EmbeddingProvider`. B-6 continua aberta e
+  bloqueia a ativação ampla em produção, não a homologação controlada.
+- Homologação com `store: false`, a redação existente preservada antes da saída e
+  `similar_items` enviado; a revisão ampliada de privacidade e governança fica na CAT-10B.
+- Prazo máximo de 8 s — acima disso, limitado a 8; ≤ 0 ou não numérico, configuração
+  inválida e `Null`. Nenhuma nova tentativa. `confidence` nula, sem pedir confiança ao
+  modelo.
+- Resposta impossível de converter para o contrato vira `CatalogAiProviderException`;
+  resposta representável mas inválida vai ao `ProviderResponseValidator`.
+- Responses API com Structured Outputs estrito, `store: false`, sem tools, busca ou conversa
+  persistente, uma chamada por geração.
+- Na revisão pré-commit: fatos objetivos do item só a partir de `dados_do_item`;
+  `contexto_recuperado` não serve como prova factual.
+
+**Entrega — commit técnico `10fe2bf` (`10fe2bfbb88132215d90644703b7c1e86c7f3a82`), publicado**
+
+- `OpenAiCatalogAiProvider`, em `app/Services/CatalogAi`, fora do módulo, sobre a
+  **Responses API**: `instruction` em `instructions`; `context` e `data` em dois itens
+  distintos de `input`, sem texto que junte canais; **Structured Outputs com JSON Schema
+  estrito**; `store: false`, sem tools, busca ou conversa; uma chamada por geração.
+- `CatalogAiProviderSelector`, também fora do módulo, lê `config('services.catalog_ai')` a
+  cada resolução e devolve o adaptador real só com o recurso ligado, provider `openai`,
+  chave e modelo preenchidos e prazo válido; em qualquer outro caso, o
+  `NullCatalogAiProvider`. Não captura exceção nem registra log.
+- A aplicação continua dependendo só de `CatalogAiProvider`: o
+  `CatalogIntelligenceServiceProvider` mantém um binding só, agora resolvido pelo seletor,
+  sem `singleton`.
+- **Recurso desligado por padrão.** Configuração por ambiente em `config/services.php` e
+  `.env.example` — `CATALOG_AI_ENABLED` (`false`), `CATALOG_AI_PROVIDER`,
+  `CATALOG_AI_MODEL`, `CATALOG_AI_API_KEY`, `CATALOG_AI_TIMEOUT` —, sem modelo fixado no
+  código e sem chave versionada. Operação em
+  [`README.md`](README.md#catalog-intelligence-provider-externo).
+- **Timeout máximo de 8 s**, no prazo total e no de conexão; acima disso, limitado a 8.
+  **Zero retry.**
+- Falha esperada — prazo, conexão, HTTP fora de 2xx, corpo ilegível, resposta incompleta,
+  recusa, ausência de texto estruturado, JSON fora do contrato — vira
+  `CatalogAiProviderException` com mensagem fixa e sem exceção encadeada. Resposta
+  representável mas inválida segue ao `ProviderResponseValidator`. Defeito inesperado sobe.
+- Regra 1 da instrução: **fatos objetivos do item só a partir de `dados_do_item`**;
+  **`contexto_recuperado` não serve como prova factual** — só terminologia, clareza,
+  organização e palavras-chave.
+- **`confidence` = null**, sem pedir confiança ao modelo.
+- Docblocks do módulo que ficariam falsos foram reconciliados, sem citar fornecedor.
+- Nenhuma alteração em `ProdutoForm`, na UX da CAT-09, em `Product`, `ProductOffer`,
+  autoridade canônica ou multi-oferta.
+
+**Bloqueios e dívidas reconciliados**
+
+- **H-11 — resolvida.** O texto de `ProviderInstruction` mora no adaptador, por `match`
+  exaustivo sem `default`; o domínio continua carregando só o enum.
+- **H-13 — resolvida e superada pelo desenho novo.** O binding deixou de ser o `Null`
+  direto: o contrato resolve pelo `CatalogAiProviderSelector`, o `Null` continua fallback e
+  o `Fake` nunca entra em runtime. `test_o_binding_padrao_do_contrato_e_o_null` foi revisto
+  de propósito: um binding só, sem `singleton` nem `Fake`; `Null` sem configuração e
+  adaptador real com configuração válida.
+- **B-3** trata do `EmbeddingProvider` e **não bloqueia** a CAT-10A.
+- **B-6 continua aberta.** Não bloqueia a homologação controlada; bloqueia a ativação ampla
+  em produção até a **CAT-10B**, onde entram custo, rate limit, observabilidade e a revisão
+  ampliada.
+
+**Testes:** `AdaptadorOpenAiTest` (adaptador e integração ponta a ponta pelo
+`GenerateListingSuggestion`, inclusive
+`test_caracteristica_so_do_contexto_nao_e_autorizada_como_fato_do_item`),
+`SelecaoDoProviderTest` (seletor) e `ContratosDeProviderTest` revisto (H-13). **Nenhuma
+chamada real à OpenAI na suíte:** `Http::fake` com `preventStrayRequests`, e o
+`phpunit.xml` força `CATALOG_AI_ENABLED=false` e `CATALOG_AI_API_KEY` vazia.
+
+**Validação**
+
+- Testes dirigidos: **85 passed · 2579 assertions**.
+- Catalog Intelligence: **442 passed · 5581 assertions** (antes: 357 · 2999).
+- Suíte completa: **1411 passed · 8617 assertions · 0 failures** (antes: 1327 · 6053),
+  executada sobre a implementação técnica **antes do ajuste textual final da regra 1** da
+  instrução. Depois do ajuste, os dois conjuntos acima — dirigidos e Catalog Intelligence
+  completo — foram executados e passaram. O teste da regra 1 nasceu com o ajuste e não
+  está entre os 1411.
+- **Exceção deliberada** ao critério de suíte completa sobre o código final
+  ([ARCHITECTURE §21](docs/ARCHITECTURE.md#21-testes-e-validação)): a repetição da suíte
+  completa depois do ajuste textual foi dispensada explicitamente na revisão da CAT-10A.
+  Os 1411 **não** foram executados sobre o conteúdo final de `10fe2bf`.
+- Controles negativos: 8 da implementação e 1 da regra 1, todos detectados, com arquivos
+  restaurados por hash.
+- Pint aprovado nos arquivos alterados; `git diff --cached --check` limpo; ROADMAP,
+  ARCHITECTURE e README fora do commit técnico.
+- **Homologação real: pendente.** Não é fase nova: é a verificação do assistente com o
+  provider ligado por ambiente, em ambiente controlado, antes da CAT-10B.
+
 ### Dívidas da trilha
 
 Tabela única em [§17](#17-dívidas-técnicas) — C-1, C-2, F-1, S-1, S-2, P-1, B-4,
-G-1, E-1, D-1…D-4 (CAT-05H), B-3, B-5, B-6 (CAT-06A), H-11 e H-12 (CAT-06H).
+G-1, E-1, D-1…D-4 (CAT-05H), B-3, B-5, B-6 (CAT-06A), H-11, H-12 e H-13 (CAT-06H).
 
 ---
 
@@ -1167,6 +1286,7 @@ herdado da FIN-SEC-01G, ainda válido:
 - `[ ]` Worker de filas ativo — recomendado; não é autoridade financeira
 - `[ ]` MySQL 8 com `STRICT_TRANS_TABLES`
 - `[ ]` `config:cache`, `route:cache`, `view:cache` após o deploy
+- `[ ]` `CATALOG_AI_ENABLED=false` até a **CAT-10B** (B-6); chave do provider só no ambiente, nunca versionada
 - `[ ]` Resolver **SEC-DEP-01** antes de publicar
 
 ---
@@ -1219,9 +1339,9 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 | ID | Dívida | Destino |
 |---|---|---|
 | **F-1** (CAT-05F) | Sem sinal de modo degradado | **`[x]` fechado** na **CAT-06G** — desfecho `ListingOutcome`, 8 estados (D-CAT-06G-3, D-CAT-06G-11) |
-| **B-5** (CAT-06A) | Timeout de chamada a provider | **`[x]` decidido** na **CAT-06G** — 8 s aplicados pelo adaptador, 0 novas tentativas, sem config até haver leitor (D-CAT-06G-5, D-CAT-06G-6) |
-| **B-3** (CAT-06A) | `EmbeddingProvider` órfão: na especificação, nenhuma fase o reivindica; trava de teste o mantém inexistente | Em aberto, sem decisão |
-| **B-6** (CAT-06A) | Custo e rate limit | Em aberto, sem fase |
+| **B-5** (CAT-06A) | Timeout de chamada a provider | **`[x]` decidido** na **CAT-06G** — 8 s aplicados pelo adaptador, 0 novas tentativas, sem config até haver leitor (D-CAT-06G-5, D-CAT-06G-6). **Aplicado** na **CAT-10A** (`10fe2bf`): `CATALOG_AI_TIMEOUT`, limitado a 8 pelo `CatalogAiProviderSelector`, no prazo total e no de conexão, sem retry |
+| **B-3** (CAT-06A) | `EmbeddingProvider` órfão: na especificação, nenhuma fase o reivindica; trava de teste o mantém inexistente | Em aberto, sem decisão. Trata só do `EmbeddingProvider` e **não bloqueia** a CAT-10A |
+| **B-6** (CAT-06A) | Custo e rate limit | Em aberto — **CAT-10B**, com custo, rate limit, observabilidade e revisão ampliada. **Não bloqueia** a homologação controlada do provider da CAT-10A; **bloqueia** a ativação ampla em produção |
 | **P-1** (CAT-05B) | Backfill de `catalog_product_knowledge` em produção (em dev foi rodado e revertido na 05H) | Decisão humana após G-1 |
 | **B-4** (CAT-05A) | Corpus de seeder: `short_description` vazia em 75/75, "demonstração" em 34/75 | Depende de catálogo real |
 | **E-1** (CAT-05E) | `KnowledgeTermType::Keyword` sem uso | Decidir quando houver registro |
@@ -1231,7 +1351,8 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 | **D-4** (CAT-05H) | 8 de 28 conceitos sem evidência direta (inclusive `Crochê`) | CAT-08 |
 | — (CAT-06A/06B) | Nomenclatura `ListingAssistant` × `GenerateListingSuggestion` (o DTO de desfecho foi batizado na 06G: `ListingOutcome`) | Reconciliada tecnicamente na **CAT-06H-F** (`b8d3d56`), nos testes, e na **CAT-06H-G** (`dc217cf`), no resíduo textual de `ListingContext.php` (H-09): `GenerateListingSuggestion` canônico |
 | — (CAT-06D §10) | Auditorias devem varrer asserções (`assertFalse(class_exists`), não só arquivos | **`[x]` feito** na **CAT-06H-H** — em `tests/`, a única trava de inexistência é a do `EmbeddingProvider`, deliberada (B-3) |
-| **H-11** (CAT-06H) | Onde mora o texto da instrução (`ProviderInstruction`) quando existir adaptador real: no domínio ou no adaptador | Dívida / decisão futura — reabre com o primeiro adaptador real de `CatalogAiProvider` |
+| **H-11** (CAT-06H) | Onde mora o texto da instrução (`ProviderInstruction`) quando existir adaptador real: no domínio ou no adaptador | **`[x]` resolvida** na **CAT-10A** (`10fe2bf`): o texto mora no adaptador, por `match` exaustivo sem `default`; o domínio continua carregando só o enum (D-CAT-10A-3) |
+| **H-13** (CAT-06H) | `test_o_binding_padrao_do_contrato_e_o_null` fixava o contrato no `NullCatalogAiProvider`; um provider real precisaria quebrá-lo e exigir revisão arquitetural explícita | **`[x]` resolvida e superada** pelo desenho da **CAT-10A** (`10fe2bf`): o binding não é mais o `Null` direto — o contrato resolve pelo `CatalogAiProviderSelector`, o `Null` continua fallback e o `Fake` nunca entra em runtime; a trava foi revista para prender esse caminho (D-CAT-10A-2) |
 | **H-12** (CAT-06H) | Captura ampla de `Throwable` no motor interno de `GenerateListingSuggestion::completar()`: defeito de programação pode virar `InternalIntelligenceFailed` que convida a repetir, e a mensagem de exceção que não seja `QueryException` vai para o log; sem teste de `TypeError`/`Error` no motor, de propósito | Dívida histórica e risco latente de observabilidade/privacidade — em aberto, sem fase; exige decisão explícita futura |
 | — (CAT-05G · CAT-09) | Custo de consultas em hierarquias profundas de categoria: a subida do `ListingContext` custa 1 consulta por ancestral não carregado — em `deProduct()` sem `with('category.parent')` e, no `ProdutoForm` da CAT-09, a cada nível acima dos dois que o `with('parent')` cobre. Observação, não dívida | Observação técnica separada, sem fase — não otimizada na CAT-09 (decisão do operador) |
 
@@ -1269,14 +1390,20 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 ## 18. Próximas fases
 
 A **CAT-09** foi concluída e publicada em `1efe1b6`; a homologação visual dela em navegador
-segue pendente ([§14](#cat-09--implantação-do-assistente-no-catálogo-x)).
+segue pendente ([§14](#cat-09--implantação-do-assistente-no-catálogo-x)). A **CAT-10A** foi
+concluída e publicada em `10fe2bf` ([§14](#cat-10a--primeiro-provider-real-x)).
 
-Ordem recomendada, sem prejuízo de decisão de produto:
+Ordem decidida pelo operador (2026-09-14):
 
-1. **CAT-08 — interface administrativa**: fecha G-1 e destrava P-1 e D-4. A CAT-05H
-   registrou que ela pode ser mais útil que a CAT-07; a ordem entre 07 e 08 é
-   decisão de produto.
-2. CAT-07 → CAT-10 → CAT-11.
+1. **CAT-10A — primeiro provider real (OpenAI)** — `[x]` concluída.
+2. **Homologação real** do assistente com o provider ligado, em ambiente controlado —
+   pendente. **Não é fase nova.**
+3. **CAT-10B — observabilidade, custo e segurança ampliados.** Vem antes da CAT-08 porque a
+   B-6 continua impedindo a ativação ampla em produção sem observabilidade, custo e rate
+   limit mínimos; inclui a revisão ampliada de privacidade e governança.
+4. **CAT-08 — interface administrativa**: fecha G-1 e destrava P-1 e D-4.
+5. **CAT-07 — feedback humano e memória.**
+6. **CAT-11 — hardening e revisão final.**
 
 Fora da Catalog Intelligence, sem ordem definida:
 
@@ -1313,7 +1440,8 @@ O detalhe de cada fase está no Git. Marcos de suíte (`passed · assertions`):
 | Fim da CAT-06F (`f7b39c2`) | 1243 · 5233 |
 | Fim da CAT-06G (`5a667b4`) | 1289 · 5603 |
 | Fim da CAT-06 (`dc217cf`) | 1294 · 5874 |
-| **Fim da CAT-09 (`1efe1b6`)** | **1327 · 6053** |
+| Fim da CAT-09 (`1efe1b6`) | 1327 · 6053 |
+| **Fim da CAT-10A** (implementação antes do ajuste textual final contido em `10fe2bf`) | **1411 · 8617** — sobre o conteúdo final de `10fe2bf` rodaram só dirigidos 85 · 2579 e Catalog Intelligence 442 · 5581 (exceção deliberada, §14) |
 
 Critério permanente: nenhuma fase é concluída com teste vermelho, e o número de
 testes nunca cai sem justificativa escrita.

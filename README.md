@@ -189,6 +189,8 @@ mudar o padrão.
 | `CI_CONSENT_COOKIE_MINUTES` | `525600` | Validade da escolha de privacidade (12 meses) |
 | `CI_VISITOR_COOKIE_*` · `CI_SESSION_COOKIE_*` | `jmf_ci_*`, 2 anos / 30 min | Nomes e validade dos cookies de coleta |
 | `CATALOG_AI_MINIMUM_GAPS` | `3` | Limiar de lacunas da `SuggestionPolicy` (Catalog Intelligence) |
+| `CATALOG_AI_ENABLED` | `false` | Liga o provider externo da Catalog Intelligence — ver [abaixo](#catalog-intelligence-provider-externo) |
+| `CATALOG_AI_PROVIDER` · `_MODEL` · `_API_KEY` · `_TIMEOUT` | vazio (o `.env.example` traz `openai`) · vazio · vazio · `8` | Provider (só `openai`), modelo, chave e prazo total em segundos, limitado a 8 |
 | `HOME_EXPOSITORES_COUNT` · `HOME_FEATURED_MAX` · `HOME_CACHE_TTL_MINUTES` | `9` · `2` · `5` | Vitrine de expositores na home |
 | `MELHOR_ENVIO_BASE_URL` · `_TOKEN` · `_ENVIRONMENT` · `_TIMEOUT` | sandbox · vazio · `sandbox` · `20` | Fallback do Melhor Envio |
 | `FRENET_TOKEN` · `FRENET_TIMEOUT` | vazio · `20` | Fallback da Frenet |
@@ -210,6 +212,33 @@ inicia.
   `/admin/melhor-envio/conectar`.
 - **Frenet:** provedor alternativo de cotação, escolhido em `frete_provedor`.
 - **SMTP:** configurável em `/admin/settings/mail`; no desenvolvimento, Mailpit.
+
+### Catalog Intelligence: provider externo
+
+**Desligado por padrão.** Sem ele, o assistente do cadastro de produtos usa só a
+inteligência interna — é o estado normal, não uma falha. Não há tela no painel: a
+configuração é só pelo `.env`.
+
+```dotenv
+CATALOG_AI_ENABLED=false
+CATALOG_AI_PROVIDER=openai
+CATALOG_AI_MODEL=
+CATALOG_AI_API_KEY=
+CATALOG_AI_TIMEOUT=8
+```
+
+- Para homologar: `CATALOG_AI_ENABLED=true`, com modelo e chave preenchidos. O
+  projeto não fixa modelo; use o definido para a homologação.
+- **A chave nunca é versionada** — fica só no `.env` do ambiente.
+- Sem chave, sem modelo, com provider diferente de `openai` ou prazo inválido, a
+  aplicação segue só com a inteligência interna, sem erro.
+- `CATALOG_AI_TIMEOUT` é o prazo total em segundos; acima de 8, vale 8. Não há
+  nova tentativa.
+- Com configuração em cache, a mudança no `.env` só vale depois de recarregar:
+  `docker compose exec app php artisan optimize:clear` no desenvolvimento, ou
+  `php artisan config:cache` de novo no deploy.
+- A ativação ampla em produção depende da CAT-10B (custo, rate limit e
+  observabilidade) — bloqueador **B-6** no [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
