@@ -6,15 +6,17 @@ use App\CatalogIntelligence\Contracts\CatalogAiProvider;
 use App\CatalogIntelligence\Providers\NullCatalogAiProvider;
 
 /**
- * Quem responde por `CatalogAiProvider` neste ambiente — CAT-10A.
+ * Quem responde por `CatalogAiProvider` neste ambiente — CAT-10A, revisto na CAT-10A.1.
  *
- * Lê `config('services.catalog_ai')` a cada resolução e devolve o adaptador real só
- * quando tudo o que ele precisa está presente e é válido. Nas condições previstas
- * abaixo devolve o `NullCatalogAiProvider`, e o assistente segue com
- * `ProviderUnavailable` — o estado normal de operar sem IA externa (D-CAT-06B-5).
+ * Lê a configuração que o painel gravou, por `CatalogAiSettings`, a cada resolução, e
+ * devolve o adaptador real só quando tudo o que ele precisa está presente e é válido.
+ * Nas condições previstas abaixo devolve o `NullCatalogAiProvider`, e o assistente segue
+ * com `ProviderUnavailable` — o estado normal de operar sem IA externa (D-CAT-06B-5).
  *
  * | Condição | Resultado |
  * |---|---|
+ * | trava técnica `CATALOG_AI_FORCE_DISABLED` ligada | `Null`, sem ler o banco |
+ * | nada gravado | `Null` |
  * | `enabled` não é verdadeiro | `Null` |
  * | `provider` não é `openai` | `Null` |
  * | `api_key` ou `model` ausente ou em branco | `Null` |
@@ -22,18 +24,24 @@ use App\CatalogIntelligence\Providers\NullCatalogAiProvider;
  * | `timeout` ausente | 8 s |
  * | `timeout` acima de 8 | limitado a 8 s (B-5) |
  *
+ * ## A trava técnica só desliga
+ *
+ * `services.catalog_ai.force_disabled` (`CATALOG_AI_FORCE_DISABLED`) é a única coisa que
+ * o ambiente ainda decide: impede chamadas externas, e nunca liga o provider nem fornece
+ * provider, modelo, chave ou prazo. Qualquer valor que não seja claramente falso conta
+ * como ligado — na dúvida, desliga. O `phpunit.xml` a força.
+ *
  * ## Não captura nada
  *
  * As condições são **verificadas**, não descobertas por exceção. Não há `try` nesta
- * classe: um defeito — `TypeError`, `Error`, `RuntimeException` de quem for
- * construído — sobe como defeito, e não vira "sem provider" em silêncio. Um teste
- * trava a ausência de `try` e `catch` neste arquivo.
+ * classe: um defeito — `TypeError`, `Error`, `RuntimeException` de quem for construído,
+ * `DecryptException` da chave gravada — sobe como defeito, e não vira "sem provider" em
+ * silêncio. Um teste trava a ausência de `try` e `catch` neste arquivo.
  *
  * ## Sem log
  *
- * Configuração inválida não registra nada: a tela do lojista já diz que a sugestão
- * saiu só com a inteligência interna, e registrar a cada resolução seria ruído
- * perto da chave.
+ * Configuração inválida não registra nada: a tela do lojista já diz que a sugestão saiu
+ * só com a inteligência interna, e registrar a cada resolução seria ruído perto da chave.
  */
 final class CatalogAiProviderSelector
 {
@@ -43,10 +51,17 @@ final class CatalogAiProviderSelector
     /** O único provider real suportado nesta fase. */
     private const PROVIDER_SUPORTADO = 'openai';
 
+    public function __construct(
+        private readonly CatalogAiSettings $settings,
+    ) {}
+
     public function resolve(): CatalogAiProvider
     {
-        $config = config('services.catalog_ai');
-        $config = is_array($config) ? $config : [];
+        if ($this->travadoPeloAmbiente()) {
+            return new NullCatalogAiProvider;
+        }
+
+        $config = $this->settings->atual();
 
         $chave = $this->texto($config['api_key'] ?? null);
         $modelo = $this->texto($config['model'] ?? null);
@@ -61,6 +76,14 @@ final class CatalogAiProviderSelector
         }
 
         return new OpenAiCatalogAiProvider($chave, $modelo, $prazo);
+    }
+
+    /** Só o claramente falso deixa passar; ausente vale o padrão `false`. */
+    private function travadoPeloAmbiente(): bool
+    {
+        $trava = config('services.catalog_ai.force_disabled', false);
+
+        return filter_var($trava, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) !== false;
     }
 
     /** Só o verdadeiro liga: `true`, `"true"`, `"1"`, `"on"`. Ausente ou ambíguo, não. */

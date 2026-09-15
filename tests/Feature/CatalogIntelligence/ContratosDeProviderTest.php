@@ -12,6 +12,7 @@ use App\CatalogIntelligence\Providers\FakeCatalogAiProvider;
 use App\CatalogIntelligence\Providers\NullCatalogAiProvider;
 use App\CatalogIntelligence\Support\PromptGuard;
 use App\Enums\ItemType;
+use App\Services\CatalogAi\CatalogAiSettings;
 use App\Services\CatalogAi\OpenAiCatalogAiProvider;
 use Tests\TestCase;
 
@@ -474,13 +475,22 @@ class ContratosDeProviderTest extends TestCase
             );
         }
 
-        config()->set('services.catalog_ai', [
-            'enabled' => true,
-            'provider' => 'openai',
-            'model' => 'modelo-de-teste',
-            'api_key' => 'chave-de-teste-que-nao-vale-nada',
-            'timeout' => 8,
-        ]);
+        // CAT-10A.1: a configuração é a que o painel grava, lida por `CatalogAiSettings`,
+        // e a trava técnica que o phpunit.xml força precisa ser desligada de propósito.
+        config()->set('services.catalog_ai.force_disabled', false);
+        $this->app->instance(CatalogAiSettings::class, new class extends CatalogAiSettings
+        {
+            public function atual(): array
+            {
+                return [
+                    'enabled' => true,
+                    'provider' => 'openai',
+                    'model' => 'modelo-de-teste',
+                    'api_key' => 'chave-de-teste-que-nao-vale-nada',
+                    'timeout' => 8,
+                ];
+            }
+        });
 
         $real = app(CatalogAiProvider::class);
 

@@ -36,18 +36,16 @@ return [
     ],
 
     /*
-    | Catalog Intelligence — provider externo (CAT-10A). Desligado por padrão.
+    | Catalog Intelligence — trava técnica do provider externo (CAT-10A.1).
     |
-    | Lido por App\Services\CatalogAi\CatalogAiProviderSelector: valor ausente ou
-    | inválido resolve o contrato para o NullCatalogAiProvider. O prazo nunca passa
-    | de 8 segundos. A chave nunca é versionada.
+    | A configuração operacional do provider (ligado, provider, modelo, chave e
+    | prazo) é do banco, gravada pelo painel em Admin → Configurações →
+    | Inteligência Artificial, e lida por App\Services\CatalogAi\CatalogAiSettings.
+    | Daqui só sai a trava: verdadeira, nenhuma chamada externa acontece, seja
+    | qual for o banco. Ela nunca liga o provider. O phpunit.xml a força.
     */
     'catalog_ai' => [
-        'enabled' => env('CATALOG_AI_ENABLED', false),
-        'provider' => env('CATALOG_AI_PROVIDER'),
-        'model' => env('CATALOG_AI_MODEL'),
-        'api_key' => env('CATALOG_AI_API_KEY'),
-        'timeout' => env('CATALOG_AI_TIMEOUT', 8),
+        'force_disabled' => env('CATALOG_AI_FORCE_DISABLED', false),
     ],
 
 ];

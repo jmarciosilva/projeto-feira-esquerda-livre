@@ -17,6 +17,7 @@ use App\CatalogIntelligence\Support\GuardedPromptRedactor;
 use App\CatalogIntelligence\Support\PromptGuard;
 use App\CatalogIntelligence\Support\ProviderResponseValidator;
 use App\Enums\ItemType;
+use App\Services\CatalogAi\CatalogAiSettings;
 use App\Services\CatalogAi\OpenAiCatalogAiProvider;
 use Error;
 use GuzzleHttp\Exception\ConnectException;
@@ -191,15 +192,18 @@ class AdaptadorOpenAiTest extends TestCase
         return $registradas->first()[0]->data();
     }
 
+    /** Liga o provider como o painel liga — gravado no banco (CAT-10A.1) —, com a trava técnica do phpunit.xml desligada de propósito. */
     private function ligarNoContainer(): void
     {
-        config()->set('services.catalog_ai', [
-            'enabled' => true,
-            'provider' => 'openai',
-            'model' => self::MODELO,
-            'api_key' => self::CHAVE,
-            'timeout' => 8,
-        ]);
+        config()->set('services.catalog_ai.force_disabled', false);
+
+        app(CatalogAiSettings::class)->salvar(
+            ativo: true,
+            provider: 'openai',
+            modelo: self::MODELO,
+            timeout: 8,
+            novaChave: self::CHAVE,
+        );
     }
 
     /** @return array{0: ListingSuggestion, 1: ListingContext, 2: ListingOutcome} */

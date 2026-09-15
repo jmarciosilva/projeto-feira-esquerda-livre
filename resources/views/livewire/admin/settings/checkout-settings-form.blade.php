@@ -103,10 +103,21 @@
                         <x-admin.input
                             label="Client Secret"
                             type="password"
+                            autocomplete="new-password"
                             wire:model="melhor_envio_client_secret"
-                            placeholder="{{ $melhor_envio_client_secret ? '************' : '' }}"
+                            placeholder="{{ $melhor_envio_client_secret_configurado ? 'Configurado - digite para substituir' : '' }}"
                             :error="$errors->first('melhor_envio_client_secret')"
                         />
+                        @if($melhor_envio_client_secret_configurado)
+                        <div class="-mt-2 flex items-center justify-between gap-3 text-xs">
+                            <span class="text-green-800"><strong>Client Secret configurado.</strong> Deixe em branco para manter.</span>
+                            <button type="button" wire:click="removerMelhorEnvioClientSecret"
+                                    wire:confirm="Remover o Client Secret? O Melhor Envio sera desativado."
+                                    class="font-semibold text-red-700 hover:text-red-900 whitespace-nowrap">
+                                Remover Client Secret
+                            </button>
+                        </div>
+                        @endif
 
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" wire:model="melhor_envio_sandbox" class="w-4 h-4 text-[#52b788] rounded border-gray-300">
@@ -128,8 +139,10 @@
                                 <x-admin.input
                                     label="Access Token"
                                     type="password"
+                                    autocomplete="new-password"
                                     wire:model="melhor_envio_token"
-                                    placeholder="{{ $melhor_envio_token ? '************' : '' }}"
+                                    placeholder="{{ $melhor_envio_connected ? 'Configurado - digite para substituir' : '' }}"
+                                    :hint="$melhor_envio_connected ? 'Deixe em branco para manter o token atual. Para remover, use Desconectar.' : null"
                                     :error="$errors->first('melhor_envio_token')"
                                 />
                             </div>
@@ -151,11 +164,22 @@
                         <x-admin.input
                             label="Token"
                             type="password"
+                            autocomplete="new-password"
                             wire:model="frenet_token"
-                            placeholder="{{ $frenet_token ? '************' : '' }}"
+                            placeholder="{{ $frenet_token_configurado ? 'Configurado - digite para substituir' : '' }}"
                             hint="Painel Frenet → icone de usuario → Dados Cadastrais → Token."
                             :error="$errors->first('frenet_token')"
                         />
+                        @if($frenet_token_configurado)
+                        <div class="-mt-2 flex items-center justify-between gap-3 text-xs">
+                            <span class="text-green-800"><strong>Token configurado.</strong> Deixe em branco para manter.</span>
+                            <button type="button" wire:click="removerFrenetToken"
+                                    wire:confirm="Remover o token da Frenet? A Frenet sera desativada."
+                                    class="font-semibold text-red-700 hover:text-red-900 whitespace-nowrap">
+                                Remover token
+                            </button>
+                        </div>
+                        @endif
                     </div>
                 </x-admin.card>
 
@@ -199,10 +223,21 @@
                         <x-admin.input
                             label="Access Token"
                             type="password"
+                            autocomplete="new-password"
                             wire:model="mercado_pago_access_token"
-                            placeholder="{{ $mercado_pago_access_token ? '************' : '' }}"
+                            placeholder="{{ $mercado_pago_access_token_configurado ? 'Configurado - digite para substituir' : '' }}"
                             :error="$errors->first('mercado_pago_access_token')"
                         />
+                        @if($mercado_pago_access_token_configurado)
+                        <div class="-mt-2 flex items-center justify-between gap-3 text-xs">
+                            <span class="text-green-800"><strong>Access Token configurado.</strong> Deixe em branco para manter.</span>
+                            <button type="button" wire:click="removerMercadoPagoAccessToken"
+                                    wire:confirm="Remover o Access Token do Mercado Pago? O Mercado Pago sera desativado."
+                                    class="font-semibold text-red-700 hover:text-red-900 whitespace-nowrap">
+                                Remover token
+                            </button>
+                        </div>
+                        @endif
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" wire:model="mercado_pago_sandbox" class="w-4 h-4 text-[#52b788] rounded border-gray-300">
                             <span class="text-sm text-gray-700">Usar ambiente de testes (sandbox)</span>

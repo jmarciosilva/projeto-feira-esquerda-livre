@@ -33,8 +33,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
-        <!-- CAT-10A: a suíte nunca chama o provider externo, mesmo com chave real no ambiente. -->
-        <env name="CATALOG_AI_ENABLED" value="false" force="true"/>
-        <env name="CATALOG_AI_API_KEY" value="" force="true"/>
+        <!-- CAT-10A.1: a suíte nunca chama o provider externo, seja qual for a configuração gravada. -->
+        <env name="CATALOG_AI_FORCE_DISABLED" value="true" force="true"/>
     </php>
 </phpunit>

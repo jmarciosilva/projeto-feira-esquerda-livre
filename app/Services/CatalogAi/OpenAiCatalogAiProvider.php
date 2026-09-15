@@ -69,7 +69,9 @@ use JsonException;
  *
  * ## Nada é gravado nem registrado
  *
- * Nem prompt, nem resposta, nem chave: esta classe não escreve log nem banco.
+ * Nem prompt, nem resposta, nem chave: esta classe não escreve log nem banco. A chave
+ * também não aparece em stack trace: o parâmetro do construtor é `#[\SensitiveParameter]`
+ * (CAT-10A.1).
  */
 final class OpenAiCatalogAiProvider implements CatalogAiProvider
 {
@@ -87,7 +89,7 @@ final class OpenAiCatalogAiProvider implements CatalogAiProvider
     private const CAMPOS_DE_TEXTO = ['suggested_name', 'short_description', 'description'];
 
     public function __construct(
-        private readonly string $chave,
+        #[\SensitiveParameter] private readonly string $chave,
         private readonly string $modelo,
         private readonly float $prazo,
     ) {}

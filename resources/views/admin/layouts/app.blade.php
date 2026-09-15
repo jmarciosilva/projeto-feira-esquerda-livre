@@ -59,6 +59,12 @@
 
             @endcan
 
+            @can('configuracoes.editar')
+            <x-admin.nav-item href="{{ route('admin.settings.catalog-ai') }}" icon="cog" :active="request()->routeIs('admin.settings.catalog-ai')">
+                Inteligência Artificial
+            </x-admin.nav-item>
+            @endcan
+
             @can('cms.visualizar')
             <x-admin.nav-item href="{{ route('admin.pages.index') }}" icon="document" :active="request()->routeIs('admin.pages.*')">
                 Páginas

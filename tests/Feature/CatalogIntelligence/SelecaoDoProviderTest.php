@@ -10,6 +10,7 @@ use App\CatalogIntelligence\Providers\NullCatalogAiProvider;
 use App\CatalogIntelligence\Support\PromptGuard;
 use App\Enums\ItemType;
 use App\Services\CatalogAi\CatalogAiProviderSelector;
+use App\Services\CatalogAi\CatalogAiSettings;
 use App\Services\CatalogAi\OpenAiCatalogAiProvider;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -18,12 +19,17 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * CAT-10A — de onde vem o provider: configuração, seletor e binding.
+ * CAT-10A — de onde vem o provider: configuração, seletor e binding. Revisto na CAT-10A.1.
  *
  * O `CatalogAiProviderSelector` devolve o adaptador real só com configuração
- * completa e válida, e o `Null` nas condições previstas: recurso desligado,
- * provider não suportado, chave ou modelo ausentes, prazo inválido. Um prazo acima
- * de 8 s é limitado a 8 s.
+ * completa e válida, e o `Null` nas condições previstas: trava técnica ligada, nada
+ * gravado, recurso desligado, provider não suportado, chave ou modelo ausentes,
+ * prazo inválido. Um prazo acima de 8 s é limitado a 8 s.
+ *
+ * Desde a CAT-10A.1 a configuração é a que o painel grava, lida por
+ * `CatalogAiSettings`. Aqui ela é substituída por um dublê que devolve qualquer
+ * valor — inclusive os que a coluna tipada não guarda —, para exercitar o seletor
+ * sozinho. A leitura do banco e a tela estão em `ConfiguracaoDoProviderNoPainelTest`.
  *
  * O que não é condição prevista não é tratado: o seletor não tem `try`, e um defeito
  * na resolução sobe.
@@ -33,11 +39,19 @@ use Tests\TestCase;
  */
 class SelecaoDoProviderTest extends TestCase
 {
+    /** A trava técnica como o `phpunit.xml` a entrega, antes de o teste desligá-la. */
+    private mixed $travaDoPhpunit;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         Http::preventStrayRequests();
+
+        $this->travaDoPhpunit = config('services.catalog_ai.force_disabled');
+
+        // O seletor só é exercitável com a trava desligada de propósito.
+        config()->set('services.catalog_ai.force_disabled', false);
     }
 
     /**
@@ -55,10 +69,38 @@ class SelecaoDoProviderTest extends TestCase
         ], $troca);
     }
 
-    /** @param  array<string, mixed>|null  $config */
+    /**
+     * O que `CatalogAiSettings` devolveria; nulo é "nada gravado".
+     *
+     * @param  array<string, mixed>|null  $config
+     */
     private function configurar(?array $config): void
     {
-        config()->set('services.catalog_ai', $config);
+        $this->app->instance(CatalogAiSettings::class, new class($config) extends CatalogAiSettings
+        {
+            /** @param  array<string, mixed>|null  $config */
+            public function __construct(private readonly ?array $config)
+            {
+                parent::__construct();
+            }
+
+            public function atual(): array
+            {
+                return $this->config ?? [];
+            }
+        });
+    }
+
+    /** Uma configuração que não pode ser lida: qualquer leitura é defeito. */
+    private function configuracaoQueFalhaAoSerLida(): void
+    {
+        $this->app->instance(CatalogAiSettings::class, new class extends CatalogAiSettings
+        {
+            public function atual(): array
+            {
+                throw new RuntimeException('defeito de leitura da configuração');
+            }
+        });
     }
 
     private function selecionar(): CatalogAiProvider
@@ -96,17 +138,72 @@ class SelecaoDoProviderTest extends TestCase
         return [$opcoes['timeout'] ?? null, $opcoes['connect_timeout'] ?? null];
     }
 
-    // ─── Sem configuração, e com configuração válida ──────────────────────────
+    // ─── A trava técnica ──────────────────────────────────────────────────────
 
-    /** O `phpunit.xml` desliga o recurso e apaga a chave: a suíte nunca fala com fora. */
-    public function test_sem_configuracao_o_contrato_e_o_null_e_a_suite_esta_isolada(): void
+    /** O `phpunit.xml` força a trava: sem desligá-la de propósito, a suíte nunca fala com fora, nem com configuração válida. */
+    public function test_a_trava_do_phpunit_isola_a_suite_mesmo_com_configuracao_valida(): void
     {
-        $this->assertFalse(filter_var(config('services.catalog_ai.enabled'), FILTER_VALIDATE_BOOL), 'o phpunit.xml precisa manter o recurso desligado');
-        $this->assertEmpty(config('services.catalog_ai.api_key'), 'o phpunit.xml precisa apagar qualquer chave vinda do ambiente');
+        $this->assertTrue(filter_var($this->travaDoPhpunit, FILTER_VALIDATE_BOOL), 'o phpunit.xml precisa forçar CATALOG_AI_FORCE_DISABLED=true');
+
+        $this->configurar($this->configValida());
+        config()->set('services.catalog_ai.force_disabled', $this->travaDoPhpunit);
 
         $this->assertInstanceOf(NullCatalogAiProvider::class, $this->selecionar());
         $this->assertInstanceOf(NullCatalogAiProvider::class, app(CatalogAiProvider::class));
     }
+
+    /** @return array<string, array{0: mixed}> */
+    public static function travasQueDesligam(): array
+    {
+        return [
+            'verdadeira' => [true],
+            'texto verdadeiro' => ['true'],
+            'um' => ['1'],
+            'ambígua' => ['talvez'],
+        ];
+    }
+
+    /** Na dúvida, a trava desliga. */
+    #[DataProvider('travasQueDesligam')]
+    public function test_a_trava_ligada_resolve_o_null_mesmo_com_configuracao_valida(mixed $trava): void
+    {
+        $this->configurar($this->configValida());
+        config()->set('services.catalog_ai.force_disabled', $trava);
+
+        $this->assertInstanceOf(NullCatalogAiProvider::class, $this->selecionar());
+        $this->assertInstanceOf(NullCatalogAiProvider::class, app(CatalogAiProvider::class));
+    }
+
+    /** @return array<string, array{0: mixed}> */
+    public static function travasQueDeixamPassar(): array
+    {
+        return [
+            'falsa' => [false],
+            'texto falso' => ['false'],
+            'zero' => ['0'],
+            'ausente' => [null],
+        ];
+    }
+
+    /** A trava só desliga: desligada, quem decide é a configuração gravada. */
+    #[DataProvider('travasQueDeixamPassar')]
+    public function test_a_trava_desligada_deixa_a_configuracao_decidir(mixed $trava): void
+    {
+        $this->configurar($this->configValida());
+        config()->set('services.catalog_ai.force_disabled', $trava);
+
+        $this->assertInstanceOf(OpenAiCatalogAiProvider::class, $this->selecionar());
+    }
+
+    public function test_com_a_trava_ligada_a_configuracao_nem_e_lida(): void
+    {
+        $this->configuracaoQueFalhaAoSerLida();
+        config()->set('services.catalog_ai.force_disabled', true);
+
+        $this->assertInstanceOf(NullCatalogAiProvider::class, $this->selecionar());
+    }
+
+    // ─── Sem configuração, e com configuração válida ──────────────────────────
 
     public function test_configuracao_valida_resolve_o_adaptador_real_pelo_container(): void
     {
@@ -120,8 +217,8 @@ class SelecaoDoProviderTest extends TestCase
         $this->assertInstanceOf(OpenAiCatalogAiProvider::class, $this->selecionar());
     }
 
-    /** Sem `singleton`: o config lido é o do momento da resolução. */
-    public function test_a_resolucao_acompanha_o_config_do_momento(): void
+    /** Sem `singleton`: a configuração lida é a do momento da resolução. */
+    public function test_a_resolucao_acompanha_a_configuracao_do_momento(): void
     {
         $this->configurar($this->configValida());
         $this->assertInstanceOf(OpenAiCatalogAiProvider::class, app(CatalogAiProvider::class));
@@ -135,6 +232,20 @@ class SelecaoDoProviderTest extends TestCase
         $this->configurar($this->configValida(['provider' => ' OpenAI ']));
 
         $this->assertInstanceOf(OpenAiCatalogAiProvider::class, $this->selecionar());
+    }
+
+    /** As chaves operacionais que o `config/services.php` tinha na CAT-10A não decidem mais nada. */
+    public function test_as_chaves_antigas_do_config_nao_participam_da_resolucao(): void
+    {
+        config()->set('services.catalog_ai', ['force_disabled' => false] + $this->configValida());
+        $this->configurar(null);
+
+        $this->assertInstanceOf(NullCatalogAiProvider::class, $this->selecionar(), 'o config antigo não liga');
+
+        config()->set('services.catalog_ai', ['force_disabled' => false, 'enabled' => false, 'api_key' => null]);
+        $this->configurar($this->configValida());
+
+        $this->assertInstanceOf(OpenAiCatalogAiProvider::class, $this->selecionar(), 'nem desliga');
     }
 
     // ─── As condições previstas resolvem o Null ───────────────────────────────
@@ -174,7 +285,7 @@ class SelecaoDoProviderTest extends TestCase
         $this->assertInstanceOf(NullCatalogAiProvider::class, app(CatalogAiProvider::class));
     }
 
-    public function test_bloco_de_config_ausente_resolve_o_null(): void
+    public function test_sem_configuracao_gravada_resolve_o_null(): void
     {
         $this->configurar(null);
 
@@ -209,11 +320,12 @@ class SelecaoDoProviderTest extends TestCase
 
     // ─── Defeito não vira "sem provider" ──────────────────────────────────────
 
-    /** Nenhum `try`, `catch` ou `finally` no seletor nem no ServiceProvider do módulo. */
-    public function test_o_seletor_e_o_binding_nao_capturam_nada(): void
+    /** Nenhum `try`, `catch` ou `finally` no seletor, na leitura da configuração nem no ServiceProvider do módulo. */
+    public function test_o_seletor_a_configuracao_e_o_binding_nao_capturam_nada(): void
     {
         $arquivos = [
             (new ReflectionClass(CatalogAiProviderSelector::class))->getFileName(),
+            (new ReflectionClass(CatalogAiSettings::class))->getFileName(),
             (new ReflectionClass(CatalogIntelligenceServiceProvider::class))->getFileName(),
         ];
 
@@ -237,10 +349,20 @@ class SelecaoDoProviderTest extends TestCase
         app(CatalogAiProvider::class);
     }
 
-    /** O fornecedor, o transporte e a credencial moram fora do módulo — o domínio segue sem saber quem responde. */
-    public function test_o_adaptador_e_o_seletor_moram_fora_do_modulo(): void
+    public function test_defeito_na_leitura_da_configuracao_sobe_e_nao_vira_null(): void
     {
-        foreach ([OpenAiCatalogAiProvider::class, CatalogAiProviderSelector::class] as $classe) {
+        $this->configuracaoQueFalhaAoSerLida();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('defeito de leitura da configuração');
+
+        app(CatalogAiProvider::class);
+    }
+
+    /** O fornecedor, o transporte, a credencial e a configuração moram fora do módulo — o domínio segue sem saber quem responde. */
+    public function test_o_adaptador_o_seletor_e_a_configuracao_moram_fora_do_modulo(): void
+    {
+        foreach ([OpenAiCatalogAiProvider::class, CatalogAiProviderSelector::class, CatalogAiSettings::class] as $classe) {
             $this->assertStringNotContainsString(
                 app_path('CatalogIntelligence'),
                 (string) (new ReflectionClass($classe))->getFileName(),

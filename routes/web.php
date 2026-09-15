@@ -37,6 +37,7 @@ use App\Livewire\Admin\Pedidos\PedidoIndex as AdminPedidoIndex;
 use App\Livewire\Admin\Permissoes\PerfilAcessoIndex;
 use App\Livewire\Admin\Posts\PostForm;
 use App\Livewire\Admin\Posts\PostIndex;
+use App\Livewire\Admin\Settings\CatalogAiSettingsForm;
 use App\Livewire\Admin\Settings\CheckoutSettingsForm;
 use App\Livewire\Admin\Settings\MailSettingsForm;
 use App\Livewire\Admin\Settings\SettingsForm;
@@ -505,6 +506,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/settings', SettingsForm::class)->name('settings.edit');
         Route::get('/settings/mail', MailSettingsForm::class)->name('settings.mail');
         Route::get('/settings/checkout', CheckoutSettingsForm::class)->name('settings.checkout');
+    });
+
+    // CAT-10A.1: a configuração do provider externo é mais restrita que as demais —
+    // até para ver a tela é preciso poder editar configurações.
+    Route::middleware('can:configuracoes.editar')->group(function () {
+        Route::get('/settings/inteligencia-artificial', CatalogAiSettingsForm::class)->name('settings.catalog-ai');
     });
 
     Route::middleware('can:configuracoes.editar')->prefix('melhor-envio')->name('melhor-envio.')->group(function () {
