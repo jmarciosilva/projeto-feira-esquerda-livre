@@ -74,14 +74,15 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 
 | | |
 |---|---|
-| **Fase atual** | Nenhuma fase em andamento. A **CAT-10A — Primeiro provider real** está concluída e publicada (commit técnico `10fe2bf`). A **homologação real** com o provider ligado está pendente e **não é fase nova**. A homologação visual da **CAT-09** em navegador também segue pendente |
-| **Última fase concluída** | **CAT-10A** — primeiro provider real, **OpenAI**, atrás de `CatalogAiProvider`: adaptador fora do módulo, em `app/Services/CatalogAi`, selecionado pelo `CatalogAiProviderSelector`, com o `NullCatalogAiProvider` como fallback; recurso desligado por padrão |
-| **Última fase com commit** | **CAT-10A** — commit técnico `10fe2bf` |
-| **Próxima implementação** | **Homologação real** do assistente com o provider ligado, em ambiente controlado — não é fase. Depois, **CAT-10B** — observabilidade, custo e segurança ampliados, não iniciada ([§18](#18-próximas-fases)) |
-| **Último commit técnico publicado** | `10fe2bf` (`10fe2bfbb88132215d90644703b7c1e86c7f3a82`) — `feat: integra primeiro provider real ao Catalog Intelligence` |
-| **Último commit documental publicado** | `a3f5a2d` (`a3f5a2df38ef192dce81ff5d7fa90851c8cf36b2`) — `docs: conclui a CAT-09` |
-| **Última suíte completa** | **1411 passed · 8617 assertions · 0 failures** (2026-09-14, na CAT-10A), executada **antes do ajuste textual final da regra 1** da instrução do adaptador; depois do ajuste rodaram os testes dirigidos e o Catalog Intelligence completos. A anterior era 1327 · 6053, sobre `1efe1b6` |
+| **Fase atual** | Nenhuma fase em andamento. A **CAT-10A.1 — Configuração administrativa do Catalog Intelligence** está tecnicamente concluída e publicada (commit técnico `50498cf`), complementando a **CAT-10A — Primeiro provider real** (`10fe2bf`). A **homologação real** do provider, com chamadas à OpenAI, está pendente e **não é fase nova**. A homologação visual da **CAT-09** em navegador também segue pendente |
+| **Última fase concluída** | **CAT-10A.1** — a configuração operacional do provider externo saiu do `.env` para o painel (**Admin → Configurações → Inteligência Artificial**) e o banco; `CATALOG_AI_FORCE_DISABLED` ficou só como trava técnica de desligamento; credenciais gravadas deixaram de ir ao navegador; recurso desligado por padrão. Complementa a **CAT-10A** — primeiro provider real, **OpenAI** (Responses API), atrás de `CatalogAiProvider`, fora do módulo, com o `NullCatalogAiProvider` como fallback |
+| **Última fase com commit** | **CAT-10A.1** — commit técnico `50498cf` |
+| **Próxima implementação** | **Homologação real** do assistente com o provider configurado e ativado pelo painel, em ambiente controlado — não é fase ([§14](#cat-10a1--configuração-administrativa-do-catalog-intelligence-x)). Depois, **CAT-10B** — observabilidade, custo e segurança ampliados, não iniciada ([§18](#18-próximas-fases)) |
+| **Último commit técnico publicado** | `50498cf` (`50498cf61bee7bff6796a338593b6df90df5bf15`) — `feat: adiciona configuração administrativa ao Catalog Intelligence` |
+| **Último commit documental publicado** | `b0bc375` (`b0bc375781007e9fc919c4a124bf53523744223f`) — `docs: conclui documentalmente a CAT-10A` |
+| **Última suíte completa** | **1492 passed · 9653 assertions · 0 failures** (2026-09-15, na CAT-10A.1), executada **antes do hardening isolado final do `MailSettingsForm`**; depois dele rodaram só a segurança das configurações e o Catalog Intelligence completos. A anterior era 1411 · 8617, na CAT-10A |
 | **Validação da CAT-10A** | Suíte completa **1411 · 8617 · 0** sobre a implementação **antes** do ajuste textual final da regra 1; **depois** do ajuste, dirigidos **85 passed · 2579 assertions** e Catalog Intelligence **442 passed · 5581 assertions**, sem repetir a suíte completa (dispensa explícita na revisão); homologação real **pendente**. Detalhe em [§14](#cat-10a--primeiro-provider-real-x) |
+| **Validação da CAT-10A.1** | Suíte completa **1492 · 9653 · 0** sobre a implementação **antes** do hardening isolado final do `MailSettingsForm`; **depois** dele, segurança das configurações **30 passed · 288 assertions · 0 failures** e Catalog Intelligence **493 passed · 6322 assertions · 0 failures**, **sem repetir a suíte completa**; homologação real **pendente**. Detalhe em [§14](#cat-10a1--configuração-administrativa-do-catalog-intelligence-x) |
 | **Documentação** | DOC-CONSOLIDATION-01 concluída — três documentos principais, commit `962eb5a` |
 
 > **Nota de reconciliação sobre a CAT-06D.** O roadmap anterior da trilha ainda a
@@ -105,8 +106,12 @@ Markdown que **permanecem fora dos três**, por necessidade técnica:
 
 A **CAT-09** foi concluída sem provider real. Na **CAT-10A** (`10fe2bf`), o provider real
 entrou só por configuração de ambiente, desligado por padrão, para homologação controlada;
-sem ele, o `CatalogAiProviderSelector` resolve o contrato para o `NullCatalogAiProvider`. A
-B-6 continua impedindo a ativação ampla em produção até a CAT-10B.
+sem ele, o `CatalogAiProviderSelector` resolve o contrato para o `NullCatalogAiProvider`. Na
+**CAT-10A.1** (`50498cf`), a configuração operacional saiu do `.env` para o painel e o banco:
+o recurso continua desligado por padrão, e sem configuração válida — ou com a trava técnica
+`CATALOG_AI_FORCE_DISABLED` ligada — o contrato continua resolvendo para o `Null`. A
+homologação real segue pendente, e a B-6 continua impedindo a ativação ampla em produção
+até a CAT-10B.
 
 ---
 
@@ -148,6 +153,7 @@ B-6 continua impedindo a ativação ampla em produção até a CAT-10B.
 | CAT-06 — IA externa (opcional) | `[x]` concluída — 06A → 06H, validação final na 06H-H | [§14](#14-catalog-intelligence) |
 | CAT-09 — Implantação do Assistente no Catálogo | `[x]` concluída — `1efe1b6`; homologação visual em navegador pendente | [§14](#14-catalog-intelligence) |
 | CAT-10A — Primeiro provider real (OpenAI) | `[x]` concluída — `10fe2bf`; homologação real pendente | [§14](#14-catalog-intelligence) |
+| CAT-10A.1 — Configuração administrativa do Catalog Intelligence | `[x]` concluída — `50498cf`; homologação real pendente | [§14](#14-catalog-intelligence) |
 | CAT-07 · CAT-08 · CAT-10B · CAT-11 | `[ ]` | [§14](#14-catalog-intelligence) |
 | FIN-DOM-01 — domínio financeiro (repasse, ledger) | `[ ]` não iniciada | [§18](#18-próximas-fases) |
 
@@ -482,6 +488,7 @@ salvo sem aprovação humana**; **falha da inteligência não bloqueia o cadastr
 | CAT-08 | `[ ]` | Interface administrativa da inteligência — **fecha G-1** | — |
 | CAT-09 | `[x]` | Implantação do Assistente no Catálogo — integração no cadastro e na edição do lojista (pré-visualização, aplicação explícita). Antecipada antes da CAT-07 e da CAT-08 | `1efe1b6` |
 | CAT-10A | `[x]` | Primeiro provider real — um único adaptador externo, OpenAI, atrás de `CatalogAiProvider`, com o `Null` como fallback, para homologação real. Antecipada antes da CAT-07 e da CAT-08 | `10fe2bf` |
+| CAT-10A.1 | `[x]` | Configuração administrativa do provider externo — painel e banco no lugar do `.env`, `CATALOG_AI_FORCE_DISABLED` só como trava de desligamento, credenciais gravadas fora do navegador. Complementa a CAT-10A | `50498cf` |
 | CAT-10B | `[ ]` | Observabilidade, custos e segurança ampliados com provider acoplado | — |
 | CAT-11 | `[ ]` | Hardening, testes e revisão final | — |
 
@@ -1176,14 +1183,18 @@ D-CAT-10A-1 a D-CAT-10A-7
 - `CatalogAiProviderSelector`, também fora do módulo, lê `config('services.catalog_ai')` a
   cada resolução e devolve o adaptador real só com o recurso ligado, provider `openai`,
   chave e modelo preenchidos e prazo válido; em qualquer outro caso, o
-  `NullCatalogAiProvider`. Não captura exceção nem registra log.
+  `NullCatalogAiProvider`. Não captura exceção nem registra log. **Refinado na CAT-10A.1**
+  (`50498cf`): lê a configuração gravada no banco, por `CatalogAiSettings`, e não mais
+  `config('services.catalog_ai')`.
 - A aplicação continua dependendo só de `CatalogAiProvider`: o
   `CatalogIntelligenceServiceProvider` mantém um binding só, agora resolvido pelo seletor,
   sem `singleton`.
 - **Recurso desligado por padrão.** Configuração por ambiente em `config/services.php` e
   `.env.example` — `CATALOG_AI_ENABLED` (`false`), `CATALOG_AI_PROVIDER`,
   `CATALOG_AI_MODEL`, `CATALOG_AI_API_KEY`, `CATALOG_AI_TIMEOUT` —, sem modelo fixado no
-  código e sem chave versionada. Operação em
+  código e sem chave versionada. **Superada pela CAT-10A.1** (`50498cf`): essas cinco
+  variáveis foram removidas, a configuração operacional passou ao painel e ao banco, e do
+  ambiente restou só a trava `CATALOG_AI_FORCE_DISABLED`. Operação atual em
   [`README.md`](README.md#catalog-intelligence-provider-externo).
 - **Timeout máximo de 8 s**, no prazo total e no de conexão; acima disso, limitado a 8.
   **Zero retry.**
@@ -1218,7 +1229,8 @@ D-CAT-10A-1 a D-CAT-10A-7
 `test_caracteristica_so_do_contexto_nao_e_autorizada_como_fato_do_item`),
 `SelecaoDoProviderTest` (seletor) e `ContratosDeProviderTest` revisto (H-13). **Nenhuma
 chamada real à OpenAI na suíte:** `Http::fake` com `preventStrayRequests`, e o
-`phpunit.xml` força `CATALOG_AI_ENABLED=false` e `CATALOG_AI_API_KEY` vazia.
+`phpunit.xml` força `CATALOG_AI_ENABLED=false` e `CATALOG_AI_API_KEY` vazia — mecanismo
+**substituído na CAT-10A.1** pela trava `CATALOG_AI_FORCE_DISABLED=true`.
 
 **Validação**
 
@@ -1238,7 +1250,129 @@ chamada real à OpenAI na suíte:** `Http::fake` com `preventStrayRequests`, e o
 - Pint aprovado nos arquivos alterados; `git diff --cached --check` limpo; ROADMAP,
   ARCHITECTURE e README fora do commit técnico.
 - **Homologação real: pendente.** Não é fase nova: é a verificação do assistente com o
-  provider ligado por ambiente, em ambiente controlado, antes da CAT-10B.
+  provider ligado — por ambiente na CAT-10A; pelo painel desde a CAT-10A.1 —, em ambiente
+  controlado, antes da CAT-10B.
+
+### CAT-10A.1 — Configuração administrativa do Catalog Intelligence `[x]`
+
+Tecnicamente concluída e publicada em `50498cf`. Aberta em 2026-09-15 sobre `b0bc375`, como
+complemento da CAT-10A, sem renumerar fases e sem iniciar a CAT-10B.
+
+**Objetivo.** Tirar a configuração operacional do provider externo do `.env` e levá-la ao
+painel administrativo, para que ativar, desativar ou trocar modelo, chave e timeout não
+exija SSH, edição de arquivo, limpeza de cache nem reinício.
+
+**Decisões aprovadas pelo operador (2026-09-15)** — registradas na ARCHITECTURE como
+D-CAT-10A1-1 a D-CAT-10A1-10
+
+- O **banco é a única autoridade operacional** para provider ativo, provider, modelo, API
+  key e timeout. `CATALOG_AI_ENABLED`, `CATALOG_AI_PROVIDER`, `CATALOG_AI_MODEL`,
+  `CATALOG_AI_API_KEY` e `CATALOG_AI_TIMEOUT` deixaram de existir.
+- A interface é a tela **Admin → Configurações → Inteligência Artificial**
+  (`/admin/settings/inteligencia-artificial`), com `configuracoes.editar` exigida inclusive
+  para abrir.
+- `CATALOG_AI_FORCE_DISABLED` é **só trava técnica**: ligada, o seletor resolve o `Null` sem
+  ler o banco; nunca liga o provider nem fornece provider, modelo, chave ou timeout.
+- `CatalogAiSettings`, fora do módulo, é a fronteira entre a persistência e o seletor, e lê
+  sem efeito colateral — `find(1)`, e não `SiteSetting::instance()`, que cria a linha.
+- Credencial vazia vira `null`; saber se uma credencial está configurada não a decripta.
+- Remover a chave desativa o provider; remover credencial de integração desativa a
+  integração dependente.
+- `melhor_envio_connected` e os demais indicadores de credencial configurada ficam
+  `#[Locked]`.
+- `#[\SensitiveParameter]` nos parâmetros que recebem a chave em texto puro.
+- Substituir uma credencial continua possível mesmo quando a gravada não se decripta mais;
+  com o provider ligado, chave ilegível (`APP_KEY` trocada) sobe como defeito, e não vira
+  "sem provider".
+- O hardening das telas de e-mail e de frete e pagamento entra no mesmo ciclo.
+
+**Entrega — commit técnico `50498cf` (`50498cf61bee7bff6796a338593b6df90df5bf15`), publicado**
+
+- Migration `2026_09_15_120000_add_catalog_ai_fields_to_site_settings_table`: `catalog_ai_ativo`
+  (padrão `false`), `catalog_ai_provider`, `catalog_ai_modelo`, `catalog_ai_api_key`
+  (criptografada) e `catalog_ai_timeout` em `site_settings`.
+- `CatalogAiSettings` (`app/Services/CatalogAi`): lê e grava a configuração; a chave só é
+  decriptada com o provider ligado; sem cache e sem `config()`, por isso a mudança vale na
+  resolução seguinte.
+- `CatalogAiProviderSelector` passa a ler `CatalogAiSettings`; condições, fallback `Null`,
+  prazo máximo de 8 s e ausência de `try` preservados. O binding do módulo não mudou.
+- `CatalogAiSettingsForm` e item de menu só para quem edita configurações. Validação:
+  provider só `openai`; modelo obrigatório para ativar, sem espaço, até 100 caracteres;
+  timeout inteiro de 1 a 8, ou em branco (8 s); ativar exige chave gravada ou digitada.
+- `config/services.php` (`catalog_ai`) fica só com `force_disabled`; `.env.example` só com
+  `CATALOG_AI_FORCE_DISABLED=false`; `phpunit.xml` força `CATALOG_AI_FORCE_DISABLED=true`.
+- No adaptador, só `#[\SensitiveParameter]` na chave do construtor. Nenhuma alteração no
+  prompt, no `ProdutoForm`, em `Product`, `ProductOffer` ou na multi-oferta.
+
+**Segurança das credenciais**
+
+- A API key é gravada com o cast `encrypted`, nunca é reexibida e nunca é carregada em
+  propriedade pública do Livewire; a tela recebe só se há chave configurada. Pode ser
+  substituída — em branco, a gravada é mantida — ou removida, o que desativa o provider.
+- **Hardening encontrado na auditoria:** as telas de SMTP, Mercado Pago, Frenet e Melhor
+  Envio carregavam as credenciais gravadas, decriptadas, em propriedades públicas do
+  Livewire, que viajam no snapshot, inclusive para quem só visualiza as configurações.
+  Deixaram de carregar. Remover o client secret do Melhor Envio, o token da Frenet ou o
+  access token do Mercado Pago desativa a integração correspondente, e o pagamento volta ao
+  modo manual.
+- `SiteSetting::SEGREDOS` lista as credenciais criptografadas, e `$hidden` as tira de toda
+  serialização do model; um teste exige igualdade nos dois sentidos entre a lista e os casts
+  `encrypted`.
+- O e-mail de teste não devolve mais ao navegador a mensagem bruta da exceção SMTP.
+- Não há cofre externo, KMS, rotação automática nem auditoria de alteração de credencial.
+
+**Deploy.** Aplicar as migrations normalmente (`php artisan migrate --force`, com backup
+antes). O provider nasce desativado; a API key é cadastrada pela tela — nunca em comando,
+no `.env` ou no repositório. As cinco variáveis antigas podem ser apagadas do `.env` dos
+ambientes.
+
+**Testes:** `ConfiguracaoDoProviderNoPainelTest` (tela, permissão, chave fora do navegador,
+leitura sem escrita, trava técnica, configuração antiga ignorada, chave ilegível),
+`SegredosDasConfiguracoesTest` (credenciais de e-mail, frete e pagamento fora do navegador;
+igualdade `SEGREDOS` × `encrypted`; exceção SMTP fora da tela) e, revistos,
+`SelecaoDoProviderTest`, `AdaptadorOpenAiTest` e `ContratosDeProviderTest`. **Nenhuma
+chamada real à OpenAI na suíte:** o `phpunit.xml` força a trava; os testes que precisam do
+adaptador a desligam só em memória, e os do adaptador, do seletor e da tela usam
+`Http::fake` com `preventStrayRequests`.
+
+**Validação**
+
+- Suíte completa: **1492 passed · 9653 assertions · 0 failures** (antes: 1411 · 8617),
+  executada sobre a implementação da CAT-10A.1 **antes do hardening isolado final do
+  `MailSettingsForm`** — a mensagem fixa no e-mail de teste.
+- Depois desse ajuste: segurança das configurações (`SegredosDasConfiguracoesTest`)
+  **30 passed · 288 assertions · 0 failures** e Catalog Intelligence **493 passed · 6322
+  assertions · 0 failures**.
+- A suíte completa **não foi repetida** depois do ajuste final: os 1492 **não** foram
+  executados sobre o conteúdo final de `50498cf`. Exceção deliberada na mesma forma da
+  CAT-10A ([ARCHITECTURE §21](docs/ARCHITECTURE.md#21-testes-e-validação)), aprovada na
+  revisão.
+- Controles negativos: 22 na implementação e 3 no ajuste final — exposição da mensagem SMTP
+  e os dois sentidos da igualdade `SEGREDOS` × `encrypted` —, todos detectados, com
+  arquivos restaurados por hash. `git diff --cached --check` limpo; documentação fora do
+  commit técnico.
+
+**Homologação real — pendente**
+
+| | |
+|---|---|
+| Implementação | concluída |
+| Publicação do commit | concluída — `50498cf` |
+| Homologação real do provider | **pendente** — nenhuma chamada real à OpenAI foi feita |
+
+Próximo passo operacional, **ainda não executado**:
+
+1. atualizar a VPS;
+2. aplicar a migration;
+3. acessar **Admin → Configurações → Inteligência Artificial**;
+4. cadastrar provider, modelo, API key e timeout;
+5. ativar o provider;
+6. gerar sugestões com produtos reais;
+7. validar desfechos, fallback, redação e comportamento da tela;
+8. só então considerar a homologação concluída.
+
+Enquanto a B-6 estiver aberta, ativar o provider serve só à homologação controlada, e não à
+ativação ampla em produção. A **CAT-10B** não foi iniciada.
 
 ### Dívidas da trilha
 
@@ -1258,6 +1392,7 @@ G-1, E-1, D-1…D-4 (CAT-05H), B-3, B-5, B-6 (CAT-06A), H-11, H-12 e H-13 (CAT-0
 | Gate de IA externa C-2 — redação de PII em texto livre | `[x]` | `FreeTextRedactor` na fronteira de saída | CAT-06E · `101748a` |
 | Gate de IA externa S-1 — separação de prompt | `[x]` | `PromptGuard`: instrução, contexto e dado em canais estruturais do `GuardedPrompt` | CAT-06F · `f7b39c2` |
 | Gate de IA externa F-1 — desfecho e fallback | `[x]` | O provider só recebe `GuardedPrompt` redigido; só a falha tipada vira fallback; `TypeError` e defeito interno sobem; log sem mensagem | CAT-06G · `5a667b4` |
+| Credenciais do painel fora do navegador | `[x]` | A chave do provider da Catalog Intelligence e as credenciais de SMTP, Mercado Pago, Frenet e Melhor Envio deixam de ser hidratadas em propriedades públicas do Livewire; `$hidden` no `SiteSetting`; remover credencial desativa a integração dependente; mensagem bruta de exceção SMTP fora da tela | CAT-10A.1 · `50498cf` |
 
 Dívidas de segurança abertas: **SEC-DEP-01** (commonmark), **F-06** (assinatura
 do webhook), **LGPD-01** (CPF/CNPJ em claro), **C-1** — ver
@@ -1286,7 +1421,7 @@ herdado da FIN-SEC-01G, ainda válido:
 - `[ ]` Worker de filas ativo — recomendado; não é autoridade financeira
 - `[ ]` MySQL 8 com `STRICT_TRANS_TABLES`
 - `[ ]` `config:cache`, `route:cache`, `view:cache` após o deploy
-- `[ ]` `CATALOG_AI_ENABLED=false` até a **CAT-10B** (B-6); chave do provider só no ambiente, nunca versionada
+- `[ ]` Provider externo do Catalog Intelligence **desativado no painel** (Admin → Configurações → Inteligência Artificial) até a **CAT-10B** (B-6), salvo homologação controlada; API key só pela tela — nunca no `.env`, em comando ou no Git; `CATALOG_AI_FORCE_DISABLED` é trava técnica que só desliga
 - `[ ]` Resolver **SEC-DEP-01** antes de publicar
 
 ---
@@ -1339,9 +1474,9 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 | ID | Dívida | Destino |
 |---|---|---|
 | **F-1** (CAT-05F) | Sem sinal de modo degradado | **`[x]` fechado** na **CAT-06G** — desfecho `ListingOutcome`, 8 estados (D-CAT-06G-3, D-CAT-06G-11) |
-| **B-5** (CAT-06A) | Timeout de chamada a provider | **`[x]` decidido** na **CAT-06G** — 8 s aplicados pelo adaptador, 0 novas tentativas, sem config até haver leitor (D-CAT-06G-5, D-CAT-06G-6). **Aplicado** na **CAT-10A** (`10fe2bf`): `CATALOG_AI_TIMEOUT`, limitado a 8 pelo `CatalogAiProviderSelector`, no prazo total e no de conexão, sem retry |
+| **B-5** (CAT-06A) | Timeout de chamada a provider | **`[x]` decidido** na **CAT-06G** — 8 s aplicados pelo adaptador, 0 novas tentativas, sem config até haver leitor (D-CAT-06G-5, D-CAT-06G-6). **Aplicado** na **CAT-10A** (`10fe2bf`): `CATALOG_AI_TIMEOUT`, limitado a 8 pelo `CatalogAiProviderSelector`, no prazo total e no de conexão, sem retry. Desde a **CAT-10A.1** (`50498cf`), o prazo é gravado pelo painel — inteiro de 1 a 8, ou em branco para 8 s — e `CATALOG_AI_TIMEOUT` foi removida; o seletor continua limitando a 8 |
 | **B-3** (CAT-06A) | `EmbeddingProvider` órfão: na especificação, nenhuma fase o reivindica; trava de teste o mantém inexistente | Em aberto, sem decisão. Trata só do `EmbeddingProvider` e **não bloqueia** a CAT-10A |
-| **B-6** (CAT-06A) | Custo e rate limit | Em aberto — **CAT-10B**, com custo, rate limit, observabilidade e revisão ampliada. **Não bloqueia** a homologação controlada do provider da CAT-10A; **bloqueia** a ativação ampla em produção |
+| **B-6** (CAT-06A) | Custo e rate limit | Em aberto — **CAT-10B**, com custo, rate limit, observabilidade e revisão ampliada. **Não bloqueia** a homologação controlada do provider da CAT-10A, configurado pelo painel desde a CAT-10A.1; **bloqueia** a ativação ampla em produção |
 | **P-1** (CAT-05B) | Backfill de `catalog_product_knowledge` em produção (em dev foi rodado e revertido na 05H) | Decisão humana após G-1 |
 | **B-4** (CAT-05A) | Corpus de seeder: `short_description` vazia em 75/75, "demonstração" em 34/75 | Depende de catálogo real |
 | **E-1** (CAT-05E) | `KnowledgeTermType::Keyword` sem uso | Decidir quando houver registro |
@@ -1352,7 +1487,7 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 | — (CAT-06A/06B) | Nomenclatura `ListingAssistant` × `GenerateListingSuggestion` (o DTO de desfecho foi batizado na 06G: `ListingOutcome`) | Reconciliada tecnicamente na **CAT-06H-F** (`b8d3d56`), nos testes, e na **CAT-06H-G** (`dc217cf`), no resíduo textual de `ListingContext.php` (H-09): `GenerateListingSuggestion` canônico |
 | — (CAT-06D §10) | Auditorias devem varrer asserções (`assertFalse(class_exists`), não só arquivos | **`[x]` feito** na **CAT-06H-H** — em `tests/`, a única trava de inexistência é a do `EmbeddingProvider`, deliberada (B-3) |
 | **H-11** (CAT-06H) | Onde mora o texto da instrução (`ProviderInstruction`) quando existir adaptador real: no domínio ou no adaptador | **`[x]` resolvida** na **CAT-10A** (`10fe2bf`): o texto mora no adaptador, por `match` exaustivo sem `default`; o domínio continua carregando só o enum (D-CAT-10A-3) |
-| **H-13** (CAT-06H) | `test_o_binding_padrao_do_contrato_e_o_null` fixava o contrato no `NullCatalogAiProvider`; um provider real precisaria quebrá-lo e exigir revisão arquitetural explícita | **`[x]` resolvida e superada** pelo desenho da **CAT-10A** (`10fe2bf`): o binding não é mais o `Null` direto — o contrato resolve pelo `CatalogAiProviderSelector`, o `Null` continua fallback e o `Fake` nunca entra em runtime; a trava foi revista para prender esse caminho (D-CAT-10A-2) |
+| **H-13** (CAT-06H) | `test_o_binding_padrao_do_contrato_e_o_null` fixava o contrato no `NullCatalogAiProvider`; um provider real precisaria quebrá-lo e exigir revisão arquitetural explícita | **`[x]` resolvida e superada** pelo desenho da **CAT-10A** (`10fe2bf`): o binding não é mais o `Null` direto — o contrato resolve pelo `CatalogAiProviderSelector`, o `Null` continua fallback e o `Fake` nunca entra em runtime; a trava foi revista para prender esse caminho (D-CAT-10A-2). A **CAT-10A.1** (`50498cf`) preservou esse binding: o seletor passou a ler o banco por `CatalogAiSettings`, sem segundo binding nem `singleton` |
 | **H-12** (CAT-06H) | Captura ampla de `Throwable` no motor interno de `GenerateListingSuggestion::completar()`: defeito de programação pode virar `InternalIntelligenceFailed` que convida a repetir, e a mensagem de exceção que não seja `QueryException` vai para o log; sem teste de `TypeError`/`Error` no motor, de propósito | Dívida histórica e risco latente de observabilidade/privacidade — em aberto, sem fase; exige decisão explícita futura |
 | — (CAT-05G · CAT-09) | Custo de consultas em hierarquias profundas de categoria: a subida do `ListingContext` custa 1 consulta por ancestral não carregado — em `deProduct()` sem `with('category.parent')` e, no `ProdutoForm` da CAT-09, a cada nível acima dos dois que o `with('parent')` cobre. Observação, não dívida | Observação técnica separada, sem fase — não otimizada na CAT-09 (decisão do operador) |
 
@@ -1391,13 +1526,16 @@ M-16, M-17 (05B), itens 1, 3, 5, 7–12 da tabela de riscos da CAT-01.
 
 A **CAT-09** foi concluída e publicada em `1efe1b6`; a homologação visual dela em navegador
 segue pendente ([§14](#cat-09--implantação-do-assistente-no-catálogo-x)). A **CAT-10A** foi
-concluída e publicada em `10fe2bf` ([§14](#cat-10a--primeiro-provider-real-x)).
+concluída e publicada em `10fe2bf` ([§14](#cat-10a--primeiro-provider-real-x)). A
+**CAT-10A.1**, que levou a configuração do provider ao painel, foi tecnicamente concluída e
+publicada em `50498cf` ([§14](#cat-10a1--configuração-administrativa-do-catalog-intelligence-x)).
 
 Ordem decidida pelo operador (2026-09-14):
 
-1. **CAT-10A — primeiro provider real (OpenAI)** — `[x]` concluída.
-2. **Homologação real** do assistente com o provider ligado, em ambiente controlado —
-   pendente. **Não é fase nova.**
+1. **CAT-10A — primeiro provider real (OpenAI)** — `[x]` concluída; complementada pela
+   **CAT-10A.1 — configuração administrativa** — `[x]` concluída.
+2. **Homologação real** do assistente com o provider configurado e ativado pelo painel, em
+   ambiente controlado — pendente. **Não é fase nova.**
 3. **CAT-10B — observabilidade, custo e segurança ampliados.** Vem antes da CAT-08 porque a
    B-6 continua impedindo a ativação ampla em produção sem observabilidade, custo e rate
    limit mínimos; inclui a revisão ampliada de privacidade e governança.
@@ -1442,6 +1580,7 @@ O detalhe de cada fase está no Git. Marcos de suíte (`passed · assertions`):
 | Fim da CAT-06 (`dc217cf`) | 1294 · 5874 |
 | Fim da CAT-09 (`1efe1b6`) | 1327 · 6053 |
 | **Fim da CAT-10A** (implementação antes do ajuste textual final contido em `10fe2bf`) | **1411 · 8617** — sobre o conteúdo final de `10fe2bf` rodaram só dirigidos 85 · 2579 e Catalog Intelligence 442 · 5581 (exceção deliberada, §14) |
+| **Fim da CAT-10A.1** (implementação antes do hardening final do `MailSettingsForm` contido em `50498cf`) | **1492 · 9653** — sobre o conteúdo final de `50498cf` rodaram só segurança das configurações 30 · 288 e Catalog Intelligence 493 · 6322 (exceção deliberada, §14) |
 
 Critério permanente: nenhuma fase é concluída com teste vermelho, e o número de
 testes nunca cai sem justificativa escrita.

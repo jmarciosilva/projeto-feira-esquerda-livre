@@ -166,7 +166,8 @@ quando têm conteúdo.
 
 O que é específico de fornecedor fica **fora** do módulo: desde a CAT-10A, o adaptador
 do provider real e o seletor que decide entre ele e o `Null` moram em
-`app/Services/CatalogAi` (D-CAT-10A-1, D-CAT-10A-2).
+`app/Services/CatalogAi` (D-CAT-10A-1, D-CAT-10A-2); desde a CAT-10A.1, também a leitura da
+configuração que o painel grava no banco (`CatalogAiSettings`, D-CAT-10A1-4).
 
 ---
 
@@ -1038,7 +1039,8 @@ ListingContext::paraItemNovo() | ::deProduct()
 `Null`, `Fake`, limiar, redator e guard; nenhum fornecedor real, credencial ou
 segredo. O domínio não conhece nome de fornecedor nem de modelo — e continua sem
 conhecer depois da **CAT-10A**, que acopla o primeiro provider real fora do módulo,
-desligado por padrão ([abaixo](#provider-real-cat-10a)).
+desligado por padrão e, desde a **CAT-10A.1**, configurado pelo painel
+([abaixo](#provider-real-cat-10a)).
 
 Entregue (06C, 06D, 06E, 06F, 06G):
 
@@ -1059,7 +1061,7 @@ interface CatalogAiProvider          // App\CatalogIntelligence\Contracts
 | `FakeCatalogAiProvider` | determinístico; `indisponivel()`, `disponivel()`, `respondendo($dto)`, `queFalha()` e `queEsgotaOTempo()` (lançam `CatalogAiProviderException` de propósito); `chamadas()` e `promptsRecebidos()`; nunca registrado no container |
 | `ProviderResponseValidator` | valida só o que o tipo não garante — texto em branco, keywords e missing_information malformadas, confiança fora de `[0,1]`, procedência incorreta; devolve lista de `ProviderResponseViolation` e nunca lança |
 | `SuggestionPolicy` | lê `ListingContext::lacunas()` (não reconta); devolve `KnowledgeSufficiency`: `Sufficient` · `ExternalMayHelp` (falta **texto**) · `AwaitsMerchant` (falta **fato** — consultar seria pagar por invenção) |
-| `config/catalog-intelligence.php` | só `fallback.minimum_gaps` (`CATALOG_AI_MINIMUM_GAPS`, padrão 3; padrão de segurança 5 se a chave sumir); **proibido** credencial, fornecedor ou endpoint (há teste). A configuração do provider real (CAT-10A) fica fora do módulo, em `config/services.php` (`catalog_ai`) |
+| `config/catalog-intelligence.php` | só `fallback.minimum_gaps` (`CATALOG_AI_MINIMUM_GAPS`, padrão 3; padrão de segurança 5 se a chave sumir); **proibido** credencial, fornecedor ou endpoint (há teste). A configuração do provider real fica fora do módulo: na CAT-10A, em `config/services.php` (`catalog_ai`); desde a CAT-10A.1, no banco (`site_settings`), lida por `CatalogAiSettings` — em `config/services.php` restou só a trava `force_disabled` (D-CAT-10A1-1, D-CAT-10A1-3) |
 | `FreeTextRedactor` (06E) | `Support/`, `redigir(string): string`, marcador único `[redigido]`. D-CAT-06B-2 sem reabertura: telefone, e-mail, CPF/CNPJ (inclusive o alfanumérico) e CEP **sempre**; medidas, preço, quantidade **nunca**; URL e `@handle` **não por padrão** — dado pessoal dentro de URL é redigido e a URL fica. Sem máscara, CPF/CNPJ só com dígito verificador válido e CEP só depois da palavra "CEP"; fixo sem máscara e fixo sem DDD **não** são reconhecidos (limitação declarada). Preserva o resto byte a byte, é idempotente, não tem dependência, não registra e nunca lança; texto ilegível **falha fechado** (sai só o marcador). Chamado na saída ligada pelo `GuardedPromptRedactor` (06G) — **fecha C-2** |
 | `PromptGuard` (06F) | `Support/`, `__invoke(ListingContext): GuardedPrompt`. Três canais em `DTOs/GuardedPrompt` (`final`, `readonly`, nenhum método além do construtor): `instruction` — `Enums/ProviderInstruction`, enum **puro** fixado pelo guard, que nenhum texto escolhe; `context` — `knowledge` e `similar_items`, por lista de permissão; `data` — todo o resto do `ListingContext`, e toda chave nova. Classifica por origem e **não lê conteúdo**: não redige, não escapa, não altera, não lança, não reconhece frase; payload hostil e conteúdo legítimo parecido com instrução atravessam intactos no canal de dado. Não escreve texto de instrução nem formato de fornecedor. Chamado por `GenerateListingSuggestion` na saída ligada (06G) — **fecha S-1** |
 | `GuardedPromptRedactor` (06G) | `Support/`, `__invoke(GuardedPrompt): GuardedPrompt`, só depende do `FreeTextRedactor`. Redige toda string de `context` e `data` em qualquer profundidade, e número cuja forma escrita é dado pessoal; `instruction` nunca chega ao redator; chaves estruturais intactas; chaves de `known_attributes` — as únicas vindas de fora (C-1) — redigidas, e na colisão fica a primeira. Não lança, não registra (D-CAT-06G-2) |
@@ -1122,7 +1124,9 @@ provider falhou → `ProviderFailed`; resposta inválida → `ProviderResponseIn
   `CatalogAiProviderException::tempoEsgotado()` → `ProviderFailed`, sugestão
   interna preservada. **0 novas tentativas.** A chave de config nasceu com o
   adaptador que a lê, na CAT-10A: `CATALOG_AI_TIMEOUT`, limitada a 8 pelo
-  `CatalogAiProviderSelector` (D-CAT-10A-2).
+  `CatalogAiProviderSelector` (D-CAT-10A-2). Desde a CAT-10A.1, o prazo é
+  `catalog_ai_timeout`, gravado pelo painel — inteiro de 1 a 8, ou em branco para 8 s —, a
+  variável foi removida, e o seletor continua limitando a 8 (D-CAT-10A1-1).
 - **Resposta válida complementa, não substitui** (D-CAT-06G-8): texto externo só
   onde o lojista não escreveu e a base não compôs; nome por `nomeSugerido()`, e só
   se diferente do atual pela chave do `KnowledgeNormalizer` (D-CAT-06G-12);
@@ -1141,15 +1145,16 @@ Ordem **06E/06F antes de 06G** (D-CAT-06B-6): resiliência antes do acoplamento.
 
 #### Provider real (CAT-10A)
 
-O primeiro provider real entra **fora** do módulo, por configuração de ambiente, e o
-contrato não muda: `GenerateListingSuggestion` continua conhecendo só
+O primeiro provider real entra **fora** do módulo — na CAT-10A, por configuração de
+ambiente; desde a CAT-10A.1, pela configuração que o painel grava no banco
+([abaixo](#configuração-pelo-painel-cat-10a1)) —, e o contrato não muda: `GenerateListingSuggestion` continua conhecendo só
 `CatalogAiProvider`, e o fluxo ligado acima vale como está.
 
 | Peça | Comportamento |
 |---|---|
-| `CatalogAiProviderSelector` | `app/Services/CatalogAi`. Lê `config('services.catalog_ai')` a cada resolução — o binding do módulo o chama, sem `singleton`. Devolve `OpenAiCatalogAiProvider` só com `enabled` verdadeiro, provider `openai`, chave e modelo não vazios e prazo válido; em qualquer outro caso, `NullCatalogAiProvider`. Prazo ausente → 8 s; acima de 8 → 8; ≤ 0 ou não numérico → `Null`. Verifica condições: não tem `try`, não registra log, não conhece o `Fake` (D-CAT-10A-2) |
+| `CatalogAiProviderSelector` | `app/Services/CatalogAi`. Resolve a cada pedido — o binding do módulo o chama, sem `singleton`. Na CAT-10A lia `config('services.catalog_ai')`; **desde a CAT-10A.1** verifica primeiro a trava `CATALOG_AI_FORCE_DISABLED` e lê a configuração gravada no banco por `CatalogAiSettings` (D-CAT-10A1-3, D-CAT-10A1-4). Devolve `OpenAiCatalogAiProvider` só com `enabled` verdadeiro, provider `openai`, chave e modelo não vazios e prazo válido; em qualquer outro caso, `NullCatalogAiProvider`. Prazo ausente → 8 s; acima de 8 → 8; ≤ 0 ou não numérico → `Null`. Verifica condições: não tem `try`, não registra log, não conhece o `Fake` (D-CAT-10A-2) |
 | `OpenAiCatalogAiProvider` | `app/Services/CatalogAi`, `final`. Responses API: `instruction` em `instructions`, `context` e `data` em dois itens distintos de `input`, Structured Outputs com JSON Schema estrito, `store: false`, sem tools nem conversa; uma chamada, prazo total e de conexão iguais, 0 retry (D-CAT-10A-6). Texto da instrução por `match` exaustivo sobre `ProviderInstruction` (D-CAT-10A-3), com as regras de D-CAT-10A-4 e D-CAT-10A-5. `confidence` nula; `missingInformation` vazia, porque o assistente a recalcula. Não grava nem registra nada |
-| `config/services.php` · `catalog_ai` | `CATALOG_AI_ENABLED` (padrão `false`), `CATALOG_AI_PROVIDER`, `CATALOG_AI_MODEL`, `CATALOG_AI_API_KEY`, `CATALOG_AI_TIMEOUT` (padrão 8). Nenhum modelo fixado no código; chave nunca versionada (D-CAT-10A-1) |
+| `config/services.php` · `catalog_ai` | **Desde a CAT-10A.1, só `force_disabled`** (`CATALOG_AI_FORCE_DISABLED`, padrão `false`) — a trava de D-CAT-10A1-3. Na CAT-10A trazia `CATALOG_AI_ENABLED` (padrão `false`), `CATALOG_AI_PROVIDER`, `CATALOG_AI_MODEL`, `CATALOG_AI_API_KEY` e `CATALOG_AI_TIMEOUT` (padrão 8) (D-CAT-10A-1) — **removidas** na CAT-10A.1, que levou a configuração ao banco (D-CAT-10A1-1). Nenhum modelo fixado no código; chave nunca versionada |
 
 Da resposta do fornecedor ao desfecho:
 
@@ -1163,6 +1168,39 @@ Operar sem o provider continua sendo o estado normal (D-CAT-06B-5): desligado ou
 configurado, o contrato é o `Null`, e a consulta que a `SuggestionPolicy` justificaria
 termina em `ProviderUnavailable`.
 
+#### Configuração pelo painel (CAT-10A.1)
+
+Desde a CAT-10A.1 o **banco é a única autoridade operacional** do provider externo
+(D-CAT-10A1-1). O `.env` não fornece provider ativo, provider, modelo, chave nem timeout;
+dele restou só a trava técnica, que só desliga (D-CAT-10A1-3).
+
+```text
+GenerateListingSuggestion
+  → CatalogAiProvider                     contrato, app/CatalogIntelligence
+  → binding do módulo                     CatalogIntelligenceServiceProvider: um bind, sem singleton — inalterado
+  → CatalogAiProviderSelector::resolve()  app/Services/CatalogAi
+       CATALOG_AI_FORCE_DISABLED ligada → NullCatalogAiProvider, sem ler o banco
+  → CatalogAiSettings::atual()            app/Services/CatalogAi
+  → SiteSetting::query()->find(1)         site_settings; sem linha, sem configuração — nada é criado
+       ausente, desligada, incompleta ou inválida → NullCatalogAiProvider
+       válida → OpenAiCatalogAiProvider(chave, modelo, prazo ≤ 8 s)
+```
+
+| Peça | Comportamento |
+|---|---|
+| `CatalogAiSettings` | `app/Services/CatalogAi`, fora do módulo. `atual()` entrega ao seletor o que está gravado, lido a cada resolução, sem cache e sem `config()`; a chave só é decriptada com o provider ligado. `paraOPainel()` entrega à tela tudo menos a chave — só se ela existe. Lê com `find(1)`, e não com `SiteSetting::instance()`, que cria a linha: ler nunca escreve (D-CAT-10A1-8). Sem `try` e sem log: `DecryptException` da chave com o provider ligado sobe como defeito de infraestrutura (D-CAT-10A1-4). Grava pela `SiteSettingService`; remover a chave também desliga o provider (D-CAT-10A1-7). Quem valida é o seletor |
+| `CatalogAiSettingsForm` | **Admin → Configurações → Inteligência Artificial** (`/admin/settings/inteligencia-artificial`). `configuracoes.editar` para abrir a tela e em cada ação; item de menu só para quem edita. Provider só `openai`; modelo obrigatório para ativar, sem espaço, até 100 caracteres; timeout inteiro de 1 a 8, ou em branco (8 s); ativar exige chave gravada ou digitada. A chave gravada nunca é carregada, e a digitada é esvaziada antes de autorizar, validar ou gravar (D-CAT-10A1-2, D-CAT-10A1-6) |
+| `CATALOG_AI_FORCE_DISABLED` · `services.catalog_ai.force_disabled` | Trava técnica, padrão `false`. Verdadeira — ou qualquer valor que não seja claramente falso —, o seletor devolve o `Null` sem ler o banco. Nunca liga o provider e nunca fornece provider, modelo, chave ou timeout. Não é configuração do administrador. O `phpunit.xml` a força (D-CAT-10A1-3, D-CAT-10A1-9) |
+
+- A mudança feita no painel vale na **resolução seguinte** do provider: sem SSH, sem
+  editar `.env`, sem `config:clear` ou `config:cache` e sem reiniciar a aplicação.
+- O que a CAT-10A decidiu continua valendo: contrato inalterado, adaptador e seletor fora
+  do módulo, `Null` para configuração ausente, desligada, incompleta ou inválida, e defeito
+  que sobe em vez de virar "sem provider" — o seletor, a leitura da configuração e o
+  ServiceProvider do módulo não têm `try` nem `catch`, e um teste trava isso.
+- **Homologação real pendente:** nenhuma chamada real à OpenAI foi feita, e a configuração
+  pelo painel não muda a B-6 (D-CAT-10A1-10).
+
 ### 14.6 Segurança e privacidade do módulo
 
 - **O que pode atravessar a fronteira** (06G): só o que o `GuardedPrompt` carrega,
@@ -1171,8 +1209,8 @@ termina em `ProviderUnavailable`.
   de categoria, resumo e descrição existentes e `known_attributes`. No canal
   `context`: conceitos aprovados (nome, tipo, descrição curada, termos) e itens
   semelhantes (nome, conceitos compartilhados, razões). Esse conteúdo **sai** para o
-  provider, redigido. Desde a CAT-10A, com o provider real ligado por ambiente, ele sai
-  para a OpenAI com `store: false` — inclusive nomes de itens semelhantes de outros
+  provider, redigido. Desde a CAT-10A, com o provider real ligado — por ambiente na
+  CAT-10A, pelo painel desde a CAT-10A.1 —, ele sai para a OpenAI com `store: false` — inclusive nomes de itens semelhantes de outros
   lojistas; desligado, nada sai. A revisão ampliada de privacidade e governança é da
   CAT-10B.
 - **O que o `FreeTextRedactor` redige nesse conteúdo** (D-CAT-06B-2, CAT-06E, sem
@@ -1201,6 +1239,10 @@ termina em `ProviderUnavailable`.
 - A falha do adaptador real tem mensagem fixa e não encadeia a exceção de transporte:
   o erro do fornecedor pode ecoar parte da chave, e o de transporte, parte do prompt
   (D-CAT-10A-6). O adaptador não grava nem registra prompt, resposta ou chave.
+- A chave do provider fica em `site_settings`, criptografada pelo cast `encrypted`; nunca é
+  reexibida, nunca é hidratada em propriedade pública do Livewire e sai da serialização do
+  model por `$hidden` (D-CAT-10A1-5, D-CAT-10A1-6). Não há cofre externo, KMS, rotação
+  automática nem auditoria de alteração da chave.
 - Texto do lojista e contexto recuperado nunca viram instrução: o `PromptGuard`
   os entrega em canais próprios do `GuardedPrompt`, e a instrução é um enum que
   texto nenhum escolhe. A garantia é de estrutura, não de reconhecer frase. Desde a
@@ -1358,11 +1400,11 @@ Decisões:
 | Autoridade × ownership (CAT-DOM-02) | Dois eixos independentes, nos dois sentidos ([§5.5](#55-proveniência-delegação-e-autoridade-canônica), [§5.6](#56-ownership-comercial)) |
 | Valor econômico vindo do cliente (FIN-SEC-01C/C.1) | Nenhum valor de frete ou preço enviado pelo cliente é autoridade; o servidor recota |
 | Webhook de pagamento | Corpo não é fonte de verdade; consulta autenticada ao gateway |
-| Credenciais de integração | `SiteSetting` com cast `encrypted` (Mercado Pago, Melhor Envio, Frenet, SMTP) |
+| Credenciais de integração | `SiteSetting` com cast `encrypted` (Mercado Pago, Melhor Envio, Frenet, SMTP e, desde a CAT-10A.1, a chave do provider da Catalog Intelligence), listadas em `SiteSetting::SEGREDOS` e tiradas da serialização do model por `$hidden`. **Credencial gravada nunca volta ao navegador** (CAT-10A.1): a tela recebe só se ela está configurada, sem hidratá-la em propriedade pública do Livewire; em branco, a gravada é mantida; remover é ação explícita e desativa a integração dependente; a mensagem bruta de exceção SMTP não chega à tela (D-CAT-10A1-6, D-CAT-10A1-7). Não há cofre externo, KMS nem rotação automática |
 | Segredos | Nunca versionados; `.env.example` só com chaves vazias ou exemplos; `.gitignore` cobre `.env*`, `*.backup`, `*.bak` |
 | Credencial legada (SEC-01) | Revogada na origem; histórico do Git não reescrito (string inerte) — reescrever quebraria clones e não desfaria a exposição |
 | PII em log (CAT-05F) | `QueryException` do módulo de IA registrada só pelo SQLSTATE |
-| IA externa (CAT-06 · CAT-10A) | Nenhum provider opera antes de C-2 (redação) e S-1 (PromptGuard) fecharem. C-2 fechado na 06E (`FreeTextRedactor`); S-1 fechado na 06F (`PromptGuard`); F-1 fechado na 06G: o provider só recebe `GuardedPrompt` redigido, e só a falha tipada vira fallback. Desde a CAT-10A, um provider real (OpenAI) acoplado fora do módulo e **desligado por padrão**; chave só no ambiente, nunca versionada; `store: false`; falha com mensagem fixa e sem exceção encadeada (D-CAT-10A-6). Ativação ampla em produção bloqueada pela B-6 até a CAT-10B |
+| IA externa (CAT-06 · CAT-10A) | Nenhum provider opera antes de C-2 (redação) e S-1 (PromptGuard) fecharem. C-2 fechado na 06E (`FreeTextRedactor`); S-1 fechado na 06F (`PromptGuard`); F-1 fechado na 06G: o provider só recebe `GuardedPrompt` redigido, e só a falha tipada vira fallback. Desde a CAT-10A, um provider real (OpenAI) acoplado fora do módulo e **desligado por padrão**; desde a CAT-10A.1, configurado pelo painel e gravado no banco, com a chave criptografada, nunca reexibida nem versionada, e `CATALOG_AI_FORCE_DISABLED` só para desligar (D-CAT-10A1-1, D-CAT-10A1-3, D-CAT-10A1-5); `store: false`; falha com mensagem fixa e sem exceção encadeada (D-CAT-10A-6). Ativação ampla em produção bloqueada pela B-6 até a CAT-10B |
 | Download de material AVA | URL assinada temporária + matrícula ativa |
 
 ### 19.2 Dívidas de segurança abertas
@@ -1410,7 +1452,12 @@ de 7 dias de carrinho anônimo.
   adaptador; depois dele passaram só os testes dirigidos (85 · 2579) e o Catalog
   Intelligence (442 · 5581), e a repetição da suíte completa foi dispensada
   explicitamente na revisão da fase. Os 1411 não valem como execução sobre o conteúdo
-  final de `10fe2bf`, e a exceção não altera o critério.
+  final de `10fe2bf`. **Segunda exceção, na mesma forma:** na CAT-10A.1, a suíte completa
+  (1492 · 9653 · 0) rodou sobre a implementação antes do hardening isolado final do
+  `MailSettingsForm` (mensagem fixa no e-mail de teste); depois dele passaram só a
+  segurança das configurações (30 · 288) e o Catalog Intelligence (493 · 6322), e a
+  repetição da suíte completa foi dispensada na revisão. Os 1492 não valem como execução
+  sobre o conteúdo final de `50498cf`. Nenhuma das duas exceções altera o critério.
 - **Teste novo precisa de controle negativo**: reverter a correção e ver o teste
   falhar. Teste que passa pelo motivo errado não prova nada.
 - **O que o SQLite não prova, prova-se em MySQL real.** SQLite não tem lock de
@@ -1430,9 +1477,12 @@ de 7 dias de carrinho anônimo.
 - Testes de fronteira travam decisões estruturais: módulo sem cliente HTTP, cadastro
   sem referência à inteligência, allowlists sem `expositor_id`, `products` sem
   colunas comerciais, cadastro produzindo uma oferta só.
-- **Nenhum teste chama provider externo real** (D-CAT-10A-7): o `phpunit.xml` força
-  `CATALOG_AI_ENABLED=false` e `CATALOG_AI_API_KEY` vazia com `force="true"`, e os
-  testes do adaptador e do seletor usam `Http::fake` com `preventStrayRequests`.
+- **Nenhum teste chama provider externo real** (D-CAT-10A-7, D-CAT-10A1-9): desde a
+  CAT-10A.1, o `phpunit.xml` força `CATALOG_AI_FORCE_DISABLED=true` com `force="true"`,
+  seja qual for a configuração gravada; os testes que precisam do adaptador desligam a
+  trava só em memória, e os do adaptador, do seletor e da tela usam `Http::fake` com
+  `preventStrayRequests`. Na CAT-10A, o mecanismo era forçar `CATALOG_AI_ENABLED=false` e
+  `CATALOG_AI_API_KEY` vazia — variáveis removidas na CAT-10A.1.
 - **Pint só nos arquivos tocados**, nunca global.
 
 ---
@@ -1483,6 +1533,11 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 
 30. `app` e `queue` nunca recebem `env_file`.
 31. Nenhuma validação destrói ou polui o banco de desenvolvimento.
+
+### Configuração e credenciais
+
+32. Credencial gravada nunca volta ao navegador: não é hidratada em propriedade pública do Livewire nem aparece em HTML, snapshot, serialização do model ou mensagem de exceção devolvida à tela; a tela recebe só se ela está configurada.
+33. A configuração operacional do provider externo da Catalog Intelligence vem só do banco; o ambiente só pode desligá-lo.
 
 ---
 
@@ -1709,7 +1764,7 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 | **D-FIN-45** | Confirmação de repasse segue a autoridade financeira do pedido (`temPagamentoConfirmado()`) | VIGENTE |
 | FIN-SEC-01 `(sem ID)` | Não abrir subfase só para guardar dívida (não existe 01H) | VIGENTE como prática |
 
-### 23.8 Catalog Intelligence — CAT-05, CAT-06 e CAT-10A
+### 23.8 Catalog Intelligence — CAT-05, CAT-06, CAT-10A e CAT-10A.1
 
 | ID | Decisão | Motivo | Estado |
 |---|---|---|---|
@@ -1787,7 +1842,7 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 | **D-CAT-06G-2** | Composição externa `PromptGuard` → `GuardedPromptRedactor` → provider. Redige toda string de `context` e `data`, e número cuja forma escrita é dado pessoal; `instruction` nunca; chaves estruturais intactas; chaves de `known_attributes` — as únicas vindas de fora (C-1) — redigidas, e na colisão fica a primeira | `ListingContext` não gera cópia redigida sem mudar o DTO; redigir depois da classificação não junta canais nem altera responsabilidade de guard ou redator | VIGENTE |
 | **D-CAT-06G-3** | Desfecho em `DTOs/ListingOutcome` + `Enums/ListingOutcomeState`, **exaustivo**, 7 estados; os 4 da D-CAT-06B-1 preservados em significado; `violations` só na resposta inválida | Com o fluxo composto, 4 estados não cobriam sucesso interno, falha do motor nem uso externo; `null`, `source` e `missing_information` não são estado | VIGENTE — ampliada para 8 estados por D-CAT-06G-11 |
 | **D-CAT-06G-4** | Falha do motor interno ≠ falha do provider: estado próprio, e o provider não é consultado quando a etapa de conhecimento falhou; falha só da similaridade segue acessória | A lacuna de conhecimento seria produto da falha; ampliar `ProviderFailed` apagaria de que lado está o defeito | VIGENTE |
-| **D-CAT-06G-5** | B-5: prazo total de 8 s para a tentativa externa, aplicado pelo adaptador no transporte; esgotado → `CatalogAiProviderException::tempoEsgotado()` → `ProviderFailed`; sem chave de config até existir adaptador | Tela síncrona com "timeout curto" (spec §7); config sem leitor seria decorativo (D-CAT-06C-3) | VIGENTE — a chave de config nasceu com o adaptador que a lê, na CAT-10A (`CATALOG_AI_TIMEOUT`, D-CAT-10A-2) |
+| **D-CAT-06G-5** | B-5: prazo total de 8 s para a tentativa externa, aplicado pelo adaptador no transporte; esgotado → `CatalogAiProviderException::tempoEsgotado()` → `ProviderFailed`; sem chave de config até existir adaptador | Tela síncrona com "timeout curto" (spec §7); config sem leitor seria decorativo (D-CAT-06C-3) | VIGENTE — a chave de config nasceu com o adaptador que a lê, na CAT-10A (`CATALOG_AI_TIMEOUT`, D-CAT-10A-2); desde a CAT-10A.1 o prazo é `catalog_ai_timeout`, gravado pelo painel, e `CATALOG_AI_TIMEOUT` foi removida (D-CAT-10A1-1) |
 | **D-CAT-06G-6** | 0 novas tentativas, no adaptador e no assistente; retry futuro exige decisão nova | Previsibilidade, latência, custo e chamada duplicada | VIGENTE — cumprida pelo adaptador real da CAT-10A (D-CAT-10A-6) |
 | **D-CAT-06G-7** | A falha esperada da fronteira é `Exceptions/CatalogAiProviderException` (`final`, sem hierarquia); só ela é capturada, só em volta de `isAvailable()` e `suggest()`; log com etapa, classe do provider e da exceção, sem mensagem | `Throwable` mascararia `TypeError` e defeito interno como falha transitória; a mensagem do adaptador pode carregar prompt | VIGENTE |
 | **D-CAT-06G-8** | Resposta válida complementa: texto externo só onde o lojista não escreveu e a base não compôs; nome por `nomeSugerido()`; keywords internas primeiro e externas sem duplicata (`KnowledgeNormalizer`); `missing_information` recalculado; `source` e `confidence` externos só com contribuição; proposta para campo preenchido é descartada e não é violação; sem contribuição → `InternalKnowledgeInsufficient` | Preservar D-CAT-05D-4 e D-CAT-05E-6; o validador olha forma (D-CAT-06D-2); o desfecho descreve contribuição, não chamada | **VIGENTE PARCIALMENTE** — a composição conservadora permanece vigente; a cláusula "sem contribuição → `InternalKnowledgeInsufficient`" foi **SUPERADA** por D-CAT-06G-11; a regra do nome foi **precisada** por D-CAT-06G-12 |
@@ -1795,13 +1850,23 @@ Regras que **não podem ser violadas** sem nova decisão explícita no Decision 
 | **D-CAT-06G-10** | `minimum_gaps` = 3 **mantido** após revalidação só de leitura sobre os 75 itens reais do MySQL de desenvolvimento (transação desfeita, 0 SQL fora de SELECT, contagens iguais, script descartável removido). Lacunas: 2 em 35 itens, 3 em 40. Com 3: 40 consultas, cobrindo os 30 itens cuja lacuna de texto a base não preenche, 10 sem essa lacuna, 0 itens perdidos. Com 1–2: 75 consultas (45 sem lacuna aberta). Com 4–5: 0 consultas (30 perdidos) | Único limiar sem item perdido e com menor desperdício. `attributes` e `short_description` abertos em 75/75 (CAT-02, B-4) fazem o limiar operar hoje como "falta categoria ou conhecimento" | VIGENTE |
 | **D-CAT-06G-11** | Oitavo estado `ExternalSuggestionNotUsed` — não é falha, não convida a repetir, sem violações: o provider foi consultado, respondeu validamente e nada da resposta foi aproveitado. `InternalKnowledgeInsufficient` volta a significar só `AwaitsMerchant`. O desfecho exaustivo passa de 7 para 8 estados | A revisão pré-commit mostrou que "o provider não contribuiu" e "o conhecimento interno foi insuficiente" são eventos distintos. Refinamento que só a composição real expôs, e não correção da CAT-06B | VIGENTE |
 | **D-CAT-06G-12** | Nome externo equivalente ao atual pela chave do `KnowledgeNormalizer` não entra e não conta como contribuição, decidido em `nomeSugerido()`; outra contribuição real na mesma resposta ainda resulta em `ExternalSuggestionUsed` | Devolver o nome que o item já tem, ou a mesma grafia sem acento, seria fingir contribuição; a chave é a mesma que desduplica palavras-chave | VIGENTE |
-| **D-CAT-10A-1** | O adaptador do provider real (`OpenAiCatalogAiProvider`) e o seletor ficam em `app/Services/CatalogAi`, **fora** do módulo. A aplicação continua dependendo só de `CatalogAiProvider`; nome de fornecedor, formato de mensagem, cliente HTTP e credencial não entram em `app/CatalogIntelligence`, e a configuração fica em `config/services.php` (`catalog_ai`), não em `config/catalog-intelligence.php` | A fronteira travada pela `FronteiraDePromptTest` (D-CAT-06F-5) e a proibição de credencial na config do módulo se cumprem pelo lugar, não por contorno de grafia; trocar de fornecedor não toca o domínio | VIGENTE |
-| **D-CAT-10A-2** | O contrato resolve pelo `CatalogAiProviderSelector` — um binding só no módulo, resolvido a cada pedido, sem `singleton`. Adaptador real só com `enabled` verdadeiro, provider `openai`, chave e modelo não vazios e prazo válido; em qualquer outro caso, `NullCatalogAiProvider`. Prazo ausente → 8 s; acima de 8 → 8; ≤ 0 ou não numérico → `Null`. O seletor verifica condições: não captura exceção nem registra log. `Fake` nunca em runtime. Recurso desligado por padrão. Revê a H-13 (CAT-06H) | Operar sem IA externa segue estado normal (D-CAT-06B-5): configuração incompleta não pode virar erro de tela nem chamada; e defeito não pode virar "sem provider" em silêncio, pela mesma razão da D-CAT-06G-7 | VIGENTE — supera em parte D-CAT-06G-9 |
+| **D-CAT-10A-1** | O adaptador do provider real (`OpenAiCatalogAiProvider`) e o seletor ficam em `app/Services/CatalogAi`, **fora** do módulo. A aplicação continua dependendo só de `CatalogAiProvider`; nome de fornecedor, formato de mensagem, cliente HTTP e credencial não entram em `app/CatalogIntelligence`, e a configuração fica em `config/services.php` (`catalog_ai`), não em `config/catalog-intelligence.php` | A fronteira travada pela `FronteiraDePromptTest` (D-CAT-06F-5) e a proibição de credencial na config do módulo se cumprem pelo lugar, não por contorno de grafia; trocar de fornecedor não toca o domínio | **VIGENTE PARCIALMENTE** — adaptador e seletor fora do módulo, sem fornecedor, transporte ou credencial em `app/CatalogIntelligence` nem em `config/catalog-intelligence.php`, continuam vigentes; "a configuração fica em `config/services.php` (`catalog_ai`)" foi **SUPERADA** por D-CAT-10A1-1: a configuração operacional é do banco, e em `config/services.php` restou só a trava de D-CAT-10A1-3 |
+| **D-CAT-10A-2** | O contrato resolve pelo `CatalogAiProviderSelector` — um binding só no módulo, resolvido a cada pedido, sem `singleton`. Adaptador real só com `enabled` verdadeiro, provider `openai`, chave e modelo não vazios e prazo válido; em qualquer outro caso, `NullCatalogAiProvider`. Prazo ausente → 8 s; acima de 8 → 8; ≤ 0 ou não numérico → `Null`. O seletor verifica condições: não captura exceção nem registra log. `Fake` nunca em runtime. Recurso desligado por padrão. Revê a H-13 (CAT-06H) | Operar sem IA externa segue estado normal (D-CAT-06B-5): configuração incompleta não pode virar erro de tela nem chamada; e defeito não pode virar "sem provider" em silêncio, pela mesma razão da D-CAT-06G-7 | VIGENTE — supera em parte D-CAT-06G-9; **REFINADA** por D-CAT-10A1-1, D-CAT-10A1-3 e D-CAT-10A1-4: condições, fallback `Null`, binding e ausência de captura continuam; os valores vêm do banco, por `CatalogAiSettings`, e a trava técnica é verificada antes de tudo |
 | **D-CAT-10A-3** | O texto da instrução, específico do fornecedor, reside no adaptador: `match` exaustivo sobre `ProviderInstruction`, sem `default`; caso novo sem texto é defeito (`UnhandledMatchError` sobe). O domínio continua carregando só o enum puro (D-CAT-06F-2). Resolve a H-11 (CAT-06H) | Texto de instrução é formato de fornecedor; no domínio, violaria D-CAT-10A-1 e daria ao enum o valor de apoio que a D-CAT-06F-2 recusou | VIGENTE |
 | **D-CAT-10A-4** | Fato objetivo sobre o item — material, medidas, origem, técnica, quantidade, prazo, garantia, certificação e demais características factuais — só pode ser afirmado a partir de `dados_do_item` (canal `data` do `GuardedPrompt`); na dúvida, omite | Forma, no canal externo, da regra inviolável 1 (§14.1) e do invariante 27: o que o lojista informou é a única fonte factual daquele item | VIGENTE |
 | **D-CAT-10A-5** | `contexto_recuperado` (canal `context`: conceitos da base e itens semelhantes cadastrados por outros lojistas) é apoio semântico — terminologia, clareza, organização e palavras-chave — e **nunca** evidência de característica específica do item | Semelhança não transfere atributo nem funde identidade (D-CAT-20); o item semelhante é de outro lojista. Ajuste da revisão pré-commit da CAT-10A, com teste próprio e controle negativo | VIGENTE |
 | **D-CAT-10A-6** | Transporte do provider real: Responses API; `instruction` em `instructions`, `context` e `data` em dois itens distintos de `input`, sem texto que junte canais; Structured Outputs com JSON Schema estrito; `store: false`, sem tools, busca, conversa ou `previous_response_id`; uma chamada por geração, 0 retry (D-CAT-06G-6), prazo total e de conexão ≤ 8 s (D-CAT-06G-5). Falha esperada → `CatalogAiProviderException` com mensagem fixa e sem `previous`; resposta que cabe no DTO mas é inválida → `ProviderResponseValidator`; `confidence` nula (D-CAT-05D-3) | A separação estrutural da S-1 chega até o fornecedor; nada fica guardado do outro lado; o erro do fornecedor pode ecoar parte da chave, e o de transporte, parte do prompt | VIGENTE |
-| **D-CAT-10A-7** | Nenhuma chamada real ao provider na suíte: `phpunit.xml` força `CATALOG_AI_ENABLED=false` e `CATALOG_AI_API_KEY` vazia (`force="true"`), e os testes do adaptador e do seletor usam `Http::fake` com `preventStrayRequests` | Uma chave real no `.env` faria a suíte chamar a API, com custo e envio de dados | VIGENTE |
+| **D-CAT-10A-7** | Nenhuma chamada real ao provider na suíte: `phpunit.xml` força `CATALOG_AI_ENABLED=false` e `CATALOG_AI_API_KEY` vazia (`force="true"`), e os testes do adaptador e do seletor usam `Http::fake` com `preventStrayRequests` | Uma chave real no `.env` faria a suíte chamar a API, com custo e envio de dados | **VIGENTE PARCIALMENTE** — nenhuma chamada real e `Http::fake` com `preventStrayRequests` continuam vigentes; o mecanismo do `phpunit.xml` (`CATALOG_AI_ENABLED=false`, chave vazia) foi **SUPERADO** por D-CAT-10A1-9 |
+| **D-CAT-10A1-1** | O **banco é a única autoridade operacional** do provider externo: provider ativo, provider, modelo, API key e timeout ficam em `site_settings` (`catalog_ai_*`), lidos a cada resolução, sem cache e sem `config()`. `CATALOG_AI_ENABLED`, `CATALOG_AI_PROVIDER`, `CATALOG_AI_MODEL`, `CATALOG_AI_API_KEY` e `CATALOG_AI_TIMEOUT` foram removidas, e valores antigos em `services.catalog_ai` não participam da resolução. A mudança vale na resolução seguinte, sem SSH, edição de `.env`, `config:clear`, `config:cache` ou reinício | Operar o provider — ativar, desativar, trocar modelo ou chave — não pode depender de acesso ao servidor; ambiente e banco ao mesmo tempo tornariam ambíguo o que está valendo | VIGENTE — supera em parte D-CAT-10A-1; refina D-CAT-10A-2 |
+| **D-CAT-10A1-2** | A interface de configuração é a tela **Admin → Configurações → Inteligência Artificial** (`/admin/settings/inteligencia-artificial`, `CatalogAiSettingsForm`). Exige `configuracoes.editar` inclusive para abrir, e em cada ação; o item de menu só aparece para quem edita. Valida provider (só `openai`), modelo (obrigatório para ativar, sem espaço, até 100 caracteres) e timeout (inteiro de 1 a 8, ou em branco = 8 s), e exige chave gravada ou digitada para ativar | É a configuração que liga envio de conteúdo de catálogo a terceiro, com custo; quem só visualiza configurações não precisa dela | VIGENTE |
+| **D-CAT-10A1-3** | `CATALOG_AI_FORCE_DISABLED` (`services.catalog_ai.force_disabled`, padrão `false`) é **trava técnica que só desliga**: verdadeira — ou qualquer valor que não seja claramente falso —, o seletor devolve o `Null` antes de ler o banco. Nunca liga o provider e nunca fornece provider, modelo, chave ou timeout. Não é configuração do administrador | O ambiente precisa impedir chamadas externas sem depender do que está gravado no banco — na suíte, e em ambiente que não pode chamar fora; um interruptor que também ligasse recriaria a segunda fonte de verdade | VIGENTE |
+| **D-CAT-10A1-4** | `CatalogAiSettings` (`app/Services/CatalogAi`, fora do módulo) é a fronteira entre a persistência e o seletor: entrega o que está gravado, e quem valida é o `CatalogAiProviderSelector`. O módulo continua dependendo só de `CatalogAiProvider`, com o mesmo binding. Configuração ausente, desligada, incompleta ou inválida resolve o `Null`; defeito sobe — sem `try` nem `catch` no seletor, na leitura da configuração e no ServiceProvider do módulo (há teste) —, inclusive `DecryptException` da chave com o provider ligado, que é defeito de infraestrutura | O domínio segue sem banco de configuração, Livewire, fornecedor ou credencial (D-CAT-10A-1); "sem provider" silencioso esconderia `APP_KEY` trocada ou defeito de código (D-CAT-06G-7) | VIGENTE |
+| **D-CAT-10A1-5** | A API key é gravada com o cast `encrypted` do `SiteSetting` e **nunca é reexibida**: a tela recebe só se há chave. Em branco ao salvar, a gravada é mantida; substituir continua possível mesmo quando a gravada não se decripta mais; parâmetros que recebem a chave em texto puro levam `#[\SensitiveParameter]` | A chave dá acesso pago a terceiro; mostrá-la de novo não ajuda a operar e amplia a exposição. Não há cofre externo, KMS, rotação automática nem auditoria de alteração | VIGENTE |
+| **D-CAT-10A1-6** | **Credencial gravada nunca é hidratada em propriedade pública do Livewire** — vale para a chave do provider e para SMTP, Mercado Pago, Frenet e Melhor Envio. A tela recebe só se cada credencial está configurada (`segredoConfigurado()`, que não decripta, em indicador `#[Locked]`); o campo guarda só o valor novo, esvaziado antes de autorizar, validar ou gravar, inclusive quando a validação falha. `SiteSetting::SEGREDOS` lista as credenciais com cast `encrypted` — teste exige igualdade nos dois sentidos — e `$hidden` as tira da serialização do model, como defesa em profundidade. Credencial em branco vira `null`. A mensagem bruta de exceção SMTP não volta ao navegador | Toda propriedade pública viaja no snapshot, também para quem só visualiza configurações; a auditoria da CAT-10A.1 encontrou as credenciais das telas de e-mail e de frete e pagamento assim expostas | VIGENTE — invariante 32 (§22) |
+| **D-CAT-10A1-7** | Remover credencial é ação explícita e desativa a integração que depende dela: remover a chave desativa o provider; remover o client secret do Melhor Envio, o token da Frenet ou o access token do Mercado Pago desativa a integração correspondente, e o pagamento volta ao modo manual | Integração ativa sem credencial é configuração que parece válida e falha na primeira chamada | VIGENTE |
+| **D-CAT-10A1-8** | Ler a configuração não tem efeito colateral: `CatalogAiSettings` usa `SiteSetting::query()->find(1)`, e não `SiteSetting::instance()`, que cria a linha. Sem linha, não há configuração, e o contrato resolve o `Null` | A resolução acontece a cada geração de sugestão; leitura que escreve criaria registro em ambiente sem configuração e misturaria leitura com gravação | VIGENTE |
+| **D-CAT-10A1-9** | A suíte continua sem chamada real ao provider: o `phpunit.xml` força `CATALOG_AI_FORCE_DISABLED=true` (`force="true"`), seja qual for a configuração gravada, e um teste confirma que a trava está ativa; os testes que precisam do adaptador a desligam só em memória, e os do adaptador, do seletor e da tela usam `Http::fake` com `preventStrayRequests` | Com a configuração no banco, forçar variáveis de ambiente vazias não isolaria mais nada; só a trava de desligamento isola | VIGENTE — supera o mecanismo de D-CAT-10A-7 |
+| **D-CAT-10A1-10** | A CAT-10A.1 fecha tecnicamente **sem homologação real**: nenhuma chamada real à OpenAI foi feita. Homologar — atualizar o ambiente, aplicar a migration, configurar e ativar pelo painel, gerar sugestões com produtos reais, validar desfechos, fallback, redação e tela — é o próximo passo operacional, e não fase nova. A configuração pelo painel não altera a B-6: ativação ampla em produção só depois da CAT-10B | Configurar pelo painel facilita ativar, e não prova o comportamento com dados reais; a B-6 trata de custo, rate limit e observabilidade, que a CAT-10A.1 não entrega | VIGENTE |
 
 ### 23.9 Documentação
 
@@ -1828,7 +1893,7 @@ arquitetura.
 | **F-06** | Integridade do pagamento depende de a verdade vir da API do gateway, não do webhook |
 | **SEC-DEP-01** | Dependência de Markdown com advisories HIGH, usada em runtime pelo painel |
 | **LGPD-01 · LGPD-02** | Princípios de proteção declarados e nunca implementados |
-| **Provider real (CAT-10A)** | Acoplado fora do módulo (D-CAT-10A-1) e escolhido por ambiente, com o `Null` de fallback (D-CAT-10A-2); recebe `GuardedPrompt` já redigido, não junta os três canais, aplica 8 s no transporte, não tenta de novo e converte só a falha esperada em `CatalogAiProviderException` (D-CAT-10A-6). Enquanto a B-6 estiver aberta, serve só à homologação controlada: não há controle de custo, rate limit nem observabilidade por chamada |
+| **Provider real (CAT-10A · CAT-10A.1)** | Acoplado fora do módulo (D-CAT-10A-1) e resolvido pelo seletor, com o `Null` de fallback (D-CAT-10A-2) — por ambiente na CAT-10A; desde a CAT-10A.1, pela configuração do painel gravada no banco, com `CATALOG_AI_FORCE_DISABLED` só para desligar (D-CAT-10A1-1, D-CAT-10A1-3); recebe `GuardedPrompt` já redigido, não junta os três canais, aplica 8 s no transporte, não tenta de novo e converte só a falha esperada em `CatalogAiProviderException` (D-CAT-10A-6). Enquanto a B-6 estiver aberta, serve só à homologação controlada — ainda pendente: não há controle de custo, rate limit nem observabilidade por chamada |
 | **B-3** | `EmbeddingProvider` sem decisão; não restringe o provider de sugestão |
 | **B-6** | Custo e rate limit sem decisão: nenhuma ativação ampla de provider externo em produção antes da CAT-10B |
 | **H-11 (CAT-06H)** — onde mora o texto da instrução | Deixou de restringir por falta de decisão: com o primeiro adaptador real, o texto mora no adaptador, que traduz `ProviderInstruction` por `match` exaustivo, sem formatter nem prompt builder no domínio (D-CAT-10A-3). Continua proibido ao domínio carregar texto de instrução ou formato de fornecedor; `ProviderInstruction` segue enum puro, e caso novo sem texto no adaptador é defeito |

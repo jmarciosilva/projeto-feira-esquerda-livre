@@ -189,8 +189,7 @@ mudar o padrão.
 | `CI_CONSENT_COOKIE_MINUTES` | `525600` | Validade da escolha de privacidade (12 meses) |
 | `CI_VISITOR_COOKIE_*` · `CI_SESSION_COOKIE_*` | `jmf_ci_*`, 2 anos / 30 min | Nomes e validade dos cookies de coleta |
 | `CATALOG_AI_MINIMUM_GAPS` | `3` | Limiar de lacunas da `SuggestionPolicy` (Catalog Intelligence) |
-| `CATALOG_AI_ENABLED` | `false` | Liga o provider externo da Catalog Intelligence — ver [abaixo](#catalog-intelligence-provider-externo) |
-| `CATALOG_AI_PROVIDER` · `_MODEL` · `_API_KEY` · `_TIMEOUT` | vazio (o `.env.example` traz `openai`) · vazio · vazio · `8` | Provider (só `openai`), modelo, chave e prazo total em segundos, limitado a 8 |
+| `CATALOG_AI_FORCE_DISABLED` | `false` | **Só trava técnica** do provider externo da Catalog Intelligence: `true` impede chamadas externas, seja qual for o painel, e nunca liga nada. A configuração do provider é feita no painel — ver [abaixo](#catalog-intelligence-provider-externo) |
 | `HOME_EXPOSITORES_COUNT` · `HOME_FEATURED_MAX` · `HOME_CACHE_TTL_MINUTES` | `9` · `2` · `5` | Vitrine de expositores na home |
 | `MELHOR_ENVIO_BASE_URL` · `_TOKEN` · `_ENVIRONMENT` · `_TIMEOUT` | sandbox · vazio · `sandbox` · `20` | Fallback do Melhor Envio |
 | `FRENET_TOKEN` · `FRENET_TIMEOUT` | vazio · `20` | Fallback da Frenet |
@@ -205,6 +204,11 @@ criptografadas no banco. O `.env` é fallback **só** para Melhor Envio e Frenet
 **Mercado Pago não tem fallback** — sem configurar o painel, o pagamento não
 inicia.
 
+Depois de gravada, nenhuma credencial do painel — SMTP, Mercado Pago, Frenet,
+Melhor Envio ou a chave da Catalog Intelligence — volta à tela: o painel mostra só
+se ela está configurada. Salvar com o campo em branco mantém a gravada; remover é
+ação explícita e, quando há integração que depende da credencial, também a desativa.
+
 - **Mercado Pago:** pagamento em `/pedido/{reference}/pagar`, retorno em
   `/pagamentos/mercado-pago/retorno/{reference}`, webhook em
   `POST /pagamentos/mercado-pago/webhook`.
@@ -216,29 +220,53 @@ inicia.
 ### Catalog Intelligence: provider externo
 
 **Desligado por padrão.** Sem ele, o assistente do cadastro de produtos usa só a
-inteligência interna — é o estado normal, não uma falha. Não há tela no painel: a
-configuração é só pelo `.env`.
+inteligência interna — é o estado normal, não uma falha. O único provider suportado
+é a **OpenAI**.
+
+A configuração é feita **no painel**, em **Admin → Configurações → Inteligência
+Artificial** (`/admin/settings/inteligencia-artificial`), e fica gravada no banco
+(`site_settings`): provider ativo ou não, provider, modelo, API key e timeout. Só
+quem tem a permissão `configuracoes.editar` abre a tela.
+
+- **As migrations precisam estar aplicadas**: a tela usa campos que a CAT-10A.1
+  adicionou a `site_settings` — `docker compose exec app php artisan migrate` no
+  desenvolvimento, `php artisan migrate --force` no deploy.
+- **Não coloque a API key no `.env`** nem a versione. Ela é digitada na tela, gravada
+  criptografada e **nunca mostrada de novo**: a tela diz só se há chave configurada.
+  Salvar com o campo em branco mantém a gravada; **Remover** apaga a chave e desativa
+  o provider.
+- Para ativar, informe modelo e chave. O projeto não fixa modelo; use o definido
+  para a homologação. Timeout: inteiro de 1 a 8 segundos; em branco, vale 8. Não há
+  nova tentativa.
+- A mudança vale **na próxima geração de sugestão**: sem SSH, sem editar `.env`, sem
+  `config:clear` ou `config:cache` e sem reiniciar a aplicação.
+- Desativado, sem chave ou sem modelo, a aplicação segue só com a inteligência
+  interna, sem erro.
+- A chave é criptografada com a `APP_KEY`. Se a `APP_KEY` mudar, a chave gravada deixa
+  de ser legível: com o provider ativo, gerar sugestão falha com erro até uma chave
+  nova ser cadastrada na tela.
+
+**`CATALOG_AI_FORCE_DISABLED`** não é configuração do provider — é uma **trava
+técnica que só desliga**:
 
 ```dotenv
-CATALOG_AI_ENABLED=false
-CATALOG_AI_PROVIDER=openai
-CATALOG_AI_MODEL=
-CATALOG_AI_API_KEY=
-CATALOG_AI_TIMEOUT=8
+CATALOG_AI_FORCE_DISABLED=false
 ```
 
-- Para homologar: `CATALOG_AI_ENABLED=true`, com modelo e chave preenchidos. O
-  projeto não fixa modelo; use o definido para a homologação.
-- **A chave nunca é versionada** — fica só no `.env` do ambiente.
-- Sem chave, sem modelo, com provider diferente de `openai` ou prazo inválido, a
-  aplicação segue só com a inteligência interna, sem erro.
-- `CATALOG_AI_TIMEOUT` é o prazo total em segundos; acima de 8, vale 8. Não há
-  nova tentativa.
-- Com configuração em cache, a mudança no `.env` só vale depois de recarregar:
-  `docker compose exec app php artisan optimize:clear` no desenvolvimento, ou
-  `php artisan config:cache` de novo no deploy.
-- A ativação ampla em produção depende da CAT-10B (custo, rate limit e
-  observabilidade) — bloqueador **B-6** no [`ROADMAP.md`](ROADMAP.md).
+- `true`: nenhuma chamada externa acontece, seja qual for a configuração do painel.
+- Nunca liga o provider e não fornece provider, modelo, chave nem timeout.
+- A suíte de testes a força como `true`.
+- Por ser variável de ambiente, com configuração em cache a mudança dela só vale
+  depois de recarregar: `docker compose exec app php artisan optimize:clear` no
+  desenvolvimento, ou `php artisan config:cache` de novo no deploy.
+- As variáveis da CAT-10A — `CATALOG_AI_ENABLED`, `CATALOG_AI_PROVIDER`,
+  `CATALOG_AI_MODEL`, `CATALOG_AI_API_KEY` e `CATALOG_AI_TIMEOUT` — **foram removidas e
+  são ignoradas**. Se ainda estiverem no `.env` de algum ambiente, apague-as: a chave
+  que estiver ali não é usada.
+
+**Estado:** a integração está implementada, mas a **homologação real com a OpenAI
+ainda não foi feita**. A ativação ampla em produção depende da CAT-10B (custo, rate
+limit e observabilidade) — bloqueador **B-6** no [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
@@ -285,8 +313,9 @@ Acesso em `/admin`, com papel interno e permissões por módulo.
 |---|---|---|
 | Dashboard | `/admin` | |
 | Configurações do site | `/admin/settings` | Registro único. Logo até **2 MB**, favicon até **512 KB**, imagem "sobre" até **4 MB** |
-| E-mail | `/admin/settings/mail` | SMTP |
-| Checkout, pagamento e frete | `/admin/settings/checkout` | Credenciais criptografadas, comissão, provedor de frete |
+| E-mail | `/admin/settings/mail` | SMTP. A senha gravada nunca é reexibida |
+| Checkout, pagamento e frete | `/admin/settings/checkout` | Credenciais criptografadas e nunca reexibidas, comissão, provedor de frete |
+| Inteligência Artificial | `/admin/settings/inteligencia-artificial` | Provider externo da Catalog Intelligence. Só com `configuracoes.editar`, inclusive para abrir; API key criptografada e nunca reexibida — ver [Catalog Intelligence: provider externo](#catalog-intelligence-provider-externo) |
 | Usuários internos e perfis | `/admin/usuarios` · `/admin/perfis-acesso` | |
 | Clientes | `/admin/clientes` | |
 | Páginas | `/admin/pages` | Slug gerado do título só na criação |
